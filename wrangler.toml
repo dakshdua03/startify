@@ -1,0 +1,23 @@
+name = "startify-daksh-accelerator"
+type = "javascript"
+compatibility_date = "2024-01-01"
+
+# Cloudflare Pages config
+[site]
+bucket = "./dist"
+
+# For Pages Functions (optional backend)
+# [build]
+# command = "npm run build"
+
+# Environment variables - set in Cloudflare dashboard, not here
+# VITE_RAZORPAY_KEY_ID
+# VITE_SUPABASE_URL
+# VITE_SUPABASE_ANON_KEY
+
+# KV namespace for bookings if you want serverless storage (optional)
+# [[kv_namespaces]]
+# binding = "BOOKINGS_KV"
+# id = "your-kv-id"
+
+# Pages will use dist folder
