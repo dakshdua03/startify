@@ -2,12 +2,17 @@
 @tailwind components;
 @tailwind utilities;
 
+/* ─── Google Fonts (loaded in index.html) ─── */
 @layer base {
+  html { font-size: 17px; }
   body {
-    background-color: #f3f4f6;
-    color: #09090b;
+    background: #e8eaed;
+    color: #111111;
     font-family: 'Inter', system-ui, sans-serif;
+    font-size: 16.5px;
+    line-height: 1.65;
     overflow-x: hidden;
+    -webkit-font-smoothing: antialiased;
   }
 
   h1, h2, h3, .font-heading {
@@ -15,36 +20,610 @@
   }
 }
 
-/* Custom Scrollbar */
-::-webkit-scrollbar {
-  width: 8px;
-}
-::-webkit-scrollbar-track {
-  background: #09090b;
-}
-::-webkit-scrollbar-thumb {
-  background: #27272a;
-  border-radius: 4px;
-}
-::-webkit-scrollbar-thumb:hover {
-  background: #3f3f46;
+/* Global readability bump — make small text actually readable */
+.text-\[11px\] { font-size: 13px !important; }
+.text-\[10px\] { font-size: 12px !important; }
+.text-\[10\.5px\] { font-size: 12.5px !important; }
+.text-\[11\.5px\] { font-size: 13.5px !important; }
+.text-\[12px\] { font-size: 14px !important; }
+.text-\[13px\] { font-size: 15px !important; }
+.text-\[13\.5px\] { font-size: 15.5px !important; }
+.text-\[12\.5px\] { font-size: 14.5px !important; }
+.text-xs { font-size: 14px !important; }
+.text-sm { font-size: 15px !important; }
+
+/* ═══════════════════════════════════════════════════════════════════
+   GLASSY GREY THEME  –  grey bg · frosted white cards · black text
+   ═══════════════════════════════════════════════════════════════════ */
+
+/* ── Page-level background ── */
+.min-h-screen {
+  background: linear-gradient(168deg, #dfe2e6 0%, #c9cdd2 50%, #d6d9dd 100%) !important;
 }
 
-/* Glassmorphic border glow effect */
+/* ── Custom Scrollbar ── */
+::-webkit-scrollbar { width: 7px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: rgba(0,0,0,0.18); border-radius: 10px; }
+::-webkit-scrollbar-thumb:hover { background: rgba(0,0,0,0.30); }
+
+/* ─────────────────────────────────────────────
+   DARK SURFACE OVERRIDES → frosted white/grey
+   ───────────────────────────────────────────── */
+
+/* Top demo-switcher bar */
+.bg-zinc-950,
+.bg-zinc-950\/80,
+.bg-zinc-950\/50 {
+  background: rgba(255,255,255,0.55) !important;
+  backdrop-filter: blur(18px) !important;
+  -webkit-backdrop-filter: blur(18px) !important;
+}
+
+/* ── HEADER: Demo bar → grey glass matching page ── */
+div.bg-zinc-950.border-b {
+  background: rgba(255,255,255,0.60) !important;
+  backdrop-filter: blur(18px) !important;
+  -webkit-backdrop-filter: blur(18px) !important;
+  border-color: rgba(0,0,0,0.08) !important;
+}
+div.bg-zinc-950.border-b .text-zinc-400,
+div.bg-zinc-950.border-b .text-zinc-500 {
+  color: #555555 !important;
+}
+div.bg-zinc-950.border-b .text-zinc-300 {
+  color: #333333 !important;
+}
+div.bg-zinc-950.border-b .text-white,
+div.bg-zinc-950.border-b .font-semibold.text-white {
+  color: #111111 !important;
+}
+div.bg-zinc-950.border-b .bg-zinc-900 {
+  background: rgba(255,255,255,0.50) !important;
+  backdrop-filter: blur(10px) !important;
+}
+div.bg-zinc-950.border-b .bg-white.text-black {
+  background: #111111 !important;
+  color: #ffffff !important;
+}
+div.bg-zinc-950.border-b .bg-zinc-800 {
+  background: rgba(0,0,0,0.06) !important;
+  backdrop-filter: none !important;
+}
+div.bg-zinc-950.border-b .hover\:text-white:hover {
+  color: #111111 !important;
+}
+
+/* ── Navigation bar → light glass, consistent for sticky and relative ── */
+nav.sticky,
+nav.relative {
+  background: rgba(255,255,255,0.75) !important;
+  backdrop-filter: blur(20px) saturate(1.4) !important;
+  -webkit-backdrop-filter: blur(20px) saturate(1.4) !important;
+  border-color: rgba(0,0,0,0.08) !important;
+  box-shadow: 0 1px 8px rgba(0,0,0,0.04) !important;
+}
+nav.sticky .text-zinc-400,
+nav.relative .text-zinc-400 {
+  color: #555555 !important;
+}
+nav.sticky .text-zinc-300,
+nav.sticky .text-zinc-200,
+nav.relative .text-zinc-300,
+nav.relative .text-zinc-200 {
+  color: #333333 !important;
+}
+nav.sticky .text-white,
+nav.relative .text-white {
+  color: #111111 !important;
+}
+nav.sticky .hover\:text-white:hover,
+nav.relative .hover\:text-white:hover {
+  color: #111111 !important;
+}
+/* Nav pill container → subtle glass */
+nav.sticky .bg-zinc-950 {
+  background: rgba(0,0,0,0.05) !important;
+  backdrop-filter: none !important;
+}
+/* Active nav tab → dark pill */
+nav.sticky .bg-white.text-black.font-bold {
+  background: #111111 !important;
+  color: #ffffff !important;
+}
+/* Nav sign-in button */
+nav.sticky .border-white\/20 {
+  border-color: rgba(0,0,0,0.15) !important;
+  color: #111111 !important;
+}
+/* Mobile menu dropdown */
+nav.sticky .bg-zinc-950.p-5 {
+  background: rgba(255,255,255,0.90) !important;
+}
+nav.sticky .bg-zinc-950.p-5 .text-zinc-300 {
+  color: #333333 !important;
+}
+nav.sticky .bg-zinc-950.p-5 .text-white {
+  color: #111111 !important;
+}
+
+/* General dark bg fallback for non-nav/non-footer areas */
+.bg-\[\\#121214\],
+.bg-\[\\#121214\]\/90,
+.bg-\[\\#202728\] {
+  background: rgba(255,255,255,0.50) !important;
+  backdrop-filter: blur(22px) !important;
+  -webkit-backdrop-filter: blur(22px) !important;
+}
+
+/* Secondary dark surfaces → subtle frosted glass */
+.bg-zinc-900,
+.bg-zinc-900\/70 {
+  background: rgba(255,255,255,0.45) !important;
+  backdrop-filter: blur(14px) !important;
+  -webkit-backdrop-filter: blur(14px) !important;
+}
+
+.bg-zinc-800 {
+  background-color: rgba(255,255,255,0.55) !important;
+  backdrop-filter: blur(10px) !important;
+}
+
+/* ── White card surfaces → glassy, elevated ── */
+.bg-white,
+.bg-white\/80,
+.bg-white\/85,
+.bg-white\/70,
+.bg-white\/75 {
+  background: rgba(255,255,255,0.72) !important;
+  backdrop-filter: blur(20px) saturate(1.4) !important;
+  -webkit-backdrop-filter: blur(20px) saturate(1.4) !important;
+}
+
+.bg-slate-100,
+.bg-slate-50,
+.bg-slate-50\/80 {
+  background-color: rgba(255,255,255,0.50) !important;
+  backdrop-filter: blur(12px) !important;
+  -webkit-backdrop-filter: blur(12px) !important;
+}
+
+/* ── Gradient sections → softer, glassy gradient ── */
+.bg-gradient-to-br.from-white {
+  background: linear-gradient(135deg, rgba(255,255,255,0.75) 0%, rgba(240,242,245,0.65) 50%, rgba(220,224,228,0.55) 100%) !important;
+  backdrop-filter: blur(20px) !important;
+  -webkit-backdrop-filter: blur(20px) !important;
+}
+
+/* ─────────────────────────────────────────────
+    TEXT COLORS → all dark / black for readability
+    ───────────────────────────────────────────── */
+.text-white {
+  color: #111111 !important;
+}
+/* Preserve deliberate white-on-dark pills/buttons (nav active, primary CTA) */
+.bg-slate-900.text-white,
+.bg-slate-900 .text-white,
+.bg-slate-900 .text-white\/70,
+.bg-slate-900 .text-white\/80,
+.bg-black.text-white,
+.bg-black .text-white,
+button.bg-slate-900.text-white,
+a.bg-slate-900.text-white,
+button.bg-black.text-white,
+.fixed.bg-black.text-white,
+.fixed.bg-black .text-white {
+  color: #ffffff !important;
+}
+.bg-slate-900 .text-white\/70 { color: rgba(255,255,255,0.75) !important; }
+.bg-slate-900 .text-white\/80 { color: rgba(255,255,255,0.85) !important; }
+
+.text-zinc-500,
+.text-zinc-400 {
+  color: #555555 !important;
+}
+
+.text-zinc-300,
+.text-zinc-200,
+.text-zinc-100 {
+  color: #222222 !important;
+}
+
+.text-slate-800 { color: #111111 !important; }
+.text-slate-700 { color: #1a1a1a !important; }
+.text-slate-600 { color: #333333 !important; }
+.text-slate-500 { color: #555555 !important; }
+
+/* Full-page text defaults */
+.min-h-screen,
+.min-h-screen p,
+.min-h-screen div,
+.min-h-screen span,
+.min-h-screen input,
+.min-h-screen textarea,
+.min-h-screen select {
+  color: #111111;
+}
+.min-h-screen button { color: inherit; }
+.min-h-screen .text-black { color: #111111 !important; }
+.min-h-screen input::placeholder,
+.min-h-screen textarea::placeholder {
+  color: #888888 !important;
+  opacity: 1;
+}
+
+/* ─────────────────────────────────────────────
+   BORDERS → subtle, refined
+   ───────────────────────────────────────────── */
+.border-white\/10,
+.border-white\/15,
+.border-white\/20,
+.border-white\/25,
+.border-white\/30,
+.border-white\/35 {
+  border-color: rgba(0,0,0,0.10) !important;
+}
+
+.border-slate-200,
+.border-slate-300 {
+  border-color: rgba(0,0,0,0.10) !important;
+}
+
 .border-glow {
-  border: 1px solid rgba(255, 255, 255, 0.12);
-  transition: border-color 0.3s ease, box-shadow 0.3s ease;
+  border-color: rgba(0,0,0,0.08);
+  box-shadow: 0 2px 16px rgba(0,0,0,0.04);
 }
 .border-glow:hover {
-  border-color: rgba(255, 255, 255, 0.3);
-  box-shadow: 0 0 25px rgba(255, 255, 255, 0.05);
+  border-color: rgba(0,0,0,0.16);
+  box-shadow: 0 4px 24px rgba(0,0,0,0.08);
 }
 
-/* Pulse animation */
+/* ─────────────────────────────────────────────
+   CARDS → glass elevation + hover lift
+   ───────────────────────────────────────────── */
+.rounded-\[24px\],
+.rounded-\[22px\],
+.rounded-\[28px\],
+.rounded-\[30px\] {
+  box-shadow:
+    0 4px 24px rgba(0,0,0,0.06),
+    0 1px 3px rgba(0,0,0,0.04),
+    inset 0 1px 0 rgba(255,255,255,0.80);
+  transition: transform 0.25s cubic-bezier(0.4, 0, 0.2, 1),
+              box-shadow 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+}
+.rounded-\[24px\]:hover,
+.rounded-\[22px\]:hover,
+.rounded-\[28px\]:hover,
+.rounded-\[30px\]:hover {
+  transform: translateY(-2px);
+  box-shadow:
+    0 8px 32px rgba(0,0,0,0.10),
+    0 2px 6px rgba(0,0,0,0.06),
+    inset 0 1px 0 rgba(255,255,255,0.85);
+}
+
+/* ─────────────────────────────────────────────
+   BUTTONS → refined contrasts
+   ───────────────────────────────────────────── */
+
+/* Primary white buttons → solid dark CTA */
+.bg-white.text-black,
+button.bg-white.text-black,
+a.bg-white.text-black {
+  background: #111111 !important;
+  color: #ffffff !important;
+}
+.bg-white.text-black:hover,
+button.bg-white.text-black:hover {
+  background: #2a2a2a !important;
+}
+
+/* Pill-shaped tag/badge buttons that should stay white */
+span.bg-white.text-black,
+span.bg-white {
+  background: rgba(255,255,255,0.85) !important;
+  color: #111111 !important;
+}
+
+/* Active nav tab → dark pill */
+.bg-white.text-black.font-bold {
+  background: #111111 !important;
+  color: #ffffff !important;
+}
+
+/* Hover on outline buttons */
+.hover\:bg-white:hover {
+  background: rgba(255,255,255,0.75) !important;
+}
+.hover\:bg-white\/10:hover {
+  background: rgba(0,0,0,0.06) !important;
+}
+
+/* Slate-100 buttons → glass with subtle fill */
+.bg-slate-100 {
+  background-color: rgba(255,255,255,0.50) !important;
+}
+
+/* Submit buttons inside modals */
+button[type="submit"].bg-white {
+  background: #111111 !important;
+  color: #ffffff !important;
+}
+button[type="submit"].bg-white:hover {
+  background: #2a2a2a !important;
+}
+
+/* ─────────────────────────────────────────────
+   ROLE CHOICE PANEL (Landing Page)
+   ───────────────────────────────────────────── */
+.role-choice-panel,
+.fixed .bg-zinc-950 {
+  background: rgba(255,255,255,0.60) !important;
+  backdrop-filter: blur(18px) !important;
+  -webkit-backdrop-filter: blur(18px) !important;
+  border-color: rgba(0,0,0,0.10) !important;
+}
+
+/* ─────────────────────────────────────────────
+   MODALS → frosted glass overlay
+   ───────────────────────────────────────────── */
+
+/* Modal cards (dark ones → convert to glassy white) */
+.fixed .bg-zinc-950,
+.fixed .rounded-\[28px\].bg-zinc-950 {
+  background: rgba(255,255,255,0.85) !important;
+  backdrop-filter: blur(24px) saturate(1.6) !important;
+  -webkit-backdrop-filter: blur(24px) saturate(1.6) !important;
+  border-color: rgba(0,0,0,0.12) !important;
+  color: #111111 !important;
+}
+
+/* Modal backdrops → softer */
+.bg-black\/85 {
+  background: rgba(0,0,0,0.40) !important;
+}
+
+/* Chat modal body */
+.bg-\[\\#121214\] {
+  background: rgba(245,246,248,0.90) !important;
+}
+
+/* Chat bubbles */
+.bg-zinc-900.text-zinc-100 {
+  background: rgba(255,255,255,0.60) !important;
+  color: #111111 !important;
+  border-color: rgba(0,0,0,0.10) !important;
+}
+
+/* Own chat bubble stays dark for distinction */
+.bg-white.text-black.font-medium {
+  background: #111111 !important;
+  color: #ffffff !important;
+}
+
+/* ─────────────────────────────────────────────
+    FOOTER → grey glass matching page, pinned to bottom, no extra gap
+    ───────────────────────────────────────────── */
+footer {
+  margin-top: auto !important;
+  background: rgba(255,255,255,0.60) !important;
+  backdrop-filter: blur(18px) saturate(1.4) !important;
+  -webkit-backdrop-filter: blur(18px) saturate(1.4) !important;
+  border-color: rgba(0,0,0,0.08) !important;
+}
+/* No extra bottom gap — outer is flex col, footer mt-auto sticks */
+.min-h-screen.flex.flex-col > footer {
+  margin-top: auto;
+}
+footer .text-zinc-400 {
+  color: #555555 !important;
+}
+footer .text-zinc-500 {
+  color: #666666 !important;
+}
+footer .text-white,
+footer a.text-white {
+  color: #111111 !important;
+}
+footer .font-semibold {
+  color: #111111 !important;
+}
+
+/* ─────────────────────────────────────────────
+    SPECIAL TYPOGRAPHY
+    ───────────────────────────────────────────── */
+.home-calligraphy {
+  font-family: 'Outfit', system-ui, sans-serif !important;
+  font-weight: 800;
+  letter-spacing: -0.02em;
+  color: #0f172a !important;
+}
+
+/* ─────────────────────────────────────────────
+   FORM INPUTS (inside modals and dark surfaces)
+   ───────────────────────────────────────────── */
+input.bg-zinc-900,
+input.bg-zinc-950,
+textarea.bg-zinc-900,
+select.bg-zinc-900 {
+  background: rgba(255,255,255,0.60) !important;
+  border-color: rgba(0,0,0,0.12) !important;
+  color: #111111 !important;
+  backdrop-filter: blur(8px) !important;
+}
+input.bg-zinc-900:focus,
+input.bg-zinc-950:focus,
+textarea.bg-zinc-900:focus,
+select.bg-zinc-900:focus {
+  border-color: rgba(0,0,0,0.30) !important;
+  box-shadow: 0 0 0 3px rgba(0,0,0,0.06) !important;
+}
+
+/* ─────────────────────────────────────────────
+   ANIMATIONS
+   ───────────────────────────────────────────── */
 @keyframes pulseGlow {
   0%, 100% { opacity: 0.4; }
   50% { opacity: 0.9; }
 }
 .animate-pulse-glow {
   animation: pulseGlow 3s infinite ease-in-out;
+}
+
+/* Smooth entrance for glassy cards */
+@keyframes fadeSlideUp {
+  from { opacity: 0; transform: translateY(12px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+section {
+  animation: fadeSlideUp 0.45s cubic-bezier(0.4, 0, 0.2, 1) both;
+}
+
+/* Selection color */
+::selection {
+  background: rgba(0,0,0,0.12);
+  color: #111111;
+}
+
+/* ─────────────────────────────────────────────
+   ADMIN DARK STAT CARDS → keep as subtle dark glass
+   ───────────────────────────────────────────── */
+.dashboard-surface .bg-zinc-950 {
+  background: rgba(17,17,17,0.85) !important;
+  backdrop-filter: blur(14px) !important;
+  color: #f7f7f7 !important;
+}
+.dashboard-surface .bg-zinc-950 .text-zinc-400,
+.dashboard-surface .bg-zinc-950 div {
+  color: rgba(255,255,255,0.70) !important;
+}
+.dashboard-surface .bg-zinc-950 .font-extrabold {
+  color: #ffffff !important;
+}
+
+/* ─────────────────────────────────────────────
+    ACTIVE USER BADGE in demo bar
+    ───────────────────────────────────────────── */
+.bg-zinc-800.text-zinc-300 {
+  background: rgba(0,0,0,0.08) !important;
+  color: #333333 !important;
+}
+
+/* Toast must never be blurred by global glass filters */
+.fixed.z-\[70\] {
+  backdrop-filter: none !important;
+  -webkit-backdrop-filter: none !important;
+  filter: none !important;
+}
+
+/* Make main content expand so footer sticks to viewport bottom with no extra gap */
+.min-h-screen.flex.flex-col > main,
+.min-h-screen.flex.flex-col > section {
+  flex: 1 0 auto;
+}
+.min-h-screen.flex.flex-col > section.mx-auto {
+  width: 100%;
+}
+
+/* ─────────────────────────────────────────────
+    POLISH: new top preview switcher + cards
+    ───────────────────────────────────────────── */
+.sticky.top-0.z-50 {
+  box-shadow: 0 1px 12px rgba(15,23,42,0.06) !important;
+}
+
+/* Soften card hover lift on mobile */
+@media (max-width: 640px) {
+  .rounded-\[24px\]:hover,
+  .rounded-\[22px\]:hover,
+  .rounded-\[28px\]:hover,
+  .rounded-\[30px\]:hover {
+    transform: none;
+  }
+}
+
+/* Hide scrollbar for nav pill container — user reported noticeable bar */
+.scrollbar-hide {
+  -ms-overflow-style: none !important;
+  scrollbar-width: none !important;
+}
+.scrollbar-hide::-webkit-scrollbar {
+  display: none !important;
+  width: 0 !important;
+  height: 0 !important;
+}
+nav .scrollbar-hide::-webkit-scrollbar { display: none !important; }
+
+/* Ensure admin amber pills keep color even under grey theme */
+.bg-amber-50,
+.bg-amber-50\/60,
+.bg-amber-50\/80 {
+  background: rgba(255,251,235,0.92) !important;
+  backdrop-filter: blur(8px) !important;
+}
+.bg-amber-500.text-white {
+  background: #f59e0b !important;
+  color: #ffffff !important;
+}
+
+/* ─────────────────────────────────────────────
+   FIX: preserve white text on dark gradient/header and dark banners
+   Without this, global .text-white -> black breaks gradient headers
+   ───────────────────────────────────────────── */
+.fixed .bg-gradient-to-br .text-white,
+.fixed .bg-gradient-to-br .text-white\/70,
+.fixed .bg-gradient-to-br .text-white\/80,
+.fixed .bg-gradient-to-br .text-white\/90,
+.bg-slate-900 .text-white,
+.bg-slate-900 .text-white\/70,
+.bg-slate-900 .text-white\/80,
+.bg-slate-900 .text-white\/90,
+/* Chat modal: user messages on dark bg */
+.fixed .bg-white .bg-slate-900.text-white,
+.fixed .bg-slate-50 .bg-slate-900.text-white,
+.fixed .bg-white .text-slate-800,
+/* Override global min-h-screen for chat bubbles */
+.min-h-screen .bg-slate-900.text-white,
+.min-h-screen .bg-slate-900 .text-white {
+  color: #ffffff !important;
+}
+.fixed .bg-gradient-to-br .text-white\/70 { color: rgba(255,255,255,0.85) !important; }
+.fixed .bg-gradient-to-br .text-white\/90 { color: rgba(255,255,255,0.92) !important; }
+.bg-slate-900 .text-white\/70 { color: rgba(255,255,255,0.85) !important; }
+
+/* ─────────────────────────────────────────────
+   FIX: invisible white text on light frosted cards
+   Talent / Idea / Backer cards were bg-zinc-950 (dark) → now light glass,
+   but text-white stayed white in some caches/specificity → force black
+   ───────────────────────────────────────────── */
+.bg-white .text-white,
+.bg-white\/60 .text-white,
+.bg-white\/70 .text-white,
+.bg-white\/80 .text-white,
+.bg-slate-50 .text-white,
+.bg-slate-50\/80 .text-white,
+.bg-zinc-950 .text-white,
+.bg-zinc-950 .text-zinc-200,
+.bg-zinc-950 .text-zinc-300,
+.bg-zinc-900 .text-white,
+.bg-zinc-900 .text-zinc-200,
+.bg-zinc-900 .text-zinc-300 {
+  color: #111111 !important;
+}
+/* Re-assert that gradient/dark overrides win over light overrides */
+.fixed .bg-gradient-to-br .text-white,
+.bg-slate-900 .text-white {
+  color: #ffffff !important;
+}
+.bg-white .text-zinc-300,
+.bg-white .text-zinc-200,
+.bg-slate-50 .text-zinc-300,
+.bg-slate-50 .text-zinc-200 {
+  color: #333333 !important;
+}
+.bg-white .text-zinc-400,
+.bg-slate-50 .text-zinc-400 {
+  color: #555555 !important;
 }

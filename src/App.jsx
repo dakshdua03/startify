@@ -1,10 +1,17 @@
 import { useState, useEffect } from "react";
-import logoImg from "./assets/startify_white_background.jpg";
+import logoImg from "./assets/startify-wordmark-full.png";
 import { dbService } from "./lib/supabase";
 
 /* ==========================================================================
    PRE-CREATED TEST ACCOUNTS & DEMO DATA FOR EASY TESTING
    ========================================================================== */
+
+export const ROLE_META = {
+  founder: { label: "Founder", icon: "", accent: "#111111", dot: "bg-emerald-500" },
+  talent: { label: "Builder", icon: "", accent: "#3b82f6", dot: "bg-sky-500" },
+  backer: { label: "Backer", icon: "", accent: "#7c3aed", dot: "bg-violet-500" },
+  admin: { label: "Admin", icon: "", accent: "#0f172a", dot: "bg-amber-500" },
+};
 
 export const DEMO_USERS = [
   {
@@ -13,7 +20,8 @@ export const DEMO_USERS = [
     email: "priya@uohyd.ac.in",
     role: "founder",
     studentId: "UOH-2023-CS042",
-    bio: "Final year CS student building CampusKart, a peer-to-peer campus marketplace."
+    bio: "Final year CS student building CampusKart, a peer-to-peer campus marketplace.",
+    avatar: "PS",
   },
   {
     id: "user_vikram",
@@ -23,7 +31,8 @@ export const DEMO_USERS = [
     studentId: "UOH-2022-CS110",
     roleTitle: "Full-Stack Engineer",
     skills: "React, Node.js, Python, PostgreSQL",
-    bio: "Passionate developer looking to join exciting campus AI & SaaS startups."
+    bio: "Passionate developer looking to join exciting campus AI & SaaS startups.",
+    avatar: "VS",
   },
   {
     id: "user_backer",
@@ -32,7 +41,16 @@ export const DEMO_USERS = [
     role: "backer",
     ticketSize: "Pre-Seed & Micro-Capital",
     focus: "EdTech, AI & Consumer Apps",
-    bio: "Alumni angel syndicate funding pre-seed student ideas from prototype to MVP."
+    bio: "Alumni angel syndicate funding pre-seed student ideas from prototype to MVP.",
+    avatar: "CA",
+  },
+  {
+    id: "user_admin",
+    name: "Startify Admin",
+    email: "admin@startify.net",
+    role: "admin",
+    bio: "Community administrator for Startify. Reviews ideas, manages events, and keeps the ecosystem healthy.",
+    avatar: "SA",
   }
 ];
 
@@ -194,8 +212,8 @@ export const MAIN_WHATSAPP_LINK = "https://chat.whatsapp.com/StartifyMainCommuni
    ========================================================================== */
 
 export default function App() {
-  // Current Logged-in User State (Defaults to Priya for smooth initial preview)
-  const [currentUser, setCurrentUser] = useState(DEMO_USERS[0]);
+  // Visitors begin at the role-selection page. The workspace only opens after sign-in.
+  const [currentUser, setCurrentUser] = useState(null);
 
   // Data Collections
   const [ideas, setIdeas] = useState(INITIAL_IDEAS);
@@ -206,9 +224,29 @@ export default function App() {
   const [messages, setMessages] = useState(INITIAL_MESSAGES);
 
   // Active Tab & Filters
-  const [activeTab, setActiveTab] = useState("ideas"); // "ideas" | "talent" | "backers" | "events" | "dashboard"
+  const [activeTab, setActiveTab] = useState("home"); // "home" | "ideas" | "talent" | "backers" | "events" | "dashboard" | "chats"
   const [ideaCategoryFilter, setIdeaCategoryFilter] = useState("All");
   const [searchQuery, setSearchQuery] = useState("");
+
+  // Motivation quotes — pick one per session so it feels fresh each login
+  const motivationalQuotes = [
+    { text: "The best time to start was yesterday. The next best time is now.", author: "Every UoH founder who shipped" },
+    { text: "You don't need permission to build something great.", author: "The startup mindset" },
+    { text: "Self-reliance is the currency of builders.", author: "Startify" },
+    { text: "An idea without execution is just a daydream. Ship it.", author: "Campus founders" },
+    { text: "Your first version won't be perfect — and that's exactly the point.", author: "Lean startup wisdom" },
+    { text: "Every large company started as two people with a whiteboard.", author: "UoHStartup" },
+    { text: "Don't wait for the right team. Be the right person and attract them.", author: "Founder truth" },
+    { text: "Constraints breed creativity. You have everything you need to start.", author: "Student builders" },
+    { text: "A campus idea today is a real company tomorrow — if you act on it.", author: "Daksh Accelerator" },
+    { text: "The only difference between a dreamer and a founder is the first commit.", author: "Startify" },
+    { text: "Your network is your net worth — build both deliberately.", author: "Campus hustle" },
+    { text: "Fail fast, learn faster, build forever.", author: "Startup DNA" },
+    { text: "Independence isn't given — it's built, one decision at a time.", author: "Self-made founders" },
+    { text: "The world rewards those who solve real problems, not those who wait for perfect plans.", author: "Builder's creed" },
+    { text: "Start small. Stay consistent. The compound effect will do the rest.", author: "UoH startup culture" },
+  ];
+  const [dailyQuote] = useState(() => motivationalQuotes[Math.floor(Math.random() * motivationalQuotes.length)]);
 
   // Modals
   const [authModalOpen, setAuthModalOpen] = useState(false);
@@ -218,12 +256,41 @@ export default function App() {
   const [connectModalOpen, setConnectModalOpen] = useState(false);
   const [chatModalOpen, setChatModalOpen] = useState(false);
   const [eventModalOpen, setEventModalOpen] = useState(false);
+  const [eventAddModalOpen, setEventAddModalOpen] = useState(false);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+  const [profileSwitcherOpen, setProfileSwitcherOpen] = useState(false);
+  const [profileEditOpen, setProfileEditOpen] = useState(false);
+  const [profileAboutDraft, setProfileAboutDraft] = useState("");
+  const [profileSkillsEditOpen, setProfileSkillsEditOpen] = useState(false);
+  const [profileSkillsDraft, setProfileSkillsDraft] = useState("");
+  const [profileRoleTitleDraft, setProfileRoleTitleDraft] = useState("");
+  const [profileFocusDraft, setProfileFocusDraft] = useState("");
+  const [showAllBuilders, setShowAllBuilders] = useState(false);
+  const [showAllFunders, setShowAllFunders] = useState(false);
+  const [showAllIdeas, setShowAllIdeas] = useState(false);
+  const getProfileImageKey = (email) => `startify_profile_img_${email.toLowerCase()}`;
+  const getProfileAboutKey = (email) => `startify_profile_about_${email.toLowerCase()}`;
+  const getProfileImage = (email) => { try { return localStorage.getItem(getProfileImageKey(email)) || ""; } catch { return ""; } };
+  const getProfileAbout = (email) => { try { return localStorage.getItem(getProfileAboutKey(email)) || ""; } catch { return ""; } };
 
   // Targets for Modals
   const [targetConnectItem, setTargetConnectItem] = useState(null);
   const [activeChatRequest, setActiveChatRequest] = useState(null);
   const [targetEvent, setTargetEvent] = useState(null);
+
+  // OTP verification (mock service — replace with real SMS/email API)
+  const [otpModalOpen, setOtpModalOpen] = useState(false);
+  const [otpEmail, setOtpEmail] = useState("");
+  const [otpCode, setOtpCode] = useState("");
+  const [otpInput, setOtpInput] = useState("");
+  const [otpPendingUser, setOtpPendingUser] = useState(null);
+  const [otpRole, setOtpRole] = useState("founder");
+  const [pendingBackers, setPendingBackers] = useState(() => {
+    try { return JSON.parse(localStorage.getItem("startify_pending_backers") || "[]"); } catch { return []; }
+  });
+  const [verifiedEmails, setVerifiedEmails] = useState(() => {
+    try { return JSON.parse(localStorage.getItem("startify_verified_emails") || "[]"); } catch { return []; }
+  });
 
   // Toast
   const [toastMessage, setToastMessage] = useState("");
@@ -250,12 +317,62 @@ export default function App() {
   const [connectForm, setConnectForm] = useState({ message: "" });
   const [chatInputText, setChatInputText] = useState("");
   const [eventRegisterForm, setEventRegisterForm] = useState({ name: "", email: "", contact: "" });
+  const [eventForm, setEventForm] = useState({
+    title: "",
+    date: "",
+    time: "",
+    venue: "",
+    category: "Pitch Night",
+    desc: ""
+  });
 
   useEffect(() => {
     dbService.getIdeas(INITIAL_IDEAS).then((data) => {
       if (data && data.length > 0) setIdeas(data);
     });
+    // Load admin-persisted talent/backers/events for launch
+    try {
+      const b = JSON.parse(localStorage.getItem("startify_admin_builders") || "null");
+      if (b && Array.isArray(b) && b.length) setBuilders((prev) => [...b, ...prev]);
+      const f = JSON.parse(localStorage.getItem("startify_admin_funders") || "null");
+      if (f && Array.isArray(f) && f.length) setFunders((prev) => [...f, ...prev]);
+      const ev = JSON.parse(localStorage.getItem("startify_events") || "null");
+      if (ev && Array.isArray(ev) && ev.length) setEvents((prev) => [...ev, ...prev]);
+      const req = JSON.parse(localStorage.getItem("startify_requests") || "null");
+      if (req && Array.isArray(req) && req.length) setRequests((prev) => [...req, ...prev]);
+      const msgs = JSON.parse(localStorage.getItem("startify_messages") || "null");
+      if (msgs && Array.isArray(msgs) && msgs.length) setMessages((prev) => [...msgs, ...prev]);
+      const pb = JSON.parse(localStorage.getItem("startify_pending_backers") || "null");
+      if (pb && Array.isArray(pb) && pb.length) setPendingBackers(pb);
+    } catch {}
   }, []);
+
+  useEffect(() => {
+    try { localStorage.setItem("startify_pending_backers", JSON.stringify(pendingBackers)); } catch {}
+  }, [pendingBackers]);
+  useEffect(() => {
+    try { localStorage.setItem("startify_verified_emails", JSON.stringify(verifiedEmails)); } catch {}
+  }, [verifiedEmails]);
+
+  const generateOtp = () => Math.floor(100000 + Math.random() * 900000).toString();
+  const sendOtp = (email, role) => {
+    const code = generateOtp();
+    setOtpCode(code);
+    setOtpEmail(email);
+    setOtpRole(role);
+    setOtpInput("");
+    setOtpModalOpen(true);
+    // Mock: in production call /api/otp to send via email/SMS (e.g., MSG91, SendGrid, Supabase OTP)
+    // For now we reveal code in toast so you can test without email service
+    setTimeout(() => showToast(`OTP for ${email}: ${code} (demo — replace with real email/SMS)`), 400);
+    // Persist for admin visibility
+    try {
+      const map = JSON.parse(localStorage.getItem("startify_otp_map") || "{}");
+      map[email.toLowerCase()] = { code, role, at: new Date().toISOString(), verified: false };
+      localStorage.setItem("startify_otp_map", JSON.stringify(map));
+    } catch {}
+  };
+  const verifyOtp = (input, expected) => input.trim() === expected.trim();
 
   const showToast = (msg) => {
     setToastMessage(msg);
@@ -275,86 +392,225 @@ export default function App() {
   // Switch Current User (Demo Account Switcher)
   const handleSwitchUser = (user) => {
     setCurrentUser(user);
+    setActiveTab("dashboard");
     showToast(`Logged in as ${user.name} (${user.role.toUpperCase()})`);
   };
 
-  // Sign In / Registration Handler
-  const handleAuthSubmit = (e) => {
-    e.preventDefault();
-    if (authMode === "signin") {
-      // Find matching demo user or create session
-      const found = DEMO_USERS.find((u) => u.email.toLowerCase() === authForm.email.toLowerCase());
-      if (found) {
-        setCurrentUser(found);
-        showToast(`Welcome back, ${found.name}!`);
-      } else {
-        const newUser = {
-          id: `user_${Date.now()}`,
-          name: authForm.name || authForm.email.split("@")[0],
-          email: authForm.email,
-          role: selectedRegisterRole,
-          studentId: authForm.studentId,
-          bio: authForm.bio
-        };
-        setCurrentUser(newUser);
-        showToast(`Account created! Logged in as ${newUser.name}.`);
-      }
-    } else {
-      // Register Single Role Account
-      const newUser = {
-        id: `user_${Date.now()}`,
-        name: authForm.name,
-        email: authForm.email,
-        role: selectedRegisterRole,
-        studentId: authForm.studentId,
-        roleTitle: authForm.roleTitle,
-        skills: authForm.skills,
-        focus: authForm.focus,
-        bio: authForm.bio
+  // Sign In / Registration Handler — UoH students must use @uohyd.ac.in (backer open to outside) + OTP + backer admin approval
+  const isUoHEmail = (email) => email.trim().toLowerCase().endsWith("@uohyd.ac.in");
+  const completeRegistration = (newUser, targetRole) => {
+    // Persist to unified profile store so same-email switching works
+    try {
+      const key="startify_user_profiles";
+      const existing=JSON.parse(localStorage.getItem(key)||"[]");
+      const normalized={ id:newUser.id, name:newUser.name, email:newUser.email.toLowerCase(), role:newUser.role, studentId:newUser.studentId||"", roleTitle:newUser.roleTitle||"", skills:newUser.skills||"", focus:newUser.focus||"", bio:newUser.bio||"", createdAt:new Date().toISOString() };
+      // allow same email with different roles — keep both, replace if same email+role
+      const filtered=existing.filter(p=> !(p.email.toLowerCase()===normalized.email.toLowerCase() && p.role===normalized.role));
+      localStorage.setItem(key, JSON.stringify([normalized, ...filtered]));
+    } catch {}
+    // Founder/Talent: verified via OTP → active immediately. Backer: OTP verified but pending admin approval
+    if (targetRole === "backer") {
+      const pending = {
+        id: newUser.id,
+        name: newUser.name,
+        email: newUser.email,
+        role: newUser.role,
+        roleTitle: newUser.roleTitle,
+        focus: newUser.focus,
+        bio: newUser.bio,
+        studentId: newUser.studentId,
+        status: "pending_admin_approval",
+        createdAt: new Date().toISOString(),
+        otpVerified: true,
       };
-
-      if (selectedRegisterRole === "talent") {
+      setPendingBackers((prev) => [pending, ...prev]);
+      // Also persist to registrations for admin
+      dbService.saveRegistration({ name: newUser.name, email: newUser.email, role: "funder", ideaOrSkills: newUser.focus || newUser.bio || "Backer", contact: "", registeredAt: new Date().toISOString().slice(0,10), status: "pending_admin_approval" });
+      showToast(`✓ OTP verified. Backer account "${newUser.name}" is pending admin approval. You'll be visible after approval.`);
+      // Still log in but mark as pending
+      const pendingUser = { ...newUser, _backerPending: true };
+      setCurrentUser(pendingUser);
+      setActiveTab("dashboard");
+    } else {
+      // Founder / Talent active
+      if (targetRole === "talent") {
         setBuilders([
           {
             id: newUser.id,
             name: newUser.name,
+            email: newUser.email.toLowerCase(),
             role: authForm.roleTitle || "Builder",
             skills: authForm.skills || "Development & Design",
             year: "Campus Builder",
-            verifiedStudent: !!authForm.studentId,
+            verifiedStudent: true,
             status: "Available for Collaboration"
           },
           ...builders
         ]);
-      } else if (selectedRegisterRole === "backer") {
-        setFunders([
-          {
-            id: newUser.id,
-            name: newUser.name,
-            role: authForm.roleTitle || "Angel Backer",
-            focus: authForm.focus || "Tech & AI",
-            bio: authForm.bio || "Supporting student founders.",
-            ticketSize: "Pre-Seed & Seed"
-          },
-          ...funders
-        ]);
       }
-
+      // persist verified email
+      setVerifiedEmails((prev) => prev.includes(newUser.email.toLowerCase()) ? prev : [...prev, newUser.email.toLowerCase()]);
+      try {
+        const map = JSON.parse(localStorage.getItem("startify_otp_map") || "{}");
+        if (map[newUser.email.toLowerCase()]) { map[newUser.email.toLowerCase()].verified = true; localStorage.setItem("startify_otp_map", JSON.stringify(map)); }
+      } catch {}
+      dbService.saveRegistration({ name: newUser.name, email: newUser.email, role: targetRole==="talent"?"builder":"founder", ideaOrSkills: targetRole==="talent"? (authForm.skills||"Talent") : "Founder", contact:"", registeredAt: new Date().toISOString().slice(0,10), status:"verified" });
       setCurrentUser(newUser);
-      showToast(`Registered as ${selectedRegisterRole.toUpperCase()}! Welcome, ${newUser.name}.`);
+      setActiveTab("dashboard");
+      showToast(`✓ OTP verified. Registered as ${targetRole.toUpperCase()}! Welcome, ${newUser.name}.`);
     }
-
     setAuthModalOpen(false);
     setAuthForm({ name: "", email: "", studentId: "", roleTitle: "", skills: "", focus: "", bio: "" });
+  };
+
+  const handleAuthSubmit = (e) => {
+    e.preventDefault();
+    const targetRole = selectedRegisterRole;
+    const email = authForm.email.trim();
+
+    if ((targetRole === "founder" || targetRole === "talent") && !isUoHEmail(email)) {
+      showToast("Use your University of Hyderabad email ending in @uohyd.ac.in for Founder/Builder accounts. Backers can use any email.");
+      return;
+    }
+
+    // If email already verified via OTP before, skip OTP for faster demo login
+    const alreadyVerified = verifiedEmails.includes(email.toLowerCase());
+    const found = DEMO_USERS.find((u) => u.email.toLowerCase() === email.toLowerCase());
+    if (authMode === "signin" && found) {
+      setCurrentUser(found);
+      setActiveTab("dashboard");
+      showToast(`Welcome back, ${found.name}!`);
+      setAuthModalOpen(false);
+      setAuthForm({ name: "", email: "", studentId: "", roleTitle: "", skills: "", focus: "", bio: "" });
+      return;
+    }
+
+    // Reuse existing profile for same email (admin-created or previous registration) so name and id are correct and chats are visible
+    let existingProfile = null;
+    try {
+      const profiles = JSON.parse(localStorage.getItem("startify_user_profiles") || "[]");
+      existingProfile = profiles.find(p => p.email.toLowerCase() === email.toLowerCase() && p.role === targetRole) || profiles.find(p => p.email.toLowerCase() === email.toLowerCase()) || null;
+      if (!existingProfile) {
+        const buildersLocal = JSON.parse(localStorage.getItem("startify_admin_builders") || "[]");
+        const b = buildersLocal.find(b => (b.email||"").toLowerCase() === email.toLowerCase());
+        if (b) existingProfile = { id: b.id, name: b.name, email: b.email, role: targetRole, roleTitle: b.roleTitle || b.role, skills: b.skills, bio: b.bio || "" };
+      }
+      if (!existingProfile) {
+        const regsLocal = JSON.parse(localStorage.getItem("startify_registrations") || "[]");
+        const r = regsLocal.find(r => r.email.toLowerCase() === email.toLowerCase());
+        if (r) existingProfile = { id: r.email, name: r.name, email: r.email, role: r.role==="builder"?"talent":r.role==="funder"?"backer":r.role, bio: "" };
+      }
+      // handle fake email user_...@uohyd.ac.in where local part is builder id
+      if (!existingProfile && email.toLowerCase().endsWith("@uohyd.ac.in") && email.toLowerCase().startsWith("user_")) {
+        const fakeId = email.split("@")[0];
+        const buildersLocal2 = JSON.parse(localStorage.getItem("startify_admin_builders") || "[]");
+        const b2 = buildersLocal2.find(b => b.id === fakeId);
+        if (b2) existingProfile = { id: b2.id, name: b2.name, email: b2.email || email, role: targetRole, roleTitle: b2.roleTitle || b2.role, skills: b2.skills, bio: b2.bio || "" };
+      }
+    } catch {}
+    if (authMode === "signin" && existingProfile) {
+      const reuseUser = {
+        id: existingProfile.id,
+        name: existingProfile.name || authForm.name || email.split("@")[0],
+        email: existingProfile.email,
+        role: existingProfile.role || targetRole,
+        studentId: existingProfile.studentId || authForm.studentId,
+        bio: existingProfile.bio || authForm.bio || "",
+        roleTitle: existingProfile.roleTitle || authForm.roleTitle,
+        skills: existingProfile.skills || authForm.skills,
+        focus: existingProfile.focus || authForm.focus,
+      };
+      if (alreadyVerified) {
+        setCurrentUser(reuseUser);
+        setActiveTab("dashboard");
+        showToast(`Welcome back, ${reuseUser.name}!`);
+        setAuthModalOpen(false);
+        setAuthForm({ name: "", email: "", studentId: "", roleTitle: "", skills: "", focus: "", bio: "" });
+        return;
+      }
+      setOtpPendingUser(reuseUser);
+      setOtpRole(reuseUser.role);
+      sendOtp(email, reuseUser.role);
+      return;
+    }
+
+    // For any new account (signin create or register), require OTP
+    const pendingUser = authMode === "signin"
+      ? {
+          id: `user_${Date.now()}`,
+          name: authForm.name || email.split("@")[0],
+          email,
+          role: targetRole,
+          studentId: authForm.studentId,
+          bio: authForm.bio,
+          roleTitle: authForm.roleTitle,
+          skills: authForm.skills,
+          focus: authForm.focus,
+        }
+      : {
+          id: `user_${Date.now()}`,
+          name: authForm.name,
+          email,
+          role: targetRole,
+          studentId: authForm.studentId,
+          roleTitle: authForm.roleTitle,
+          skills: authForm.skills,
+          focus: authForm.focus,
+          bio: authForm.bio
+        };
+
+    if ((pendingUser.role === "founder" || pendingUser.role === "talent") && !isUoHEmail(pendingUser.email)) {
+      showToast("Founder/Builder requires @uohyd.ac.in. Switch to Backer for external email.");
+      return;
+    }
+
+    // If already OTP-verified earlier in this browser, complete directly (still enforce backer pending)
+    if (alreadyVerified && pendingUser.role !== "backer") {
+      completeRegistration(pendingUser, targetRole);
+      return;
+    }
+    if (alreadyVerified && pendingUser.role === "backer") {
+      // backer still needs admin approval, but OTP already done
+      completeRegistration(pendingUser, targetRole);
+      return;
+    }
+
+    setOtpPendingUser(pendingUser);
+    setOtpRole(targetRole);
+    sendOtp(email, targetRole);
+  };
+
+  const handleOtpVerify = (e) => {
+    e.preventDefault();
+    if (!verifyOtp(otpInput, otpCode)) {
+      showToast("Invalid OTP. Please check the 6-digit code (demo code shown in toast).");
+      return;
+    }
+    const user = otpPendingUser;
+    if (!user) { setOtpModalOpen(false); return; }
+    setVerifiedEmails((prev) => prev.includes(user.email.toLowerCase()) ? prev : [...prev, user.email.toLowerCase()]);
+    try {
+      const map = JSON.parse(localStorage.getItem("startify_otp_map") || "{}");
+      if (map[user.email.toLowerCase()]) { map[user.email.toLowerCase()].verified = true; localStorage.setItem("startify_otp_map", JSON.stringify(map)); }
+    } catch {}
+    setOtpModalOpen(false);
+    setOtpInput("");
+    completeRegistration(user, otpRole);
+    setOtpPendingUser(null);
+  };
+
+  const handleOtpResend = () => {
+    if (!otpEmail) return;
+    sendOtp(otpEmail, otpRole);
   };
 
   // Submit New Idea (Requires Login & Founder Role)
   const handleIdeaSubmit = (e) => {
     e.preventDefault();
     if (!currentUser) return;
-
-    if (!newIdeaForm.studentId.trim() && !currentUser.studentId) {
-      showToast("Student ID is required for verification.");
+    if (currentUser.role !== "founder") {
+      showToast("Only Founder accounts can post ideas.");
+      setIdeaModalOpen(false);
       return;
     }
 
@@ -364,19 +620,38 @@ export default function App() {
       category: newIdeaForm.category,
       founderId: currentUser.id,
       founder: currentUser.name,
+      email: currentUser.email.toLowerCase(),
       verifiedStudent: true,
-      studentId: newIdeaForm.studentId || currentUser.studentId || "UOH-VERIFIED",
+      studentId: currentUser.studentId || "UOH",
       desc: newIdeaForm.desc,
       seeking: newIdeaForm.seeking,
-      status: "Verified & Live",
-      createdDate: "Just now"
+      status: "Pending Review",
+      createdDate: "Pending admin review"
     };
 
     dbService.saveIdea(newIdea);
     setIdeas([newIdea, ...ideas]);
     setIdeaModalOpen(false);
-    showToast(`✓ Idea "${newIdeaForm.title}" posted!`);
+    showToast(`✓ Idea "${newIdeaForm.title}" sent for admin review.`);
     setNewIdeaForm({ title: "", category: "Tech / AI", studentId: "", desc: "", seeking: "Tech Co-Founder" });
+  };
+
+  const handleApproveIdea = (ideaId) => {
+    setIdeas(
+      ideas.map((idea) =>
+        idea.id === ideaId ? { ...idea, status: "Approved & Live", createdDate: "Just now" } : idea
+      )
+    );
+    showToast("Idea approved and published to the board.");
+  };
+
+  const handleRejectIdea = (ideaId) => {
+    setIdeas(
+      ideas.map((idea) =>
+        idea.id === ideaId ? { ...idea, status: "Rejected", createdDate: "Rejected" } : idea
+      )
+    );
+    showToast("Idea rejected and removed from the public board.");
   };
 
   // Send Connection Request
@@ -440,8 +715,68 @@ export default function App() {
     setChatInputText("");
   };
 
-  // Filtered Ideas
+  // Helpers to hide own profiles across same email (different role with same email should not see own other profile)
+  const currentEmail = currentUser?.email?.toLowerCase() || "";
+  const sameEmailIds = (() => {
+    if (!currentEmail) return new Set();
+    try {
+      const profiles = JSON.parse(localStorage.getItem("startify_user_profiles") || "[]");
+      const ids = profiles.filter(p => p.email && p.email.toLowerCase() === currentEmail).map(p => p.id);
+      const buildersLocal = JSON.parse(localStorage.getItem("startify_admin_builders") || "[]");
+      buildersLocal.forEach(b => { if ((b.email||"").toLowerCase() === currentEmail) ids.push(b.id); });
+      const fundersLocal = JSON.parse(localStorage.getItem("startify_admin_funders") || "[]");
+      fundersLocal.forEach(f => { if ((f.email||"").toLowerCase() === currentEmail) ids.push(f.id); });
+      const regsLocal = JSON.parse(localStorage.getItem("startify_registrations") || "[]");
+      regsLocal.forEach(r => { if ((r.email||"").toLowerCase() === currentEmail) ids.push(r.email); ids.push(r.id || r.email); });
+      // handle fake email user_...@uohyd.ac.in where id is local part
+      if (currentEmail.startsWith("user_") && currentEmail.endsWith("@uohyd.ac.in")) {
+        const fakeId = currentEmail.split("@")[0];
+        ids.push(fakeId);
+        const bFake = buildersLocal.find(b => b.id === fakeId);
+        if (bFake && bFake.email) {
+          const realEmail = bFake.email.toLowerCase();
+          profiles.filter(p => p.email.toLowerCase() === realEmail).forEach(p=> ids.push(p.id));
+          buildersLocal.filter(b=> (b.email||"").toLowerCase()===realEmail).forEach(b=> ids.push(b.id));
+        }
+      }
+      if (currentUser?.id) ids.push(currentUser.id);
+      ids.push(currentEmail);
+      return new Set(ids);
+    } catch { return new Set(currentUser?.id ? [currentUser.id, currentEmail] : []); }
+  })();
+  const isOwnIdea = (idea) => {
+    if (!currentUser) return false;
+    if (idea.founderId === currentUser.id) return true;
+    if (idea.email && idea.email.toLowerCase() === currentEmail) return true;
+    if (sameEmailIds.has(idea.founderId)) return true;
+    return false;
+  };
+  const isOwnBuilder = (b) => {
+    if (!currentUser) return false;
+    if (b.id === currentUser.id) return true;
+    if (b.email && b.email.toLowerCase() === currentEmail) return true;
+    if (sameEmailIds.has(b.id)) return true;
+    // legacy builders without email: match by name + same email profile name
+    if (b.name === currentUser.name && currentEmail) {
+      try {
+        const profiles = JSON.parse(localStorage.getItem("startify_user_profiles") || "[]");
+        if (profiles.some(p => p.email.toLowerCase() === currentEmail && p.name === b.name && p.role === "talent")) return true;
+      } catch {}
+    }
+    return false;
+  };
+  const isOwnFunder = (f) => {
+    if (!currentUser) return false;
+    if (f.id === currentUser.id) return true;
+    if (f.email && f.email.toLowerCase() === currentEmail) return true;
+    if (sameEmailIds.has(f.id)) return true;
+    return false;
+  };
+
+  // Filtered Ideas — also hide own ideas from the public board (you see them in Dashboard)
   const filteredIdeas = ideas.filter((idea) => {
+    if (idea.status === "Pending Review" || idea.status === "Rejected") return false;
+    if (isOwnIdea(idea)) return false;
     const matchesCategory =
       ideaCategoryFilter === "All" || idea.category.toLowerCase().includes(ideaCategoryFilter.toLowerCase());
     const matchesSearch =
@@ -452,323 +787,307 @@ export default function App() {
     return matchesCategory && matchesSearch;
   });
 
+  // Self-filtered directories — deduped and never show own profile (same email across roles hidden)
+  const dedupeByEmail = (arr) => {
+    const seen = new Set();
+    return arr.filter(item => {
+      const key = (item.email || item.id || "").toString().toLowerCase();
+      if (seen.has(key)) return false;
+      seen.add(key);
+      return true;
+    });
+  };
+  const visibleBuilders = dedupeByEmail(builders.filter((b) => !isOwnBuilder(b)));
+  const visibleFunders = dedupeByEmail(funders.filter((f) => !isOwnFunder(f)));
+
+  // Role-based connection permissions
+  // founder -> talent/backer | talent -> idea only | backer -> idea + talent | admin -> all
+  const canConnect = (senderRole, targetKind) => {
+    if (senderRole === "admin") return true;
+    if (targetKind === "idea") return senderRole === "talent" || senderRole === "backer";
+    if (targetKind === "builder") return senderRole === "founder" || senderRole === "backer";
+    if (targetKind === "backer") return senderRole === "founder";
+    return false;
+  };
+
+  // Role-based nav visibility: hide same-role hubs
+  const showIdeasTab = !currentUser || currentUser.role === "admin" || currentUser.role === "talent" || currentUser.role === "backer";
+  const showTalentTab = !currentUser || currentUser.role === "admin" || currentUser.role === "founder" || currentUser.role === "backer";
+  const showBackersTab = !currentUser || currentUser.role === "admin" || currentUser.role === "founder";
+  // Events visible to all logged-in roles
+  const showEventsTab = !!currentUser;
+
   // User Dashboard Filtered Data
-  const myIncomingRequests = requests.filter((r) => r.receiverId === currentUser?.id);
-  const myOutgoingRequests = requests.filter((r) => r.senderId === currentUser?.id);
+  const myIncomingRequests = requests.filter((r) => r.receiverId === currentUser?.id || sameEmailIds.has(r.receiverId));
+  const myOutgoingRequests = requests.filter((r) => r.senderId === currentUser?.id || sameEmailIds.has(r.senderId));
   const myAcceptedConnections = requests.filter(
-    (r) => (r.senderId === currentUser?.id || r.receiverId === currentUser?.id) && r.status === "accepted"
+    (r) => (sameEmailIds.has(r.senderId) || sameEmailIds.has(r.receiverId) || r.senderId === currentUser?.id || r.receiverId === currentUser?.id) && r.status === "accepted"
   );
-  const myIdeas = ideas.filter((i) => i.founderId === currentUser?.id);
+  const myIdeas = ideas.filter((i) => isOwnIdea(i));
+  const dashboardGroups = currentUser?.role === "founder"
+    ? [{ title: "Skilled talent", subtitle: "People ready to build alongside you", items: visibleBuilders, kind: "builder" }, { title: "Backers & mentors", subtitle: "People who can fund and guide you", items: visibleFunders, kind: "backer" }]
+    : currentUser?.role === "backer"
+      ? [{ title: "Founders & ideas", subtitle: "Early-stage opportunities to explore", items: ideas.filter((i) => !isOwnIdea(i)), kind: "idea" }, { title: "Talent & skills", subtitle: "People with capabilities behind strong teams", items: visibleBuilders, kind: "builder" }]
+      : currentUser?.role === "talent"
+        ? [{ title: "Founders & ideas", subtitle: "Teams looking for a builder like you", items: ideas.filter((i) => !isOwnIdea(i)), kind: "idea" }]
+        : currentUser?.role === "admin"
+          ? [{ title: "Founders & ideas", subtitle: "All live ideas", items: ideas, kind: "idea" }, { title: "Talent & skills", subtitle: "All builders", items: builders, kind: "builder" }]
+          : [{ title: "Founders & ideas", subtitle: "Teams looking for collaborators", items: ideas, kind: "idea" }, { title: "Backers", subtitle: "Backers and mentors in the network", items: funders, kind: "backer" }];
 
   return (
-    <div className="min-h-screen bg-[#121214] text-zinc-100 selection:bg-white selection:text-black">
-      {/* Toast Notification */}
+    <div className="min-h-screen flex flex-col bg-[#202728] text-zinc-100 selection:bg-white selection:text-black">
+      {/* Toast Notification — white on black, high contrast, no blur */}
       {toastMessage && (
-        <div className="fixed bottom-6 right-6 z-50 bg-white text-black px-5 py-3.5 rounded-2xl shadow-2xl text-xs font-semibold flex items-center gap-3 animate-bounce">
-          <span className="h-2 w-2 rounded-full bg-black"></span>
-          {toastMessage}
+        <div className="fixed bottom-6 right-6 z-[70] bg-black text-white px-5 py-3.5 rounded-2xl shadow-2xl text-sm font-semibold flex items-center gap-3 border border-white/10" style={{backdropFilter:"none", WebkitBackdropFilter:"none"}}>
+          <span className="h-2.5 w-2.5 rounded-full bg-emerald-400 shadow-[0_0_8px_rgba(16,185,129,0.6)] shrink-0"></span>
+          <span className="leading-5 text-white">{toastMessage}</span>
         </div>
       )}
 
-      {/* QUICK DEMO ACCOUNT SWITCHER BAR (FOR EASY TESTING ACROSS 3 ROLES) */}
-      <div className="bg-zinc-950 border-b border-white/10 px-4 py-2.5 text-xs text-zinc-400">
-        <div className="mx-auto max-w-[1200px] flex flex-wrap items-center justify-between gap-3">
-          <div className="flex items-center gap-2 font-medium">
-            <span className="text-zinc-500 uppercase tracking-widest text-[10px] font-bold">
-              Test Accounts Switcher:
-            </span>
-            {DEMO_USERS.map((u) => (
-              <button
-                key={u.id}
-                onClick={() => handleSwitchUser(u)}
-                className={`px-3 py-1 rounded-full text-[11px] font-semibold transition ${
-                  currentUser?.id === u.id
-                    ? "bg-white text-black"
-                    : "bg-zinc-900 text-zinc-300 border border-white/10 hover:border-white/30"
-                }`}
-              >
-                {u.role === "founder" && "💡 "}
-                {u.role === "talent" && "⚡ "}
-                {u.role === "backer" && "💼 "}
-                {u.name} ({u.role.toUpperCase()})
-              </button>
-            ))}
-          </div>
-
-          <div className="flex items-center gap-3">
-            {currentUser ? (
-              <div className="flex items-center gap-2">
-                <span className="text-white font-semibold">{currentUser.name}</span>
-                <span className="px-2 py-0.5 rounded-full bg-zinc-800 text-[10px] text-zinc-300 uppercase font-bold border border-white/10">
-                  {currentUser.role}
-                </span>
-                <button
-                  onClick={() => setCurrentUser(null)}
-                  className="text-zinc-500 hover:text-white underline ml-1"
-                >
-                  Sign Out
-                </button>
-              </div>
-            ) : (
-              <button
-                onClick={() => {
-                  setAuthMode("signin");
-                  setAuthModalOpen(true);
-                }}
-                className="text-white hover:underline font-bold"
-              >
-                Sign In / Register →
-              </button>
-            )}
-          </div>
+      {/* UoH launch banner — hidden after sign-in, profile badge moves to dashboard */}
+      {!currentUser && (
+        <div className="bg-indigo-600 text-white text-center text-[11px] font-semibold py-2 px-4">
+          An initiative for <strong>University of Hyderabad</strong> students • Founder / Builder (@uohyd.ac.in) + Backer (open)
         </div>
-      </div>
+      )}
 
-      {/* NAVIGATION HEADER */}
-      <nav className="sticky top-0 z-40 backdrop-blur-xl bg-[#121214]/90 border-b border-white/10">
-        <div className="mx-auto max-w-[1200px] px-5 md:px-8 h-[72px] flex items-center justify-between">
-          <div className="flex items-center gap-3.5 cursor-pointer" onClick={() => setActiveTab("ideas")}>
+      {/* NAVIGATION HEADER — light glass, not sticky on dashboard/chats, no overlap */}
+      <nav className={`${activeTab==="dashboard" || activeTab==="chats" ? "relative" : "sticky top-0"} z-40 backdrop-blur-xl bg-white/75 border-b border-slate-200`}>
+        <div className="mx-auto max-w-[1200px] px-5 md:px-8 min-h-[72px] py-3 flex flex-wrap items-center justify-between gap-3">
+          <div className="flex items-center gap-3.5 cursor-pointer" onClick={() => setActiveTab(currentUser ? "dashboard" : "home")}>
             <img
               src={logoImg}
               alt="Startify Logo"
-              className="h-10 w-10 rounded-full border border-white/20 object-cover"
+              className="h-12 w-auto object-contain"
             />
-            <div className="leading-tight">
-              <div className="flex items-center gap-2">
-                <span className="font-bold tracking-wider text-[19px] font-heading text-white">
-                  STARTIFY
-                </span>
-                <span className="hidden sm:inline-block h-3.5 w-px bg-white/20" />
-                <span className="hidden sm:inline-block text-[10px] font-bold tracking-widest text-zinc-400 uppercase">
-                  Community Ecosystem
-                </span>
-              </div>
-              <div className="text-[11px] text-zinc-400 mt-0.5 font-medium">
-                Connect • Collaborate • Build
-              </div>
+            <div className="hidden sm:flex items-center gap-2 text-[11px] font-semibold text-slate-500 whitespace-nowrap leading-none">
+              <span className="font-bold tracking-widest uppercase">University of Hyderabad</span>
+              <span className="h-1 w-1 rounded-full bg-slate-300"></span>
+              <span>A student initiative • Connect • Build</span>
             </div>
           </div>
 
-          {/* Navigation Tabs */}
-          <div className="hidden md:flex items-center gap-2 text-[13px] font-medium text-zinc-300 bg-zinc-950 p-1.5 rounded-full border border-white/10">
-            <button
-              onClick={() => setActiveTab("ideas")}
-              className={`px-4 py-1.5 rounded-full transition ${
-                activeTab === "ideas" ? "bg-white text-black font-bold" : "hover:text-white"
-              }`}
-            >
-              Ideas Board
-            </button>
-            <button
-              onClick={() => setActiveTab("talent")}
-              className={`px-4 py-1.5 rounded-full transition ${
-                activeTab === "talent" ? "bg-white text-black font-bold" : "hover:text-white"
-              }`}
-            >
-              Skilled Talent
-            </button>
-            <button
-              onClick={() => setActiveTab("backers")}
-              className={`px-4 py-1.5 rounded-full transition ${
-                activeTab === "backers" ? "bg-white text-black font-bold" : "hover:text-white"
-              }`}
-            >
-              Backers Hub
-            </button>
-            <button
-              onClick={() => setActiveTab("events")}
-              className={`px-4 py-1.5 rounded-full transition ${
-                activeTab === "events" ? "bg-white text-black font-bold" : "hover:text-white"
-              }`}
-            >
-              Events
-            </button>
-            {currentUser && (
+          {/* Navigation Tabs — hidden when signed-out (no need), only for logged-in */}
+          {currentUser && (
+            <div className="hidden md:flex items-center gap-1 text-[12px] font-medium bg-black/[0.04] p-1 rounded-full border border-black/10 flex-nowrap overflow-visible shrink-0">
+              <button
+                onClick={() => setActiveTab("home")}
+                className={`px-3 py-1.5 rounded-full transition whitespace-nowrap shrink-0 ${activeTab === "home" ? "bg-slate-900 text-white font-bold shadow" : "text-slate-600 hover:text-slate-900"}`}
+              >
+                Home
+              </button>
+              {showIdeasTab && (
+                <button
+                  onClick={() => setActiveTab("ideas")}
+                  className={`px-3 py-1.5 rounded-full transition whitespace-nowrap shrink-0 ${activeTab === "ideas" ? "bg-slate-900 text-white font-bold shadow" : "text-slate-600 hover:text-slate-900"}`}
+                >
+                  Ideas Board
+                </button>
+              )}
+              {showTalentTab && (
+                <button
+                  onClick={() => setActiveTab("talent")}
+                  className={`px-3 py-1.5 rounded-full transition whitespace-nowrap shrink-0 ${activeTab === "talent" ? "bg-slate-900 text-white font-bold shadow" : "text-slate-600 hover:text-slate-900"}`}
+                >
+                  Skilled Talent
+                </button>
+              )}
+              {showBackersTab && (
+                <button
+                  onClick={() => setActiveTab("backers")}
+                  className={`px-3 py-1.5 rounded-full transition whitespace-nowrap shrink-0 ${activeTab === "backers" ? "bg-slate-900 text-white font-bold shadow" : "text-slate-600 hover:text-slate-900"}`}
+                >
+                  Backers Hub
+                </button>
+              )}
+              {showEventsTab && (
+                <button
+                  onClick={() => setActiveTab("events")}
+                  className={`px-3 py-1.5 rounded-full transition whitespace-nowrap shrink-0 ${activeTab === "events" ? "bg-slate-900 text-white font-bold shadow" : "text-slate-600 hover:text-slate-900"}`}
+                >
+                  Events
+                </button>
+              )}
               <button
                 onClick={() => setActiveTab("dashboard")}
-                className={`px-4 py-1.5 rounded-full transition relative ${
-                  activeTab === "dashboard" ? "bg-white text-black font-bold" : "hover:text-white text-zinc-200"
-                }`}
+                className={`px-3 py-1.5 rounded-full transition relative whitespace-nowrap shrink-0 ${activeTab === "dashboard" ? "bg-slate-900 text-white font-bold shadow" : "text-slate-600 hover:text-slate-900"}`}
               >
-                My Dashboard
+                {currentUser.role === "admin" ? "Admin workspace" : "My Dashboard"}
                 {myIncomingRequests.filter((r) => r.status === "pending").length > 0 && (
-                  <span className="ml-1.5 h-2 w-2 rounded-full bg-white inline-block animate-pulse" />
+                  <span className="ml-1.5 h-2 w-2 rounded-full bg-emerald-500 inline-block animate-pulse" />
                 )}
               </button>
+              <button
+                onClick={() => setActiveTab("chats")}
+                className={`px-3 py-1.5 rounded-full transition whitespace-nowrap shrink-0 ${activeTab === "chats" ? "bg-slate-900 text-white font-bold shadow" : "text-slate-600 hover:text-slate-900"}`}
+              >
+                Chats
+                {myAcceptedConnections.length > 0 && <span className="ml-1.5 inline-grid h-5 min-w-[20px] place-items-center rounded-full bg-white text-[10px] font-bold text-slate-900 px-1 border border-slate-200">{myAcceptedConnections.length}</span>}
+              </button>
+            </div>
+          )}
+
+          {/* Header Action — one line, polished after login */}
+          <div className="hidden md:flex items-center gap-3 shrink-0">
+            {!currentUser ? (
+              <button
+                onClick={() => { setAuthMode("signin"); setAuthModalOpen(true); }}
+                className="h-10 px-5 rounded-full border border-slate-200 bg-white text-slate-700 font-semibold text-[12.5px] hover:bg-slate-50 shadow-sm transition whitespace-nowrap"
+              >
+                Sign in
+              </button>
+            ) : (
+              <div className="flex items-center gap-3 whitespace-nowrap">
+                <div className="hidden lg:flex items-center gap-2.5 bg-white border border-slate-200 rounded-full pl-1 pr-3 py-1 shadow-sm">
+                  <div className="h-8 w-8 rounded-full bg-slate-100 border border-slate-200 grid place-items-center text-[14px] shrink-0">👤</div>
+                  <div className="min-w-0 text-left leading-none">
+                    <div className="text-xs font-bold text-slate-800 truncate max-w-[90px]">{currentUser.name.split(" ")[0]}</div>
+                    <div className="text-[11px] text-slate-500 truncate">{ROLE_META[currentUser.role]?.label || currentUser.role}</div>
+                  </div>
+                </div>
+                <button
+                  onClick={() => { setCurrentUser(null); setActiveTab("home"); showToast("Signed out"); }}
+                  className="h-9 px-4 rounded-full bg-slate-900 text-white font-semibold text-xs hover:bg-black whitespace-nowrap shrink-0 shadow"
+                >
+                  Sign out
+                </button>
+              </div>
             )}
           </div>
 
-          {/* Header Action Button */}
-          <div className="hidden md:flex items-center gap-3">
+          {/* Mobile Menu Button + one-line Sign out */}
+          <div className="md:hidden flex items-center gap-2 shrink-0">
+            {currentUser && <button onClick={() => { setCurrentUser(null); setActiveTab("home"); showToast("Signed out"); }} className="h-9 px-3 rounded-full bg-slate-900 text-white text-xs font-bold whitespace-nowrap">Sign out</button>}
             <button
-              onClick={() =>
-                requireAuth(() => {
-                  if (currentUser.role !== "founder") {
-                    showToast("Switching to Founder role or posting idea!");
-                  }
-                  setIdeaModalOpen(true);
-                })
-              }
-              className="h-10 px-5 rounded-full bg-white text-black font-bold text-[12.5px] hover:bg-zinc-200 transition"
+              onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
+              className="h-10 w-10 rounded-full border border-slate-200 bg-white grid place-items-center text-slate-700 shadow-sm shrink-0"
             >
-              + Post Idea
+              {mobileMenuOpen ? "✕" : "☰"}
             </button>
           </div>
-
-          {/* Mobile Menu Button */}
-          <button
-            onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
-            className="md:hidden h-10 w-10 rounded-full border border-white/15 grid place-items-center text-white"
-          >
-            {mobileMenuOpen ? "✕" : "☰"}
-          </button>
         </div>
 
         {/* Mobile Dropdown Menu */}
         {mobileMenuOpen && (
-          <div className="md:hidden border-t border-white/10 bg-zinc-950 p-5 space-y-3 text-[14px]">
-            <button
-              onClick={() => {
-                setActiveTab("ideas");
-                setMobileMenuOpen(false);
-              }}
-              className="block w-full text-left py-1 text-zinc-300"
-            >
-              Ideas Board
-            </button>
-            <button
-              onClick={() => {
-                setActiveTab("talent");
-                setMobileMenuOpen(false);
-              }}
-              className="block w-full text-left py-1 text-zinc-300"
-            >
-              Skilled Talent
-            </button>
-            <button
-              onClick={() => {
-                setActiveTab("backers");
-                setMobileMenuOpen(false);
-              }}
-              className="block w-full text-left py-1 text-zinc-300"
-            >
-              Backers Hub
-            </button>
-            <button
-              onClick={() => {
-                setActiveTab("events");
-                setMobileMenuOpen(false);
-              }}
-              className="block w-full text-left py-1 text-zinc-300"
-            >
-              Events & Meetups
-            </button>
-            {currentUser && (
-              <button
-                onClick={() => {
-                  setActiveTab("dashboard");
-                  setMobileMenuOpen(false);
-                }}
-                className="block w-full text-left py-1 font-bold text-white"
-              >
-                My Dashboard ({currentUser.role.toUpperCase()})
-              </button>
-            )}
-            <div className="pt-2">
-              <button
-                onClick={() =>
-                  requireAuth(() => {
-                    setMobileMenuOpen(false);
-                    setIdeaModalOpen(true);
-                  })
-                }
-                className="w-full h-11 rounded-full bg-white text-black font-bold text-[13px]"
-              >
-                + Post Startup Idea
-              </button>
-            </div>
+          <div className="md:hidden border-t border-slate-200 bg-white/90 backdrop-blur p-5 space-y-1 text-[14px]">
+            <button onClick={() => { setActiveTab("home"); setMobileMenuOpen(false); }} className={`block w-full text-left py-2 px-3 rounded-xl ${activeTab === "home" ? "bg-slate-900 text-white" : "text-slate-700"}`}>Home</button>
+            {currentUser && <>
+              {showIdeasTab && <button onClick={() => { setActiveTab("ideas"); setMobileMenuOpen(false); }} className={`block w-full text-left py-2 px-3 rounded-xl ${activeTab === "ideas" ? "bg-slate-900 text-white" : "text-slate-700"}`}>Ideas Board</button>}
+              {showTalentTab && <button onClick={() => { setActiveTab("talent"); setMobileMenuOpen(false); }} className={`block w-full text-left py-2 px-3 rounded-xl ${activeTab === "talent" ? "bg-slate-900 text-white" : "text-slate-700"}`}>Skilled Talent</button>}
+              {showBackersTab && <button onClick={() => { setActiveTab("backers"); setMobileMenuOpen(false); }} className={`block w-full text-left py-2 px-3 rounded-xl ${activeTab === "backers" ? "bg-slate-900 text-white" : "text-slate-700"}`}>Backers Hub</button>}
+              {showEventsTab && <button onClick={() => { setActiveTab("events"); setMobileMenuOpen(false); }} className={`block w-full text-left py-2 px-3 rounded-xl ${activeTab === "events" ? "bg-slate-900 text-white" : "text-slate-700"}`}>Events & Meetups</button>}
+              <button onClick={() => { setActiveTab("dashboard"); setMobileMenuOpen(false); }} className={`block w-full text-left py-2 px-3 rounded-xl font-bold ${activeTab === "dashboard" ? "bg-slate-900 text-white" : "text-slate-700"}`}>{currentUser.role === "admin" ? "Admin workspace" : "My Dashboard"} ({currentUser.role.toUpperCase()})</button>
+              <button onClick={() => { setActiveTab("chats"); setMobileMenuOpen(false); }} className={`block w-full text-left py-2 px-3 rounded-xl ${activeTab === "chats" ? "bg-slate-900 text-white" : "text-slate-700"}`}>Chats</button>
+            </>}
+            {!currentUser && <button onClick={() => { setAuthMode("register"); setAuthModalOpen(true); setMobileMenuOpen(false); }} className="block w-full text-left py-2 px-3 rounded-xl bg-slate-900 text-white font-bold">Join Startify →</button>}
           </div>
         )}
       </nav>
 
-      {/* HERO BANNER (Shown when viewing main tabs) */}
-      {activeTab !== "dashboard" && (
-        <section className="mx-auto max-w-[1200px] px-5 md:px-8 pt-10 pb-8 border-b border-white/10">
-          <div className="grid md:grid-cols-[1.2fr_0.8fr] gap-8 items-center">
+      {/* PUBLIC ENTRY: intentionally no ideas feed until the visitor chooses a role and joins. */}
+      {activeTab === "home" && !currentUser && (
+        <main className="mx-auto max-w-[1200px] px-5 md:px-8 py-8 md:py-12 lg:py-16">
+          <div className="grid lg:grid-cols-[1.15fr_.85fr] gap-6 md:gap-10 items-start lg:items-stretch">
             <div>
-              <div className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-zinc-900 border border-white/15 text-xs text-zinc-300 font-medium">
-                <span className="h-2 w-2 rounded-full bg-white animate-pulse-glow" />
-                Single-Role Ecosystem • Direct Connection & Live Chat
+              <div className="inline-flex items-center gap-2 rounded-full border border-indigo-200 bg-indigo-50 px-3.5 py-1.5 text-xs text-indigo-700 font-bold shadow-sm">
+                <span className="h-2 w-2 rounded-full bg-indigo-600 animate-pulse" /> Connect • Build • Launch
               </div>
-
-              <h1 className="font-heading text-[36px] sm:text-[44px] md:text-[52px] font-extrabold leading-[1.08] tracking-tight mt-5">
-                Connect on <span className="text-zinc-400">Startup Ideas</span>. Chat Directly After Request Acceptance.
+              <h1 className="font-heading mt-5 max-w-[720px] text-[42px] leading-[1.02] font-extrabold tracking-tight md:text-[58px] text-slate-900">
+                Find the people who can <span className="bg-gradient-to-r from-indigo-600 to-violet-600 bg-clip-text text-transparent">move your idea forward.</span>
               </h1>
-
-              <p className="text-[15px] md:text-[16.5px] leading-[1.6] text-zinc-400 mt-4 max-w-[580px]">
-                Sign in as an <strong>Idea Creator</strong>, <strong>Skilled Builder</strong>, or <strong>Backer</strong>. Send requests to connect and unlock real-time direct chat upon acceptance.
+              <p className="mt-5 max-w-[620px] text-[16px] leading-7 text-slate-600">
+                A space where ideas are validated, teams find their builders, and every skill finds a mission. Startify connects people, gives your ideas a team, and turns thoughts into real ventures.
               </p>
-
-              <div className="mt-6 flex flex-wrap gap-3.5">
-                <button
-                  onClick={() =>
-                    requireAuth(() => setIdeaModalOpen(true))
-                  }
-                  className="h-11 px-6 rounded-full bg-white text-black font-bold text-[13.5px] hover:bg-zinc-200 transition"
-                >
-                  Post Your Idea →
-                </button>
-                {currentUser ? (
-                  <button
-                    onClick={() => setActiveTab("dashboard")}
-                    className="h-11 px-6 rounded-full border border-white/20 bg-zinc-900 text-white font-semibold text-[13px] hover:bg-zinc-800 transition"
-                  >
-                    Open My Role Dashboard ({currentUser.role.toUpperCase()})
-                  </button>
-                ) : (
-                  <button
-                    onClick={() => {
-                      setAuthMode("register");
-                      setAuthModalOpen(true);
-                    }}
-                    className="h-11 px-6 rounded-full border border-white/20 bg-zinc-900 text-white font-semibold text-[13px] hover:bg-zinc-800 transition"
-                  >
-                    Register Account (Choose Role)
-                  </button>
-                )}
+              <div className="mt-6 flex flex-wrap gap-2 text-[11px]">
+                <span className="px-3 py-1.5 rounded-full bg-white border border-slate-200 text-slate-600">✓ Verified UoH community</span>
+                <span className="px-3 py-1.5 rounded-full bg-white border border-slate-200 text-slate-600">✓ Direct founder → talent connect</span>
+                <span className="px-3 py-1.5 rounded-full bg-white border border-slate-200 text-slate-600">✓ Chat after acceptance</span>
+              </div>
+              {/* Our belief — directly under hero as requested */}
+              <div className="mt-8 rounded-[20px] bg-slate-900 p-5 md:p-6 border border-slate-800 shadow-md overflow-hidden relative">
+                <div className="absolute inset-0 bg-gradient-to-br from-indigo-600/20 via-violet-600/20 to-fuchsia-600/20 pointer-events-none" />
+                <div className="relative">
+                  <div className="inline-flex items-center gap-2 rounded-full bg-white/10 border border-white/15 px-3 py-1 text-[10px] font-bold tracking-widest text-white">OUR BELIEF</div>
+                  <blockquote className="font-heading mt-3 text-[22px] md:text-[26px] font-extrabold leading-tight tracking-tight text-white">“If you can think it, you can build it.”</blockquote>
+                  <p className="mt-2 text-[13px] leading-6 text-white">A platform that connects ideas with people, and people with purpose — where every idea gets space to be built, tested, and launched.</p>
+                </div>
               </div>
             </div>
-
-            {/* Quick Role Explanation Card */}
-            <div className="rounded-[24px] border border-white/15 bg-zinc-950 p-6 border-glow">
-              <div className="text-[11px] font-bold uppercase tracking-widest text-zinc-400">
-                Ecosystem Workflow
-              </div>
-              <div className="mt-4 space-y-3">
-                <div className="p-3.5 rounded-xl bg-zinc-900 border border-white/10 flex items-center justify-between text-xs">
-                  <div>
-                    <span className="font-bold text-white">1. Single Role Account</span>
-                    <p className="text-zinc-400 mt-0.5">Register as Founder, Builder, or Backer.</p>
-                  </div>
-                  <span className="text-[10px] px-2 py-0.5 rounded bg-zinc-800 border border-white/10">Step 1</span>
+            <div className="flex flex-col gap-4 w-full max-w-full overflow-hidden">
+              <div className="role-choice-panel rounded-[28px] border border-slate-200 bg-white p-5 sm:p-7 shadow-sm flex flex-col w-full max-w-full overflow-hidden">
+                <div className="mb-3 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
+                  <div className="text-xs font-bold uppercase tracking-[.16em] text-slate-500">Choose how you participate</div>
+                  <span className="text-xs px-3 py-1 rounded-full bg-slate-50 border border-slate-200 text-slate-600 shrink-0 self-start sm:self-auto">3 roles • One ecosystem</span>
                 </div>
-
-                <div className="p-3.5 rounded-xl bg-zinc-900 border border-white/10 flex items-center justify-between text-xs">
-                  <div>
-                    <span className="font-bold text-white">2. Send Connection Request</span>
-                    <p className="text-zinc-400 mt-0.5">Pitch backers or offer skills to ideas.</p>
-                  </div>
-                  <span className="text-[10px] px-2 py-0.5 rounded bg-zinc-800 border border-white/10">Step 2</span>
-                </div>
-
-                <div className="p-3.5 rounded-xl bg-zinc-900 border border-white/10 flex items-center justify-between text-xs">
-                  <div>
-                    <span className="font-bold text-white">3. Accept & Direct Chat</span>
-                    <p className="text-zinc-400 mt-0.5">Accept request to open live direct chat.</p>
-                  </div>
-                  <span className="text-[10px] px-2 py-0.5 rounded bg-white text-black font-bold">Step 3</span>
+                <p className="mb-5 text-[13px] leading-5 text-slate-600 break-words">Pick your path — every idea finds a team, every skill finds a mission, and every supporter finds promising builders.</p>
+                <div className="space-y-4">
+                  {[
+                    ["Founder", "Post and manage ideas", "Meet verified UoH builders and campus backers.", "founder", "bg-white border-slate-200 hover:border-slate-300 hover:shadow-md shadow-sm"],
+                    ["Builder", "Build with ambitious teams", "Discover UoH founder ideas that need your skills.", "talent", "bg-white border-slate-200 hover:border-sky-300 hover:shadow-md shadow-sm"],
+                    ["Backer", "Back promising people", "Browse UoH ideas and the talent behind them.", "backer", "bg-white border-slate-200 hover:border-violet-300 hover:shadow-md shadow-sm"],
+                  ].map(([title, label, detail, role, cls]) => (
+                    <button key={role} onClick={() => { setSelectedRegisterRole(role); setAuthMode("register"); setAuthModalOpen(true); }} className={`group w-full rounded-2xl border p-5 text-left transition ${cls}`}>
+                      <div className="min-w-0"><div className="font-heading text-[16px] font-bold text-slate-800">{title} <span className="ml-1 text-[12px] font-medium text-slate-500">— {label}</span></div><p className="mt-1 text-[13px] leading-5 text-slate-600">{detail}</p></div>
+                    </button>
+                  ))}
                 </div>
               </div>
+              {/* Ecosystem workflow — separate card: compact & horizontal */}
+              <div className="rounded-[28px] border border-slate-200 bg-white p-4 sm:p-5 shadow-sm w-full max-w-full overflow-hidden">
+                <div className="text-xs font-bold uppercase tracking-widest text-slate-500">Ecosystem workflow</div>
+                <div className="mt-3 grid grid-cols-1 sm:grid-cols-3 gap-3 sm:gap-4">
+                  {[
+                    ["1", "Create account", "Pick a role — Founder, Builder or Backer.", "bg-indigo-600"],
+                    ["2", "Send a request", "Pitch an idea or offer your skills.", "bg-violet-600"],
+                    ["3", "Get accepted & chat", "Chat unlocks after acceptance.", "bg-emerald-600"],
+                  ].map(([n, t, d, bg]) => (
+                    <div key={t} className="flex gap-2.5 text-xs sm:text-[13px] items-start"><span className={`grid h-8 w-8 shrink-0 place-items-center rounded-xl text-xs font-bold text-white ${bg}`}>{n}</span><div className="min-w-0"><div className="font-semibold text-slate-800 leading-tight">{t}</div><div className="text-slate-500 leading-4 text-[11px] sm:text-xs mt-0.5">{d}</div></div></div>
+                  ))}
+                </div>
+              </div>
+            </div>
+          </div>
+        </main>
+      )}
+
+      {/* Signed-in Home is the shared community overview for every role. */}
+      {activeTab === "home" && currentUser && (
+        <main className="mx-auto max-w-[1200px] px-5 py-10 md:px-8 md:py-12">
+          <div className="rounded-[30px] border border-slate-200 bg-gradient-to-br from-white via-slate-50 to-slate-200 p-7 shadow-sm md:p-10">
+            <div className="grid gap-8 lg:grid-cols-[1.3fr_.7fr] lg:items-end"><div><div className="inline-flex items-center gap-1.5 rounded-full bg-indigo-50 border border-indigo-200 px-2.5 py-1 text-[10px] font-bold uppercase tracking-widest text-indigo-700">University of Hyderabad • An initiative for UoH students</div><h1 className="font-heading home-calligraphy mt-3 text-[34px] font-extrabold tracking-tight text-slate-800 md:text-[46px]">Good to see you, {currentUser.name.split(" ")[0]}.</h1><p className="mt-3 max-w-[650px] text-[15px] leading-6 text-slate-600">Your UoH community is actively connecting ideas, talent and support. Explore your dashboard for role-specific matches, or open Chats to continue a conversation.</p></div><div className="rounded-2xl border border-white/80 bg-white/70 p-5 shadow-sm"><div className="text-[11px] font-bold uppercase tracking-widest text-slate-500">MOTIVATION OF THE DAY</div><blockquote className="font-heading mt-3 text-[22px] font-bold leading-tight text-slate-800">“{dailyQuote.text}”</blockquote><div className="mt-2 text-[11px] text-slate-500 italic">— {dailyQuote.author}</div><div className="mt-3 h-1 w-12 rounded-full bg-slate-700" /></div></div>
+            <div className="mt-8 grid gap-4 sm:grid-cols-2 lg:grid-cols-4"><div className="rounded-2xl border border-slate-200 bg-white/80 p-5"><div className="text-[11px] font-bold uppercase tracking-wide text-slate-500">Live ideas</div><div className="font-heading mt-2 text-3xl font-extrabold text-slate-800">{ideas.length}</div><p className="mt-1 text-[11px] text-slate-500">Projects looking for momentum</p></div><div className="rounded-2xl border border-slate-200 bg-white/80 p-5"><div className="text-[11px] font-bold uppercase tracking-wide text-slate-500">Active people</div><div className="font-heading mt-2 text-3xl font-extrabold text-slate-800">{builders.length + funders.length + ideas.length}</div><p className="mt-1 text-[11px] text-slate-500">Founders, talent, and funders</p></div><div className="rounded-2xl border border-slate-200 bg-white/80 p-5"><div className="text-[11px] font-bold uppercase tracking-wide text-slate-500">Connections made</div><div className="font-heading mt-2 text-3xl font-extrabold text-slate-800">{requests.filter((request) => request.status === "accepted").length}</div><p className="mt-1 text-[11px] text-slate-500">Conversations unlocked</p></div><div className="rounded-2xl border border-slate-200 bg-white/80 p-5"><div className="text-[11px] font-bold uppercase tracking-wide text-slate-500">Upcoming events</div><div className="font-heading mt-2 text-3xl font-extrabold text-slate-800">{events.length}</div><p className="mt-1 text-[11px] text-slate-500">Ways to meet the community</p></div></div>
+          </div>
+          <section className="mt-8"><div className="mb-4 flex items-end justify-between"><div><div className="text-[11px] font-bold uppercase tracking-widest text-slate-500">MARK YOUR CALENDAR</div><h2 className="font-heading mt-1 text-[25px] font-extrabold text-slate-800" style={{color: '#0f172a'}}>Upcoming community events</h2></div><button onClick={() => setActiveTab("dashboard")} className="text-xs font-bold text-slate-700 hover:underline">Go to my dashboard →</button></div><div className="grid gap-5 md:grid-cols-2">{events.map((event) => <article key={event.id} className="rounded-[24px] border border-slate-200 bg-white p-6 shadow-sm" style={{background: 'rgba(255,255,255,0.92)'}}><div className="flex items-center justify-between gap-3"><span className="rounded-full bg-slate-100 px-3 py-1 text-[10px] font-bold uppercase tracking-wide text-slate-600">{event.category}</span><span className="text-xs font-semibold text-slate-500">{event.date}</span></div><h3 className="font-heading mt-4 text-[19px] font-extrabold" style={{color: '#0f172a'}}>{event.title}</h3><p className="mt-2 text-[13px]" style={{color: '#475569'}}>{event.time} · {event.venue}</p><p className="mt-3 text-[13px] leading-5" style={{color: '#334155'}}>{event.desc}</p></article>)}</div></section>
+          <section className="mt-10"><div className="mb-4 flex items-end justify-between"><div><div className="text-[11px] font-bold uppercase tracking-widest text-slate-500">IDEAS GAINING MOMENTUM</div><h2 className="font-heading mt-1 text-[25px] font-extrabold text-slate-800">What the community is building</h2></div><button onClick={() => setActiveTab("dashboard")} className="text-xs font-bold text-slate-700 hover:underline">Find your matches in Dashboard →</button></div><div className="grid gap-5 md:grid-cols-3">{ideas.slice(0, 3).map((idea) => <article key={idea.id} className="rounded-[24px] border border-slate-200 bg-white/85 p-6 shadow-sm"><div className="flex items-center justify-between gap-3"><span className="rounded-full bg-slate-100 px-3 py-1 text-[10px] font-bold text-slate-600">{idea.category}</span><span className="text-[10px] font-semibold text-slate-500">{idea.createdDate}</span></div><h3 className="font-heading mt-4 text-[20px] font-extrabold text-slate-800">{idea.title}</h3><p className="mt-1 text-[12px] font-medium text-slate-500">By {idea.founder}</p><p className="mt-3 text-[13px] leading-5 text-slate-600">{idea.desc}</p><div className="mt-4 border-t border-slate-200 pt-3 text-[11px] font-semibold text-slate-600">Seeking: {idea.seeking}</div></article>)}</div></section>
+        </main>
+      )}
+
+      {/* HERO BANNER — kept minimal for signed-in users; workflow lives only on signed-out home */}
+      {activeTab !== "dashboard" && activeTab !== "home" && activeTab !== "chats" && (
+        <section className="mx-auto max-w-[1200px] px-5 md:px-8 pt-8 pb-6">
+          <div className="max-w-[760px]">
+            <div className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-white border border-slate-200 text-xs text-slate-600 font-semibold shadow-sm">
+              <span className="h-2 w-2 rounded-full bg-emerald-500 animate-pulse" />
+              University of Hyderabad • Students Only Community
+            </div>
+            <h1 className="font-heading text-[30px] sm:text-[38px] md:text-[44px] font-extrabold leading-[1.08] tracking-tight mt-4 text-slate-900">
+              {currentUser?.role === "founder" && "Share your idea. Find your builders and backers."}
+              {currentUser?.role === "talent" && "Discover UoH ideas to build with."}
+              {currentUser?.role === "backer" && "Discover UoH ideas to support."}
+              {currentUser?.role === "admin" && "Admin overview — ideas, talent & backers."}
+              {!currentUser && <>Connect on <span className="bg-gradient-to-r from-violet-600 to-indigo-600 bg-clip-text text-transparent">Startup Ideas</span>. Chat directly after acceptance.</>}
+            </h1>
+            <p className="text-[14.5px] md:text-[15px] leading-[1.65] text-slate-600 mt-3 max-w-[620px]">
+              {currentUser?.role === "founder" && "An initiative for University of Hyderabad students — post ideas, meet verified campus talent, and pitch campus backers."}
+              {currentUser?.role === "talent" && "An initiative for University of Hyderabad students — browse founder ideas and send a request to collaborate."}
+              {currentUser?.role === "backer" && "An initiative for University of Hyderabad students — browse founder ideas and skilled talent, then connect with promising teams."}
+              {currentUser?.role === "admin" && "University of Hyderabad — Startify internal review. You have all data; no public admin signup."}
+              {!currentUser && "For University of Hyderabad students. Sign in as Founder, Builder, or Backer to connect and chat after acceptance."}
+            </p>
+            <div className="mt-5 flex flex-wrap gap-3">
+              {currentUser?.role === "founder" && <button onClick={() => setIdeaModalOpen(true)} className="h-10 px-5 rounded-full bg-slate-900 text-white font-bold text-[13px] hover:bg-slate-800 shadow transition">Post Your Idea</button>}
+              {currentUser && <button onClick={() => setActiveTab("dashboard")} className="h-10 px-5 rounded-full bg-slate-900 text-white font-bold text-[13px] hover:bg-slate-800 shadow transition">Open My Dashboard</button>}
+              {!currentUser && <button onClick={() => { setAuthMode("register"); setAuthModalOpen(true); }} className="h-10 px-5 rounded-full bg-slate-900 text-white font-bold text-[13px] hover:bg-slate-800 shadow transition">Get Started</button>}
             </div>
           </div>
         </section>
@@ -777,7 +1096,7 @@ export default function App() {
       {/* ==========================================================================
          TAB 1: IDEAS BOARD (FRONT PAGE SHOWCASE)
          ========================================================================== */}
-      {activeTab === "ideas" && (
+      {activeTab === "ideas" && currentUser && (
         <section id="ideas" className="mx-auto max-w-[1200px] px-5 md:px-8 py-12">
           <div className="flex flex-col md:flex-row md:items-end justify-between gap-6 border-b border-white/10 pb-6">
             <div>
@@ -792,14 +1111,12 @@ export default function App() {
               </p>
             </div>
 
-            <button
-              onClick={() =>
-                requireAuth(() => setIdeaModalOpen(true))
-              }
-              className="h-10 px-5 rounded-full bg-white text-black font-bold text-[13px] hover:bg-zinc-200 transition shrink-0"
+            {currentUser?.role === "founder" && <button
+              onClick={() => setIdeaModalOpen(true)}
+              className="h-10 px-5 rounded-full bg-slate-900 text-white font-bold text-[13px] hover:bg-slate-800 shadow transition shrink-0"
             >
               + Post Idea
-            </button>
+            </button>}
           </div>
 
           {/* Search & Filters */}
@@ -812,7 +1129,7 @@ export default function App() {
                   className={`h-9 px-4 rounded-full text-[12.5px] font-semibold transition border ${
                     ideaCategoryFilter === cat
                       ? "bg-white text-black border-white"
-                      : "bg-zinc-950 text-zinc-400 border-white/10 hover:border-white/30"
+                      : "bg-white text-slate-600 border-slate-200 hover:border-slate-400"
                   }`}
                 >
                   {cat}
@@ -826,74 +1143,97 @@ export default function App() {
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
                 placeholder="Search ideas..."
-                className="w-full h-10 rounded-full bg-zinc-950 border border-white/15 px-4 text-[13px] text-white placeholder-zinc-500 outline-none focus:border-white"
+                className="w-full h-10 rounded-full bg-slate-50 border border-slate-200 px-4 text-[13px] text-slate-800 placeholder-slate-400 outline-none focus:border-slate-400"
               />
             </div>
           </div>
 
-          {/* Ideas Grid */}
+          {/* Ideas Grid — filtered per role (never shows own ideas) */}
+          {filteredIdeas.length === 0 ? (
+            <div className="mt-8 rounded-[24px] border border-dashed border-slate-200 bg-white/70 py-10 text-center text-sm text-slate-500">
+              {currentUser?.role === "founder"
+                ? "Founders don't browse other founders here — your ideas live in Dashboard. Switch to Talent/Backer preview to see ideas."
+                : "No ideas match your search right now."}
+            </div>
+          ) : (
+          <>
           <div className="mt-8 grid md:grid-cols-2 gap-6">
-            {filteredIdeas.map((idea) => (
+            {(showAllIdeas ? filteredIdeas : filteredIdeas.slice(0,6)).map((idea) => {
+              const allowed = canConnect(currentUser.role, "idea");
+              return (
               <div
                 key={idea.id}
-                className="rounded-[24px] border border-white/10 bg-zinc-950 p-6 flex flex-col justify-between hover:border-white/30 transition border-glow"
+                className="rounded-[24px] border border-slate-200 bg-white p-6 flex flex-col justify-between hover:border-slate-300 transition border-glow"
               >
                 <div>
                   <div className="flex items-start justify-between gap-3">
-                    <span className="text-[11px] font-bold px-3 py-1 rounded-full bg-zinc-900 border border-white/15 text-zinc-300">
+                    <span className="text-[11px] font-bold px-3 py-1 rounded-full bg-slate-100 border border-slate-200 text-slate-700">
                       {idea.category}
                     </span>
-                    <span className="text-[10px] font-bold px-2.5 py-0.5 rounded-full bg-white text-black">
+                    <span className="text-[10px] font-bold px-2.5 py-0.5 rounded-full bg-slate-900 text-white">
                       ✓ ID VERIFIED
                     </span>
                   </div>
 
-                  <h3 className="font-heading font-extrabold text-[22px] mt-4 text-white">
+                  <h3 className="font-heading font-extrabold text-[22px] mt-4 text-slate-900">
                     {idea.title}
                   </h3>
 
-                  <div className="text-[12px] text-zinc-400 mt-1 font-medium flex items-center gap-2">
+                  <div className="text-[12px] text-slate-500 mt-1 font-medium flex items-center gap-2">
                     <span>Founder: {idea.founder}</span>
                     {idea.studentId && (
-                      <span className="text-[10.5px] text-zinc-500 font-mono">
+                      <span className="text-[10.5px] text-slate-500 font-mono">
                         ({idea.studentId})
                       </span>
                     )}
                   </div>
 
-                  <p className="text-[14px] text-zinc-300 leading-[1.6] mt-4">
+                  <p className="text-[14px] text-slate-600 leading-[1.6] mt-4">
                     {idea.desc}
                   </p>
                 </div>
 
-                <div className="mt-6 pt-5 border-t border-white/10 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-                  <div className="text-[12px] text-zinc-400">
-                    <span className="font-semibold text-white">Seeking:</span>{" "}
-                    <span className="text-zinc-300">{idea.seeking}</span>
+                <div className="mt-6 pt-5 border-t border-slate-200 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                  <div className="text-[12px] text-slate-600">
+                    <span className="font-semibold text-slate-900">Seeking:</span>{" "}
+                    <span className="text-slate-800">{idea.seeking}</span>
                   </div>
 
-                  <button
-                    onClick={() =>
-                      requireAuth(() => {
-                        setTargetConnectItem(idea);
-                        setConnectModalOpen(true);
-                      })
-                    }
-                    className="h-10 px-5 rounded-full bg-white text-black text-[12.5px] font-bold hover:bg-zinc-200 transition shrink-0"
-                  >
-                    Connect / Pitch →
-                  </button>
+                  {allowed ? (
+                    <button
+                      onClick={() =>
+                        requireAuth(() => {
+                          setTargetConnectItem(idea);
+                          setConnectModalOpen(true);
+                        })
+                      }
+                      className="h-10 px-5 rounded-full bg-slate-900 text-white text-[12.5px] font-bold hover:bg-black transition shrink-0"
+                    >
+                      Connect / Pitch →
+                    </button>
+                  ) : (
+                    <span className="text-[11px] px-3 py-1.5 rounded-full bg-slate-50 border border-slate-200 text-slate-500">Connect available to Talent & Backers</span>
+                  )}
                 </div>
               </div>
-            ))}
+            );})}
           </div>
+          {filteredIdeas.length > 6 && (
+            <div className="mt-6 flex justify-center">
+              <button onClick={() => setShowAllIdeas(!showAllIdeas)} className="h-10 px-6 rounded-full bg-white border border-slate-200 text-sm font-semibold hover:bg-slate-50 shadow-sm">
+                {showAllIdeas ? "Show less" : `Show all ${filteredIdeas.length} ideas →`}
+              </button>
+            </div>
+          )}
+          </>
+          )}
         </section>
       )}
 
       {/* ==========================================================================
          TAB 2: SKILLED TALENT DIRECTORY
          ========================================================================== */}
-      {activeTab === "talent" && (
+      {activeTab === "talent" && currentUser && (
         <section id="talent" className="mx-auto max-w-[1200px] px-5 md:px-8 py-12">
           <div className="flex flex-col md:flex-row md:items-end justify-between gap-6 border-b border-white/10 pb-6">
             <div>
@@ -914,64 +1254,77 @@ export default function App() {
                 setSelectedRegisterRole("talent");
                 setAuthModalOpen(true);
               }}
-              className="h-10 px-5 rounded-full border border-white/20 bg-zinc-950 text-white font-semibold text-[13px] hover:bg-zinc-800 transition"
+              className="h-10 px-5 rounded-full border border-slate-900 bg-slate-900 text-white font-semibold text-[13px] hover:bg-black transition shadow"
             >
               + Register as Skilled Talent
             </button>
           </div>
 
           <div className="mt-8 grid sm:grid-cols-2 lg:grid-cols-4 gap-5">
-            {builders.map((b) => (
+            {visibleBuilders.length === 0 ? (
+              <div className="col-span-full rounded-[22px] border border-dashed border-slate-200 bg-white/60 py-10 text-center text-sm text-slate-500">No other builders to show — you’re the only builder here (switch to Founder/Backer to see talent).</div>
+            ) : (showAllBuilders ? visibleBuilders : visibleBuilders.slice(0,8)).map((b) => {
+              const allowed = canConnect(currentUser.role, "builder");
+              return (
               <div
                 key={b.id}
-                className="rounded-[22px] border border-white/10 bg-zinc-950 p-5 flex flex-col justify-between hover:border-white/25 transition border-glow"
+                className="rounded-[22px] border border-slate-200 bg-white p-5 flex flex-col justify-between hover:border-slate-300 transition border-glow"
               >
                 <div>
                   <div className="flex items-center justify-between">
-                    <div className="h-11 w-11 rounded-full bg-white text-black grid place-items-center font-bold font-heading text-[16px]">
-                      {b.name[0]}
-                    </div>
-                    <span className="text-[9.5px] font-bold px-2 py-0.5 rounded-full bg-zinc-900 text-zinc-300 border border-white/15">
+                    <div className="h-11 w-11 rounded-full bg-slate-100 border border-slate-200 grid place-items-center text-[20px] shrink-0">👤</div>
+                    <span className="text-[9.5px] font-bold px-2 py-0.5 rounded-full bg-slate-100 text-slate-700 border border-slate-200">
                       ✓ STUDENT ID
                     </span>
                   </div>
 
-                  <div className="font-heading font-bold text-[18px] mt-4 text-white">
+                  <div className="font-heading font-bold text-[18px] mt-4 text-slate-900">
                     {b.name}
                   </div>
-                  <div className="text-[12px] font-semibold text-zinc-300 mt-0.5">
+                  <div className="text-[12px] font-semibold text-slate-600 mt-0.5">
                     {b.role}
                   </div>
 
-                  <div className="mt-4 p-3 rounded-xl bg-zinc-900 border border-white/5 text-[12px]">
-                    <div className="text-zinc-400 text-[10.5px] font-bold uppercase tracking-wider">
+                  <div className="mt-4 p-3 rounded-xl bg-slate-50 border border-slate-200 text-[12px]">
+                    <div className="text-slate-500 text-[10.5px] font-bold uppercase tracking-wider">
                       Skills
                     </div>
-                    <div className="text-zinc-200 mt-1 font-medium">{b.skills}</div>
+                    <div className="text-slate-800 mt-1 font-medium">{b.skills}</div>
                   </div>
                 </div>
 
-                <button
-                  onClick={() =>
-                    requireAuth(() => {
-                      setTargetConnectItem(b);
-                      setConnectModalOpen(true);
-                    })
-                  }
-                  className="mt-5 w-full h-9 rounded-full border border-white/20 text-[12px] font-semibold text-white hover:bg-white hover:text-black transition"
-                >
-                  Invite to Team →
-                </button>
+                {allowed ? (
+                  <button
+                    onClick={() =>
+                      requireAuth(() => {
+                        setTargetConnectItem(b);
+                        setConnectModalOpen(true);
+                      })
+                    }
+                    className="mt-5 w-full h-9 rounded-full border border-slate-900 bg-slate-900 text-white text-[12px] font-semibold hover:bg-black transition"
+                  >
+                    Invite to Team →
+                  </button>
+                ) : (
+                  <span className="mt-5 w-full h-9 grid place-items-center rounded-full bg-slate-50 border border-slate-200 text-[11px] text-slate-500">Builders connect via Founders & Backers</span>
+                )}
               </div>
-            ))}
+            );})}
           </div>
+          {visibleBuilders.length > 8 && (
+            <div className="mt-6 flex justify-center">
+              <button onClick={() => setShowAllBuilders(!showAllBuilders)} className="h-10 px-6 rounded-full bg-white border border-slate-200 text-sm font-semibold hover:bg-slate-50 shadow-sm">
+                {showAllBuilders ? "Show less" : `Show all ${visibleBuilders.length} builders →`}
+              </button>
+            </div>
+          )}
         </section>
       )}
 
       {/* ==========================================================================
          TAB 3: BACKERS HUB
          ========================================================================== */}
-      {activeTab === "backers" && (
+      {activeTab === "backers" && currentUser && (
         <section id="backers" className="mx-auto max-w-[1200px] px-5 md:px-8 py-12">
           <div className="flex flex-col md:flex-row md:items-end justify-between gap-6 border-b border-white/10 pb-6">
             <div>
@@ -992,61 +1345,74 @@ export default function App() {
                 setSelectedRegisterRole("backer");
                 setAuthModalOpen(true);
               }}
-              className="h-10 px-5 rounded-full border border-white/20 bg-zinc-950 text-white font-semibold text-[13px] hover:bg-zinc-800 transition"
+              className="h-10 px-5 rounded-full border border-slate-900 bg-slate-900 text-white font-semibold text-[13px] hover:bg-black transition shadow"
             >
               + Register as Backer
             </button>
           </div>
 
           <div className="mt-8 grid md:grid-cols-2 gap-6">
-            {funders.map((f) => (
+            {visibleFunders.length === 0 ? (
+              <div className="col-span-full rounded-[24px] border border-dashed border-slate-200 bg-white/60 py-10 text-center text-sm text-slate-500">No other backers to show — pitch flows founder → backer. Builders connect to backers via ideas, not directly.</div>
+            ) : (showAllFunders ? visibleFunders : visibleFunders.slice(0,6)).map((f) => {
+              const allowed = canConnect(currentUser.role, "backer");
+              return (
               <div
                 key={f.id}
-                className="rounded-[24px] border border-white/15 bg-zinc-950 p-6 flex flex-col justify-between hover:border-white/30 transition border-glow"
+                className="rounded-[24px] border border-slate-200 bg-white p-6 flex flex-col justify-between hover:border-slate-300 transition border-glow"
               >
                 <div>
                   <div className="flex items-start justify-between gap-3">
-                    <div className="h-10 w-10 rounded-full border border-white/20 bg-zinc-900 grid place-items-center font-bold text-white font-heading text-[15px]">
-                      {f.name[0]}
-                    </div>
-                    <span className="text-[10.5px] font-bold px-3 py-1 rounded-full bg-white text-black">
+                    <div className="h-10 w-10 rounded-full border border-slate-200 bg-slate-100 grid place-items-center text-[18px] shrink-0">👤</div>
+                    <span className="text-[10.5px] font-bold px-3 py-1 rounded-full bg-slate-900 text-white">
                       {f.ticketSize}
                     </span>
                   </div>
 
-                  <h3 className="font-heading font-extrabold text-[20px] mt-4 text-white">
+                  <h3 className="font-heading font-extrabold text-[20px] mt-4 text-slate-900">
                     {f.name}
                   </h3>
-                  <div className="text-[12px] text-zinc-400 font-medium">
+                  <div className="text-[12px] text-slate-500 font-medium">
                     {f.role}
                   </div>
 
-                  <div className="mt-3 p-3 rounded-xl bg-zinc-900 border border-white/10 text-[12px]">
-                    <span className="text-zinc-400 font-semibold">Focus Areas:</span>{" "}
-                    <span className="text-white">{f.focus}</span>
+                  <div className="mt-3 p-3 rounded-xl bg-slate-50 border border-slate-200 text-[12px]">
+                    <span className="text-slate-500 font-semibold">Focus Areas:</span>{" "}
+                    <span className="text-slate-800">{f.focus}</span>
                   </div>
 
-                  <p className="text-[13.5px] text-zinc-300 leading-[1.55] mt-4">
+                  <p className="text-[13.5px] text-slate-600 leading-[1.55] mt-4">
                     {f.bio}
                   </p>
                 </div>
 
-                <div className="mt-6 pt-4 border-t border-white/10">
-                  <button
-                    onClick={() =>
-                      requireAuth(() => {
-                        setTargetConnectItem(f);
-                        setConnectModalOpen(true);
-                      })
-                    }
-                    className="w-full h-10 rounded-full bg-white text-black text-[12.5px] font-bold hover:bg-zinc-200 transition"
-                  >
-                    Pitch Idea to Backer →
-                  </button>
+                <div className="mt-6 pt-4 border-t border-slate-200">
+                  {allowed ? (
+                    <button
+                      onClick={() =>
+                        requireAuth(() => {
+                          setTargetConnectItem(f);
+                          setConnectModalOpen(true);
+                        })
+                      }
+                      className="w-full h-10 rounded-full bg-slate-900 text-white text-[12.5px] font-bold hover:bg-black transition"
+                    >
+                      Pitch Idea to Backer →
+                    </button>
+                  ) : (
+                    <span className="w-full h-10 grid place-items-center rounded-full bg-slate-50 border border-slate-200 text-[11px] text-slate-500">Builders connect via ideas — backers review pitches from founders</span>
+                  )}
                 </div>
               </div>
-            ))}
+            );})}
           </div>
+          {visibleFunders.length > 6 && (
+            <div className="mt-6 flex justify-center">
+              <button onClick={() => setShowAllFunders(!showAllFunders)} className="h-10 px-6 rounded-full bg-white border border-slate-200 text-sm font-semibold hover:bg-slate-50 shadow-sm">
+                {showAllFunders ? "Show less" : `Show all ${visibleFunders.length} backers →`}
+              </button>
+            </div>
+          )}
         </section>
       )}
 
@@ -1055,55 +1421,68 @@ export default function App() {
          ========================================================================== */}
       {activeTab === "events" && (
         <section id="events" className="mx-auto max-w-[1200px] px-5 md:px-8 py-12">
-          <div className="border-b border-white/10 pb-6">
-            <div className="text-[11px] font-bold tracking-widest text-zinc-400 uppercase">
-              MEETUPS & PITCH DAYS
+          <div className="flex flex-col gap-4 border-b border-white/10 pb-6 md:flex-row md:items-end md:justify-between">
+            <div>
+              <div className="text-[11px] font-bold tracking-widest text-zinc-400 uppercase">
+                MEETUPS & PITCH DAYS
+              </div>
+              <h2 className="font-heading text-[22px] sm:text-[26px] md:text-[32px] lg:text-[36px] font-extrabold mt-1 leading-tight text-balance">
+                Upcoming Community Events
+              </h2>
+              <p className="text-[13.5px] text-zinc-400 mt-1 max-w-[600px]">
+                Present your idea or meet co-founders in person & online.
+              </p>
             </div>
-            <h2 className="font-heading text-[28px] md:text-[36px] font-extrabold mt-1">
-              Upcoming Community Events
-            </h2>
-            <p className="text-[13.5px] text-zinc-400 mt-1 max-w-[600px]">
-              Present your idea or meet co-founders in person & online.
-            </p>
+            {currentUser?.role === "admin" && (
+              <button
+                onClick={() => setEventAddModalOpen(true)}
+                className="h-10 px-5 rounded-full bg-white text-black font-bold text-[12.5px] hover:bg-zinc-200 transition"
+              >
+                + Add Event
+              </button>
+            )}
           </div>
 
           <div className="mt-8 grid md:grid-cols-2 gap-6">
             {events.map((ev) => (
               <div
                 key={ev.id}
-                className="rounded-[24px] border border-white/10 bg-zinc-950 p-6 flex flex-col justify-between hover:border-white/30 transition border-glow"
+                className="rounded-[24px] border border-slate-200 bg-white p-6 flex flex-col justify-between hover:border-slate-300 transition shadow-sm"
+                style={{color: '#0f172a'}}
               >
                 <div>
                   <div className="flex items-center justify-between">
-                    <span className="text-[10.5px] font-bold px-3 py-1 rounded-full bg-zinc-900 border border-white/15 text-zinc-300 uppercase">
+                    <span className="text-[10.5px] font-bold px-3 py-1 rounded-full bg-slate-100 border border-slate-200 text-slate-700 uppercase">
                       {ev.category}
                     </span>
-                    <span className="text-[11px] text-zinc-400 font-medium">
+                    <span className="text-[11px] text-slate-500 font-medium">
                       {ev.date}
                     </span>
                   </div>
 
-                  <h3 className="font-heading font-extrabold text-[20px] mt-4 text-white">
+                  <h3 className="font-heading font-extrabold text-[20px] mt-4" style={{color: '#0f172a'}}>
                     {ev.title}
                   </h3>
 
-                  <div className="mt-3 space-y-1.5 text-[12.5px] text-zinc-300">
+                  <div className="mt-3 space-y-1.5 text-[12.5px] text-slate-600">
                     <div>🕒 <strong>Time:</strong> {ev.time}</div>
                     <div>📍 <strong>Venue:</strong> {ev.venue}</div>
                   </div>
 
-                  <p className="text-[13.5px] text-zinc-400 leading-[1.55] mt-4">
+                  <p className="text-[13.5px] leading-[1.55] mt-4" style={{color: '#334155'}}>
                     {ev.desc}
                   </p>
                 </div>
 
-                <div className="mt-6 pt-4 border-t border-white/10">
+                <div className="mt-6 pt-4 border-t border-slate-200">
                   <button
                     onClick={() => {
-                      setTargetEvent(ev);
-                      setEventModalOpen(true);
+                      requireAuth(() => {
+                        setTargetEvent(ev);
+                        setEventModalOpen(true);
+                      });
                     }}
-                    className="w-full h-10 rounded-full bg-white text-black text-[12.5px] font-bold hover:bg-zinc-200 transition"
+                    className="w-full h-10 rounded-full bg-slate-900 text-white text-[12.5px] font-bold hover:bg-slate-800 transition"
                   >
                     RSVP for Event →
                   </button>
@@ -1114,61 +1493,375 @@ export default function App() {
         </section>
       )}
 
+      {/* A separate inbox keeps interest-based conversations away from discovery. */}
+      {activeTab === "chats" && currentUser && (
+        <section className="mx-auto max-w-[1200px] px-5 py-10 md:px-8">
+          <div className="rounded-[28px] border border-slate-200 bg-white p-6 shadow-sm">
+            <div className="mb-7 flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between"><div><div className="inline-flex items-center gap-1.5 rounded-full bg-indigo-50 border border-indigo-200 px-2.5 py-1 text-[10px] font-bold uppercase tracking-widest text-indigo-700">University of Hyderabad • Private</div><h1 className="font-heading mt-3 text-[32px] font-extrabold text-slate-800">Your interest-based chats</h1><p className="mt-1 text-[13.5px] text-slate-500">Only accepted connections can start a conversation. Keep it respectful — this is a UoH student community.</p></div><div className="rounded-2xl bg-amber-50 border border-amber-200 p-3 text-[11px] leading-4 text-amber-800 max-w-[320px]"><strong>Community note:</strong> Misuse of chat can lead to removal. Conversations are interest-based and require acceptance.</div></div>
+            <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+              {myAcceptedConnections.map((req) => {
+                const partnerName = req.senderId === currentUser.id ? req.receiverName : req.senderName;
+                const partnerRole = req.senderId === currentUser.id ? req.receiverRole || "partner" : req.senderRole;
+                const latest = messages.filter((m) => m.requestId === req.id).slice(-1)[0];
+                return <button key={req.id} onClick={() => { setActiveChatRequest(req); setChatModalOpen(true); }} className="rounded-[22px] border border-slate-200 bg-white/80 p-5 text-left shadow-sm transition hover:border-slate-300"><div className="flex items-center gap-3"><div className="grid h-11 w-11 place-items-center rounded-full bg-slate-100 font-heading font-bold text-slate-700">{partnerName[0]}</div><div><div className="font-heading font-bold text-slate-800">{partnerName}</div><div className="text-[11px] uppercase tracking-wide text-slate-500">{partnerRole}</div></div></div><div className="mt-5 border-t border-slate-200 pt-4"><div className="text-[11px] font-semibold text-slate-500">Shared interest: {req.targetTitle}</div><p className="mt-2 line-clamp-2 text-[13px] text-slate-600">{latest ? latest.text : "Your connection is ready — send the first message."}</p></div></button>;
+              })}
+            </div>
+            {myAcceptedConnections.length === 0 && <div className="rounded-[22px] border border-dashed border-slate-200 bg-slate-50/80 py-14 text-center text-sm text-slate-500">No chats yet. Connect with a person whose work interests you, then chat once they accept.</div>}
+          </div>
+        </section>
+      )}
+
       {/* ==========================================================================
          TAB 5: ROLE-SPECIFIC DASHBOARD (FOR LOGGED IN USER)
          ========================================================================== */}
       {activeTab === "dashboard" && currentUser && (
-        <section className="mx-auto max-w-[1200px] px-5 md:px-8 py-10">
-          {/* Dashboard Header */}
-          <div className="rounded-[28px] border border-white/15 bg-zinc-950 p-6 md:p-8 flex flex-col md:flex-row items-start md:items-center justify-between gap-6 border-glow">
-            <div>
-              <div className="flex items-center gap-2">
-                <span className="px-3 py-1 rounded-full bg-white text-black font-extrabold text-[11px] uppercase">
-                  {currentUser.role} DASHBOARD
-                </span>
-                {currentUser.studentId && (
-                  <span className="text-[11px] text-zinc-400 font-mono">
-                    ({currentUser.studentId})
-                  </span>
+        <section className="dashboard-surface mx-auto max-w-[1200px] px-5 md:px-8 py-10">
+          {/* Profile Card — shows who you are + same-email role switcher */}
+          {(() => {
+            const initials = currentUser.name.split(" ").map(s=>s[0]).join("").slice(0,2).toUpperCase();
+            const isVerified = verifiedEmails.includes(currentUser.email.toLowerCase()) || ["admin","founder","talent","backer"].includes(currentUser.role) && DEMO_USERS.some(u=>u.email.toLowerCase()===currentUser.email.toLowerCase());
+            const profilesKey = "startify_user_profiles";
+            const allProfiles = (()=>{ try{
+              const a=JSON.parse(localStorage.getItem(profilesKey)||"[]");
+              const regs=JSON.parse(localStorage.getItem("startify_registrations")||"[]");
+              const fromRegs=regs.map(r=>({id:r.email, name:r.name, email:r.email, role: r.role==="builder"?"talent": r.role==="funder"?"backer": r.role}));
+              const pb=JSON.parse(localStorage.getItem("startify_pending_backers")||"[]");
+              const fromPb=pb.map(p=>({id:p.id, name:p.name, email:p.email, role:"backer"}));
+              const ab=JSON.parse(localStorage.getItem("startify_admin_builders")||"[]");
+              const fromAb=ab.map(b=>({id:b.id, name:b.name, email:(b.email||b.id+"@uohyd.ac.in"), role:"talent"}));
+              const af=JSON.parse(localStorage.getItem("startify_admin_funders")||"[]");
+              const fromAf=af.map(f=>({id:f.id, name:f.name, email:(f.email||f.id+"@startify.net"), role:"backer"}));
+              return [...a, ...fromRegs, ...fromPb, ...fromAb, ...fromAf, ...DEMO_USERS];
+            }catch{ return [...DEMO_USERS]; }})();
+            const sameEmailProfiles = allProfiles.filter(p=> p.email && p.email.toLowerCase()===currentUser.email.toLowerCase());
+            const roleOptions = [
+              {role:"founder", label:"Founder", desc:"Post ideas", needUoH:true},
+              {role:"talent", label:"Builder", desc:"Join teams", needUoH:true},
+              {role:"backer", label:"Backer", desc:"Fund ideas", needUoH:false},
+            ];
+            const hasRole = (r) => sameEmailProfiles.some(p=>p.role===r) || currentUser.role===r;
+            const isSameEmailRolePending = (r) => r==="backer" && pendingBackers.some(p=>p.email.toLowerCase()===currentUser.email.toLowerCase());
+            return (
+              <div className="rounded-[28px] border border-slate-200 bg-white p-4 sm:p-6 md:p-7">
+                <div className="flex gap-3 sm:gap-4 items-start">
+                  {(() => {
+                    const img = getProfileImage(currentUser.email);
+                    return (
+                      <div className="relative shrink-0">
+                        {img ? (
+                          <img src={img} alt={currentUser.name} className="h-12 w-12 sm:h-16 sm:w-16 rounded-2xl object-cover border border-slate-200 shadow-sm" />
+                        ) : (
+                          <div className="h-12 w-12 sm:h-16 sm:w-16 rounded-2xl bg-slate-100 border border-slate-200 grid place-items-center text-2xl sm:text-3xl">👤</div>
+                        )}
+                        <label className="absolute -bottom-1 -right-1 h-6 w-6 sm:h-7 sm:w-7 rounded-full bg-white border border-slate-200 shadow-sm grid place-items-center text-[9px] sm:text-[10px] font-bold text-slate-600 cursor-pointer hover:bg-slate-50" title="Upload profile image">
+                          Edit
+                          <input type="file" accept="image/*" className="hidden" onChange={(e)=>{
+                            const file=e.target.files[0];
+                            if(!file) return;
+                            if(file.size > 2*1024*1024){ showToast("Image too large — max 2MB"); return; }
+                            const reader=new FileReader();
+                            reader.onload=()=>{
+                              try{
+                                localStorage.setItem(getProfileImageKey(currentUser.email), reader.result);
+                                // also update unified profile store
+                                try{
+                                  const key2="startify_user_profiles";
+                                  const arr=JSON.parse(localStorage.getItem(key2)||"[]");
+                                  const idx=arr.findIndex(p=> p.email.toLowerCase()===currentUser.email.toLowerCase() && p.role===currentUser.role);
+                                  if(idx>=0){ arr[idx].profileImage=reader.result; localStorage.setItem(key2, JSON.stringify(arr)); }
+                                }catch{}
+                                showToast("✓ Profile image updated");
+                                // force re-render
+                                setProfileSwitcherOpen(v=>v);
+                              }catch{ showToast("Failed to save image"); }
+                            };
+                            reader.readAsDataURL(file);
+                          }}/>
+                        </label>
+                      </div>
+                    );
+                  })()}
+                  <div className="min-w-0 flex-1">
+                    <div className="flex flex-wrap items-center gap-1.5 sm:gap-2">
+                      <h1 className="font-heading text-[18px] sm:text-[24px] md:text-[28px] font-extrabold leading-none text-slate-900">Welcome, {currentUser.name}</h1>
+                      <span className={`px-2 py-0.5 sm:px-2.5 sm:py-1 rounded-full text-[10px] sm:text-[11px] font-bold border ${currentUser.role==="founder"?"bg-indigo-50 border-indigo-200 text-indigo-700":currentUser.role==="talent"?"bg-sky-50 border-sky-200 text-sky-700":currentUser.role==="backer"?"bg-violet-50 border-violet-200 text-violet-700":"bg-amber-50 border-amber-200 text-amber-700"}`}>{ROLE_META[currentUser.role]?.label || currentUser.role.toUpperCase()}</span>
+                      {isVerified ? <span className="inline-flex items-center px-2 py-0.5 sm:px-2 sm:py-1 rounded-full bg-emerald-50 border border-emerald-200 text-emerald-700 text-[10px] sm:text-[11px] font-bold whitespace-nowrap">✓ Verified</span> : <span className="px-2 py-0.5 sm:py-1 rounded-full bg-slate-100 border border-slate-200 text-slate-600 text-[10px] sm:text-[11px] font-bold">Unverified</span>}
+                      {currentUser._backerPending && <span className="px-2 py-0.5 sm:py-1 rounded-full bg-amber-500 text-white text-[10px] sm:text-[11px] font-bold">Pending admin</span>}
+                    </div>
+                    <div className="mt-1.5 sm:mt-2 text-xs sm:text-sm text-slate-600 truncate">{currentUser.email}</div>
+                    {(() => {
+                      const about = getProfileAbout(currentUser.email) || currentUser.bio || "";
+                      return (
+                        <div className="mt-2 sm:mt-3">
+                          {about ? <p className="text-xs sm:text-sm text-slate-700 leading-4 sm:leading-5 bg-slate-50 border border-slate-200 rounded-xl p-2.5 sm:p-3 line-clamp-3">{about}</p> : <p className="text-xs sm:text-sm text-slate-400 italic">No about yet — tell others what you build or fund.</p>}
+                          <button onClick={()=>{ setProfileAboutDraft(about); setProfileEditOpen(true); }} className="mt-2 h-7 sm:h-8 px-2.5 sm:px-3 rounded-full bg-white border border-slate-200 text-[11px] sm:text-xs font-bold text-slate-700 hover:bg-slate-50">{about ? "Edit about" : "Add about"}</button>
+                        </div>
+                      );
+                    })()}
+                    {currentUser.role === "talent" && (
+                      <div className="mt-3 p-3 rounded-xl bg-slate-50 border border-slate-200">
+                        <div className="text-[11px] font-bold uppercase tracking-widest text-slate-500">Your skills</div>
+                        <div className="mt-1 text-sm text-slate-800 font-semibold">{currentUser.roleTitle || "Builder"}</div>
+                        <div className="text-xs text-slate-600 mt-1 break-words">{currentUser.skills || "No skills added yet — add your stack to attract founders."}</div>
+                        <button onClick={()=>{ setProfileRoleTitleDraft(currentUser.roleTitle||""); setProfileSkillsDraft(currentUser.skills||""); setProfileSkillsEditOpen(true); }} className="mt-2 h-7 px-3 rounded-full bg-white border border-slate-200 text-[11px] font-bold text-slate-700 hover:bg-slate-50">Edit skills</button>
+                      </div>
+                    )}
+                    {currentUser.role === "backer" && (
+                      <div className="mt-3 p-3 rounded-xl bg-slate-50 border border-slate-200">
+                        <div className="text-[11px] font-bold uppercase tracking-widest text-slate-500">Your focus</div>
+                        <div className="text-xs text-slate-600 mt-1 break-words">{currentUser.focus || "No focus set — add what you fund."}</div>
+                        <button onClick={()=>{ setProfileFocusDraft(currentUser.focus||""); setProfileSkillsEditOpen(true); }} className="mt-2 h-7 px-3 rounded-full bg-white border border-slate-200 text-[11px] font-bold text-slate-700 hover:bg-slate-50">Edit focus</button>
+                      </div>
+                    )}
+                    <p className="hidden sm:block text-[13px] text-slate-600 mt-3 leading-5">
+                      {currentUser.role === "founder" && "Manage your posted startup ideas, view incoming talent & backer requests, and chat directly."}
+                      {currentUser.role === "talent" && "View your builder profile, track incoming team invites, and talk to founders."}
+                      {currentUser.role === "backer" && "View founder pitches, manage dealflow inquiries, and chat directly with student startups."}
+                      {currentUser.role === "admin" && "Sole admin — you have all data. Manage ideas, backers, and OTP logs at /admin.html."}
+                    </p>
+                    {currentUser.role==="founder" && <div className="mt-2 sm:mt-3"><button onClick={()=> setIdeaModalOpen(true)} className="h-8 sm:h-9 px-3 sm:px-4 rounded-full bg-slate-900 text-white text-[11px] sm:text-xs font-bold hover:bg-slate-800">+ Post New Idea</button></div>}
+                  </div>
+                  <button onClick={()=> setProfileSwitcherOpen(!profileSwitcherOpen)} className="shrink-0 h-8 w-8 sm:h-10 sm:w-10 rounded-full border border-slate-200 bg-slate-50 grid place-items-center text-slate-700 hover:bg-white hover:border-slate-300 shadow-sm" title="Switch profile (same email)">
+                    <span className={`transition-transform text-base sm:text-lg ${profileSwitcherOpen?"rotate-180":""}`}>⌄</span>
+                  </button>
+                </div>
+                {profileSwitcherOpen && (
+                  <div className="mt-3 rounded-2xl border border-slate-200 bg-slate-50 p-4">
+                    <div className="grid md:grid-cols-3 gap-3">
+                      {roleOptions.map(o=>{
+                        const active = currentUser.role===o.role;
+                        const exists = hasRole(o.role);
+                        const pending = isSameEmailRolePending(o.role);
+                        const needUoHFail = o.needUoH && !currentUser.email.toLowerCase().endsWith("@uohyd.ac.in");
+                        return (
+                          <div key={o.role} className={`flex flex-col p-3 rounded-xl border ${active?"bg-slate-900 border-slate-900 text-white":"bg-white border-slate-200"}`}>
+                            <div className="flex items-center gap-2">
+                              <div className={`text-sm font-bold ${active?"text-white":"text-slate-800"}`}>{o.label}</div>
+                              {pending ? <span className="ml-auto text-[10px] px-1.5 py-0.5 rounded-full bg-amber-500 text-white">pending</span>: exists && !active ? <span className="ml-auto text-[10px] px-1.5 py-0.5 rounded-full bg-emerald-50 border border-emerald-200 text-emerald-700">ready</span>: null}
+                            </div>
+                            <div className={`text-[11px] mt-2 ${active?"text-white/70":"text-slate-500"}`}>{o.desc} {o.needUoH? "• @uohyd.ac.in":"• any email"}</div>
+                            <div className="mt-3">
+                              {active ? <span className="inline-flex h-8 px-3 rounded-full bg-white/15 border border-white/20 text-xs font-bold text-white items-center">Active</span> : needUoHFail ? <span className="text-[11px] text-amber-600 font-semibold">Needs @uohyd.ac.in</span> : exists ? <button onClick={()=>{
+                                const target = sameEmailProfiles.find(p=> p.role===o.role);
+                                if(target){
+                                  // Keep same name and profile image for same email across roles
+                                  const img = getProfileImage(currentUser.email);
+                                  if(img) try{ localStorage.setItem(getProfileImageKey(target.email), img); }catch{}
+                                  const mapped={ id: target.id, name: currentUser.name, email: target.email, role: target.role, studentId: target.studentId|| currentUser.studentId, bio: getProfileAbout(target.email) || target.bio|| currentUser.bio||"", roleTitle: target.roleTitle||"", skills: target.skills||"", focus: target.focus||"" }; setCurrentUser(mapped); setProfileSwitcherOpen(false); showToast(`Switched to ${o.label} — same name & photo kept`);
+                                }
+                              }} className="h-8 px-3 rounded-full bg-slate-900 text-white text-xs font-bold hover:bg-slate-800 w-full">Switch →</button> : <button onClick={()=>{
+                                setAuthForm({...authForm, name: currentUser.name, email: currentUser.email, studentId: currentUser.studentId||"", roleTitle:"", skills:"", focus:"", bio:""});
+                                setSelectedRegisterRole(o.role);
+                                setAuthMode("register");
+                                setAuthModalOpen(true);
+                              }} className="h-8 px-3 rounded-full bg-white border border-slate-200 text-xs font-bold text-slate-700 hover:bg-slate-50 w-full">Create →</button>}
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </div>
+                )}
+                {profileEditOpen && (
+                  <div className="mt-4 rounded-2xl border border-slate-200 bg-white p-4">
+                    <div className="text-sm font-bold text-slate-800">Edit about</div>
+                    <p className="text-xs text-slate-500 mt-1">Visible on your profile card — tell others what you build or fund.</p>
+                    <textarea value={profileAboutDraft} onChange={e=> setProfileAboutDraft(e.target.value)} placeholder="I build... I study... I fund..." className="mt-3 w-full min-h-[110px] rounded-2xl border border-slate-200 bg-slate-50 p-3 text-sm outline-none focus:border-slate-300" />
+                    <div className="mt-3 flex justify-end gap-2">
+                      <button onClick={()=> setProfileEditOpen(false)} className="h-9 px-4 rounded-full border border-slate-200 text-sm font-semibold">Cancel</button>
+                      <button onClick={()=>{
+                        try{
+                          localStorage.setItem(getProfileAboutKey(currentUser.email), profileAboutDraft);
+                          const key2="startify_user_profiles";
+                          const arr=JSON.parse(localStorage.getItem(key2)||"[]");
+                          const idx=arr.findIndex(p=> p.email.toLowerCase()===currentUser.email.toLowerCase() && p.role===currentUser.role);
+                          if(idx>=0){ arr[idx].bio=profileAboutDraft; localStorage.setItem(key2, JSON.stringify(arr)); }
+                          setCurrentUser({...currentUser, bio: profileAboutDraft});
+                          setProfileEditOpen(false);
+                          showToast("✓ About updated");
+                        }catch{ showToast("Failed to save"); }
+                      }} className="h-9 px-5 rounded-full bg-slate-900 text-white text-sm font-bold">Save</button>
+                    </div>
+                  </div>
+                )}
+                {profileSkillsEditOpen && (
+                  <div className="mt-4 rounded-2xl border border-slate-200 bg-white p-4">
+                    {currentUser.role === "talent" ? (
+                      <>
+                        <div className="text-sm font-bold text-slate-800">Edit skills</div>
+                        <p className="text-xs text-slate-500 mt-1">Update your role title and skills — visible to founders.</p>
+                        <div className="mt-3 space-y-3">
+                          <div>
+                            <label className="block text-xs font-semibold text-slate-600 mb-1">Role title</label>
+                            <input value={profileRoleTitleDraft} onChange={e=> setProfileRoleTitleDraft(e.target.value)} placeholder="e.g. Full-Stack Engineer" className="w-full h-10 rounded-xl border border-slate-200 bg-slate-50 px-3 text-sm outline-none focus:border-slate-300" />
+                          </div>
+                          <div>
+                            <label className="block text-xs font-semibold text-slate-600 mb-1">Skills</label>
+                            <input value={profileSkillsDraft} onChange={e=> setProfileSkillsDraft(e.target.value)} placeholder="React, Node.js, Python" className="w-full h-10 rounded-xl border border-slate-200 bg-slate-50 px-3 text-sm outline-none focus:border-slate-300" />
+                          </div>
+                        </div>
+                        <div className="mt-3 flex justify-end gap-2">
+                          <button onClick={()=> setProfileSkillsEditOpen(false)} className="h-9 px-4 rounded-full border border-slate-200 text-sm font-semibold">Cancel</button>
+                          <button onClick={()=>{
+                            try{
+                              const emailLower = currentUser.email.toLowerCase();
+                              const newRoleTitle = profileRoleTitleDraft.trim();
+                              const newSkills = profileSkillsDraft.trim();
+                              setBuilders(prev => prev.map(b => (b.id === currentUser.id || (b.email && b.email.toLowerCase()===emailLower)) ? { ...b, role: newRoleTitle || b.role, skills: newSkills || b.skills } : b));
+                              try{
+                                const key2="startify_user_profiles";
+                                const arr=JSON.parse(localStorage.getItem(key2)||"[]");
+                                const idx=arr.findIndex(p=> p.email.toLowerCase()===emailLower && p.role===currentUser.role);
+                                if(idx>=0){ arr[idx].roleTitle=newRoleTitle; arr[idx].skills=newSkills; localStorage.setItem(key2, JSON.stringify(arr)); }
+                              }catch{}
+                              setCurrentUser({...currentUser, roleTitle: newRoleTitle || currentUser.roleTitle, skills: newSkills || currentUser.skills});
+                              setProfileSkillsEditOpen(false);
+                              showToast("✓ Skills updated");
+                            }catch{ showToast("Failed to save"); }
+                          }} className="h-9 px-5 rounded-full bg-slate-900 text-white text-sm font-bold">Save</button>
+                        </div>
+                      </>
+                    ) : currentUser.role === "backer" ? (
+                      <>
+                        <div className="text-sm font-bold text-slate-800">Edit focus</div>
+                        <p className="text-xs text-slate-500 mt-1">Update your investment focus — visible to founders.</p>
+                        <div className="mt-3">
+                          <label className="block text-xs font-semibold text-slate-600 mb-1">Focus / Expertise</label>
+                          <input value={profileFocusDraft} onChange={e=> setProfileFocusDraft(e.target.value)} placeholder="e.g. EdTech, AI & SaaS" className="w-full h-10 rounded-xl border border-slate-200 bg-slate-50 px-3 text-sm outline-none focus:border-slate-300" />
+                        </div>
+                        <div className="mt-3 flex justify-end gap-2">
+                          <button onClick={()=> setProfileSkillsEditOpen(false)} className="h-9 px-4 rounded-full border border-slate-200 text-sm font-semibold">Cancel</button>
+                          <button onClick={()=>{
+                            try{
+                              const emailLower = currentUser.email.toLowerCase();
+                              const newFocus = profileFocusDraft.trim();
+                              setFunders(prev => prev.map(f => (f.id === currentUser.id || (f.email && f.email.toLowerCase()===emailLower)) ? { ...f, focus: newFocus || f.focus } : f));
+                              try{
+                                const key2="startify_user_profiles";
+                                const arr=JSON.parse(localStorage.getItem(key2)||"[]");
+                                const idx=arr.findIndex(p=> p.email.toLowerCase()===emailLower && p.role===currentUser.role);
+                                if(idx>=0){ arr[idx].focus=newFocus; localStorage.setItem(key2, JSON.stringify(arr)); }
+                              }catch{}
+                              setCurrentUser({...currentUser, focus: newFocus || currentUser.focus});
+                              setProfileSkillsEditOpen(false);
+                              showToast("✓ Focus updated");
+                            }catch{ showToast("Failed to save"); }
+                          }} className="h-9 px-5 rounded-full bg-slate-900 text-white text-sm font-bold">Save</button>
+                        </div>
+                      </>
+                    ) : null}
+                  </div>
                 )}
               </div>
-              <h1 className="font-heading text-[28px] md:text-[34px] font-extrabold mt-2 text-white">
-                Welcome, {currentUser.name}
-              </h1>
-              <p className="text-[13.5px] text-zinc-400 mt-1">
-                {currentUser.role === "founder" && "Manage your posted startup ideas, view incoming talent & backer requests, and chat directly."}
-                {currentUser.role === "talent" && "View your builder profile, track incoming team invites, and talk to founders."}
-                {currentUser.role === "backer" && "View founder pitches, manage dealflow inquiries, and chat directly with student startups."}
-              </p>
-            </div>
+            );
+          })()}
 
-            <div className="flex items-center gap-3 shrink-0">
-              {currentUser.role === "founder" && (
-                <button
-                  onClick={() => setIdeaModalOpen(true)}
-                  className="h-10 px-5 rounded-full bg-white text-black font-bold text-[12.5px] hover:bg-zinc-200 transition"
-                >
-                  + Post New Idea
-                </button>
-              )}
+          {currentUser?._backerPending && (
+            <div className="mt-6 rounded-2xl border border-amber-200 bg-amber-50 p-4 flex items-start gap-3">
+              <div className="h-8 w-8 rounded-full bg-amber-500 text-white grid place-items-center font-bold shrink-0">!</div>
+              <div>
+                <div className="font-bold text-sm text-amber-900">Backer verification complete — pending admin approval</div>
+                <div className="text-xs text-amber-800 mt-1">Your OTP is verified. Admin will approve your backer ID shortly. You can browse ideas, but pitching & visibility in the Backers Hub will unlock after approval. For urgent approval, contact admin.</div>
+              </div>
             </div>
-          </div>
+          )}
+          {currentUser.role !== "admin" && <div className={`mt-8 grid gap-6 ${dashboardGroups.length === 1 ? "lg:grid-cols-1 max-w-[640px]" : "lg:grid-cols-2"}`}>
+            {dashboardGroups.map((group) => {
+              const allowed = canConnect(currentUser.role, group.kind);
+              return <section key={group.title} className="rounded-[24px] border border-slate-200 bg-white p-6">
+              <div className="border-b border-slate-200 pb-4"><div className="text-[11px] font-bold uppercase tracking-widest text-slate-500">DISCOVER</div><h2 className="font-heading mt-1 text-[26px] font-extrabold text-slate-800">{group.title}</h2><p className="mt-1 text-[12px] text-slate-500">{group.subtitle} {group.kind === "backer" && currentUser.role === "talent" ? "· not needed for builders" : ""}</p></div>
+              <div className="mt-4 space-y-3">{group.items.length === 0 ? <div className="py-6 text-center text-sm text-slate-500">Nothing to show here for your role right now.</div> : (group.kind === "builder" ? (showAllBuilders ? group.items : group.items.slice(0,3)) : group.kind === "backer" ? (showAllFunders ? group.items : group.items.slice(0,3)) : (showAllIdeas ? group.items : group.items.slice(0,3))).map((person) => { const isIdea = Boolean(person.title); const name = person.name || person.title; const detail = isIdea ? `${person.category} · ${person.founder}` : person.role || person.focus; return <div key={person.id} className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 rounded-2xl border border-slate-200 bg-slate-50 p-4"><div className="min-w-0 flex-1"><div className="truncate font-heading font-bold text-slate-800">{name}</div><div className="mt-0.5 truncate text-[11.5px] text-slate-500">{detail}</div></div>{allowed ? <button onClick={() => { setTargetConnectItem(person); setConnectModalOpen(true); }} className="w-full sm:w-auto shrink-0 rounded-full border border-slate-200 bg-slate-900 px-4 py-2 text-[11px] font-bold text-white hover:bg-slate-800 transition text-center">Connect</button> : <span className="shrink-0 text-[11px] text-slate-400 px-3 py-1.5 rounded-full bg-white border border-slate-200 text-center">Via ideas</span>}</div>; })}</div>
+              {group.items.length > 3 && (
+                <div className="mt-3 flex justify-center">
+                  <button onClick={() => {
+                    if (group.kind === "builder") setShowAllBuilders(!showAllBuilders);
+                    else if (group.kind === "backer") setShowAllFunders(!showAllFunders);
+                    else setShowAllIdeas(!showAllIdeas);
+                  }} className="h-8 px-4 rounded-full bg-white border border-slate-200 text-xs font-semibold hover:bg-slate-50">
+                    {(group.kind === "builder" ? showAllBuilders : group.kind === "backer" ? showAllFunders : showAllIdeas) ? "Show less" : `Show all ${group.items.length} →`}
+                  </button>
+                </div>
+              )}
+            </section>;})}
+          </div>}
+
+          {currentUser.role === "admin" && <div className="mt-8 grid gap-5 sm:grid-cols-4"><div className="rounded-[22px] border border-white/10 bg-zinc-950 p-6"><div className="text-xs text-zinc-400">Ideas under review</div><div className="font-heading mt-2 text-3xl font-extrabold">{ideas.filter((idea) => idea.status === "Pending Review").length}</div></div><div className="rounded-[22px] border border-white/10 bg-zinc-950 p-6"><div className="text-xs text-zinc-400">Talent profiles</div><div className="font-heading mt-2 text-3xl font-extrabold">{builders.length}</div></div><div className="rounded-[22px] border border-white/10 bg-zinc-950 p-6"><div className="text-xs text-zinc-400">Funders (approved)</div><div className="font-heading mt-2 text-3xl font-extrabold">{funders.length}</div></div><div className="rounded-[22px] border border-amber-200 bg-amber-500 p-6 text-white"><div className="text-xs text-white/80">Backers pending approval</div><div className="font-heading mt-2 text-3xl font-extrabold">{pendingBackers.length}</div></div></div>}
+
+          {currentUser.role === "admin" && (
+            <div className="mt-8 rounded-[24px] border border-slate-200 bg-white p-6">
+              <div className="flex items-center justify-between border-b border-slate-200 pb-4">
+                <h3 className="font-heading font-extrabold text-[24px] text-slate-800">Pending idea approvals</h3>
+                <span className="rounded-full bg-slate-100 border border-slate-200 px-3 py-1 text-xs font-bold text-slate-600">{ideas.filter((idea) => idea.status === "Pending Review").length} pending</span>
+              </div>
+              <div className="mt-4 space-y-3">
+                {ideas.filter((idea) => idea.status === "Pending Review").length === 0 ? (
+                  <div className="py-6 text-center text-sm text-slate-500">No ideas waiting for review.</div>
+                ) : (
+                  ideas.filter((idea) => idea.status === "Pending Review").map((idea) => (
+                    <div key={idea.id} className="flex flex-col gap-3 rounded-2xl border border-slate-200 bg-slate-50 p-4 md:flex-row md:items-center md:justify-between">
+                      <div>
+                        <div className="font-heading text-[20px] font-bold text-slate-800">{idea.title}</div>
+                        <div className="mt-1 text-[12px] text-slate-500">By {idea.founder} • {idea.category}</div>
+                        <p className="mt-2 text-[13px] text-slate-600">{idea.desc}</p>
+                      </div>
+                      <div className="flex gap-2 md:flex-col">
+                        <button onClick={() => handleApproveIdea(idea.id)} className="h-9 rounded-full bg-slate-100 border border-slate-200 px-4 text-[11px] font-bold text-slate-700 hover:bg-slate-200">Approve</button>
+                        <button onClick={() => handleRejectIdea(idea.id)} className="h-9 rounded-full border border-slate-200 px-4 text-[11px] font-bold text-slate-600 hover:bg-slate-100">Reject</button>
+                      </div>
+                    </div>
+                  ))
+                )}
+              </div>
+            </div>
+          )}
+
+          {currentUser.role === "admin" && (
+            <div className="mt-8 rounded-[24px] border border-amber-200 bg-amber-50 p-6">
+              <div className="flex items-center justify-between border-b border-amber-200 pb-4">
+                <h3 className="font-heading font-extrabold text-[24px] text-amber-900">Backers pending approval</h3>
+                <span className="rounded-full bg-amber-500 text-white px-3 py-1 text-xs font-bold">{pendingBackers.length} pending</span>
+              </div>
+              <p className="text-xs text-amber-800 mt-2">Backer IDs require verification (OTP done) + your approval before they appear in the Backers Hub.</p>
+              <div className="mt-4 space-y-3">
+                {pendingBackers.length === 0 ? (
+                  <div className="py-6 text-center text-sm text-amber-700">No backers pending — all verified.</div>
+                ) : (
+                  pendingBackers.map((b) => (
+                    <div key={b.id} className="flex flex-col gap-3 rounded-2xl border border-amber-200 bg-white p-4 md:flex-row md:items-center md:justify-between">
+                      <div>
+                        <div className="font-heading text-[16px] font-bold text-slate-800">{b.name} <span className="text-xs font-normal text-slate-500">• {b.email}</span></div>
+                        <div className="mt-1 text-[12px] text-slate-500">Focus: {b.focus || b.bio || "—"} • OTP ✓</div>
+                      </div>
+                      <div className="flex gap-2">
+                        <button onClick={() => {
+                          setFunders([{ id: b.id, name: b.name, email: b.email.toLowerCase(), role: b.roleTitle || "Angel Backer", focus: b.focus || "Tech & AI", bio: b.bio || "Approved backer.", ticketSize: "Pre-Seed & Seed" }, ...funders]);
+                          setPendingBackers(pendingBackers.filter(x=>x.id!==b.id));
+                          showToast(`✓ Approved backer: ${b.name}`);
+                        }} className="h-9 rounded-full bg-slate-900 text-white px-4 text-[11px] font-bold hover:bg-slate-800">Approve →</button>
+                        <button onClick={() => { setPendingBackers(pendingBackers.filter(x=>x.id!==b.id)); showToast("Rejected backer"); }} className="h-9 rounded-full border border-slate-200 px-4 text-[11px] font-bold text-slate-600">Reject</button>
+                      </div>
+                    </div>
+                  ))
+                )}
+              </div>
+            </div>
+          )}
 
           {/* DASHBOARD GRID */}
           <div className="mt-8 grid md:grid-cols-2 gap-8">
             {/* COLUMN 1: INCOMING REQUESTS (Accept / Decline Flow) */}
             <div className="space-y-6">
-              <div className="rounded-[24px] border border-white/10 bg-zinc-950 p-6 border-glow">
-                <div className="flex items-center justify-between border-b border-white/10 pb-4">
-                  <div>
-                    <h3 className="font-heading font-extrabold text-[18px]">
-                      Incoming Connection Requests
+              <div className="rounded-[24px] border border-slate-200 bg-white p-4 sm:p-6">
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-slate-200 pb-4">
+                  <div className="min-w-0">
+                    <h3 className="font-heading font-extrabold text-[20px] sm:text-[24px] text-slate-800">
+                      {currentUser.role === "founder" ? "Requests for you & your startup ideas" : "Incoming connection requests"}
                     </h3>
-                    <div className="text-[12px] text-zinc-400">
-                      Requests sent to you or your startup ideas.
+                    <div className="text-[12px] text-slate-500">
+                      {currentUser.role === "founder" ? "Requests sent directly to you or one of your startup ideas." : "People who would like to connect with your profile."}
                     </div>
                   </div>
-                  <span className="h-7 px-3 rounded-full bg-zinc-900 border border-white/15 text-white font-bold text-xs grid place-items-center">
+                  <span className="inline-flex items-center justify-center whitespace-nowrap px-3 py-1 rounded-full bg-slate-100 border border-slate-200 text-slate-700 font-bold text-xs shrink-0 self-start sm:self-auto">
                     {myIncomingRequests.length}
                   </span>
                 </div>
@@ -1177,56 +1870,56 @@ export default function App() {
                   {myIncomingRequests.map((req) => (
                     <div
                       key={req.id}
-                      className="p-4 rounded-2xl bg-zinc-900 border border-white/10 flex flex-col justify-between gap-3"
+                      className="p-4 rounded-2xl bg-slate-50 border border-slate-200 flex flex-col justify-between gap-3"
                     >
                       <div>
                         <div className="flex items-center justify-between text-xs">
-                          <span className="font-bold text-white text-[13.5px]">
+                          <span className="font-bold text-slate-800 text-[13.5px]">
                             {req.senderName}
                           </span>
-                          <span className="px-2 py-0.5 rounded-full bg-zinc-800 text-[10px] text-zinc-300 uppercase font-bold border border-white/10">
+                          <span className="px-2 py-0.5 rounded-full bg-slate-200 text-[10px] text-slate-700 uppercase font-bold border border-slate-200">
                             {req.senderRole}
                           </span>
                         </div>
-                        <div className="text-[11.5px] text-zinc-400 mt-0.5">
+                        <div className="text-[11.5px] text-slate-500 mt-0.5">
                           Re: <strong>{req.targetTitle}</strong> • {req.createdAt}
                         </div>
-                        <p className="text-[13px] text-zinc-300 mt-2 bg-zinc-950 p-3 rounded-xl border border-white/5">
+                        <p className="text-[13px] text-slate-600 mt-2 bg-white p-3 rounded-xl border border-slate-200">
                           "{req.message}"
                         </p>
                       </div>
 
-                      <div className="flex items-center justify-end gap-2 pt-2 border-t border-white/5">
+                      <div className="flex items-center justify-end gap-2 pt-2 border-t border-slate-200">
                         {req.status === "pending" ? (
                           <>
                             <button
                               onClick={() => handleRejectRequest(req.id)}
-                              className="h-8 px-3 rounded-full border border-white/15 text-[11.5px] font-semibold text-zinc-400 hover:text-white"
+                              className="h-8 px-3 rounded-full border border-slate-200 text-[11.5px] font-semibold text-slate-600 hover:bg-slate-100"
                             >
                               Decline
                             </button>
                             <button
                               onClick={() => handleAcceptRequest(req.id)}
-                              className="h-8 px-4 rounded-full bg-white text-black text-[11.5px] font-bold hover:bg-zinc-200"
+                              className="h-8 px-4 rounded-full bg-slate-100 text-slate-700 text-[11.5px] font-bold hover:bg-slate-200"
                             >
                               ✓ Accept Request
                             </button>
                           </>
                         ) : req.status === "accepted" ? (
-                          <span className="text-[11.5px] font-bold text-white flex items-center gap-2">
+                          <span className="text-[11.5px] font-bold text-slate-700 flex items-center gap-2">
                             <span>✓ Accepted</span>
                             <button
                               onClick={() => {
                                 setActiveChatRequest(req);
                                 setChatModalOpen(true);
                               }}
-                              className="h-8 px-4 rounded-full bg-white text-black text-[11.5px] font-bold"
+                              className="h-8 px-4 rounded-full bg-slate-100 text-slate-700 text-[11.5px] font-bold hover:bg-slate-200"
                             >
-                              Open Live Chat 💬
+                              Open Live Chat
                             </button>
                           </span>
                         ) : (
-                          <span className="text-[11.5px] text-zinc-500 font-medium">Declined</span>
+                          <span className="text-[11.5px] text-slate-500 font-medium">Declined</span>
                         )}
                       </div>
                     </div>
@@ -1241,23 +1934,23 @@ export default function App() {
               </div>
 
               {/* OUTGOING REQUESTS */}
-              <div className="rounded-[24px] border border-white/10 bg-zinc-950 p-6 border-glow">
-                <div className="flex items-center justify-between border-b border-white/10 pb-4">
-                  <h3 className="font-heading font-extrabold text-[18px]">
+              <div className="rounded-[24px] border border-slate-200 bg-white p-6">
+                <div className="flex items-center justify-between border-b border-slate-200 pb-4">
+                  <h3 className="font-heading font-extrabold text-[24px] text-slate-800">
                     My Sent Requests
                   </h3>
-                  <span className="text-xs text-zinc-400">{myOutgoingRequests.length} total</span>
+                  <span className="text-xs text-slate-500">{myOutgoingRequests.length} total</span>
                 </div>
 
                 <div className="mt-4 space-y-3">
                   {myOutgoingRequests.map((req) => (
                     <div
                       key={req.id}
-                      className="p-3.5 rounded-xl bg-zinc-900 border border-white/5 flex items-center justify-between text-xs"
+                      className="p-3.5 rounded-xl bg-slate-50 border border-slate-200 flex items-center justify-between text-xs"
                     >
                       <div>
-                        <div className="font-semibold text-white">To: {req.receiverName}</div>
-                        <div className="text-[11px] text-zinc-400 mt-0.5">Re: {req.targetTitle}</div>
+                        <div className="font-semibold text-slate-800">To: {req.receiverName}</div>
+                        <div className="text-[11px] text-slate-500 mt-0.5">Re: {req.targetTitle}</div>
                       </div>
                       <div>
                         {req.status === "accepted" ? (
@@ -1266,12 +1959,12 @@ export default function App() {
                               setActiveChatRequest(req);
                               setChatModalOpen(true);
                             }}
-                            className="h-8 px-3.5 rounded-full bg-white text-black font-bold text-[11px]"
+                            className="h-8 px-3.5 rounded-full bg-slate-100 text-slate-700 font-bold text-[11px] hover:bg-slate-200"
                           >
-                            Chat Now 💬
+                            Chat Now
                           </button>
                         ) : (
-                          <span className="px-2.5 py-1 rounded-full bg-zinc-800 text-zinc-400 text-[10.5px] capitalize font-medium">
+                          <span className="px-2.5 py-1 rounded-full bg-slate-100 text-slate-600 text-[10.5px] capitalize font-medium border border-slate-200">
                             {req.status}
                           </span>
                         )}
@@ -1290,17 +1983,17 @@ export default function App() {
 
             {/* COLUMN 2: ACTIVE CONNECTIONS & DIRECT CHATS */}
             <div className="space-y-6">
-              <div className="rounded-[24px] border border-white/15 bg-zinc-950 p-6 border-glow">
-                <div className="flex items-center justify-between border-b border-white/10 pb-4">
-                  <div>
-                    <h3 className="font-heading font-extrabold text-[18px]">
+              <div className="rounded-[24px] border border-slate-200 bg-white p-4 sm:p-6">
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-slate-200 pb-4">
+                  <div className="min-w-0">
+                    <h3 className="font-heading font-extrabold text-[20px] sm:text-[24px] text-slate-800">
                       Active Connections & Direct Chats
                     </h3>
-                    <div className="text-[12px] text-zinc-400">
+                    <div className="text-[12px] text-slate-500">
                       Unlocked messaging with accepted partners.
                     </div>
                   </div>
-                  <span className="h-7 px-3 rounded-full bg-white text-black font-bold text-xs grid place-items-center">
+                  <span className="inline-flex items-center justify-center whitespace-nowrap px-3 py-1 rounded-full bg-slate-100 border border-slate-200 text-slate-700 font-bold text-xs shrink-0 self-start sm:self-auto">
                     {myAcceptedConnections.length} Active
                   </span>
                 </div>
@@ -1312,34 +2005,32 @@ export default function App() {
                     const partnerRole =
                       req.senderId === currentUser.id ? req.receiverRole || "partner" : req.senderRole;
 
-                    return (
-                      <div
-                        key={req.id}
-                        className="p-4 rounded-2xl bg-zinc-900 border border-white/10 flex items-center justify-between hover:border-white/30 transition cursor-pointer"
-                        onClick={() => {
-                          setActiveChatRequest(req);
-                          setChatModalOpen(true);
-                        }}
-                      >
-                        <div className="flex items-center gap-3">
-                          <div className="h-10 w-10 rounded-full bg-white text-black grid place-items-center font-bold font-heading text-[14px]">
-                            {partnerName[0]}
-                          </div>
-                          <div>
-                            <div className="font-bold text-white text-[14px]">
-                              {partnerName}
+                      return (
+                        <div
+                          key={req.id}
+                          className="p-4 rounded-2xl bg-slate-50 border border-slate-200 flex flex-col sm:flex-row sm:items-center justify-between gap-3 transition cursor-pointer"
+                          onClick={() => {
+                            setActiveChatRequest(req);
+                            setChatModalOpen(true);
+                          }}
+                        >
+                          <div className="flex items-center gap-3 min-w-0">
+                            <div className="h-10 w-10 rounded-full bg-slate-100 border border-slate-200 grid place-items-center text-[18px] shrink-0">👤</div>
+                            <div className="min-w-0">
+                              <div className="font-bold text-slate-800 text-[14px] truncate">
+                                {partnerName}
+                              </div>
+                              <div className="text-[11px] text-slate-500 truncate">
+                                Topic: {req.targetTitle} • {partnerRole.toUpperCase()}
+                              </div>
                             </div>
-                            <div className="text-[11px] text-zinc-400">
-                              Topic: {req.targetTitle} • {partnerRole.toUpperCase()}
-                            </div>
                           </div>
-                        </div>
 
-                        <button className="h-9 px-4 rounded-full bg-white text-black font-bold text-[11.5px]">
-                          Open Chat 💬
-                        </button>
-                      </div>
-                    );
+                          <button className="w-full sm:w-auto h-9 px-4 rounded-full bg-slate-100 text-slate-700 font-bold text-[11.5px] border border-slate-200 hover:bg-slate-200 shrink-0">
+                            Open Chat
+                          </button>
+                        </div>
+                      );
                   })}
 
                   {myAcceptedConnections.length === 0 && (
@@ -1352,14 +2043,14 @@ export default function App() {
 
               {/* ROLE CONTENT (MY IDEAS FOR FOUNDER) */}
               {currentUser.role === "founder" && (
-                <div className="rounded-[24px] border border-white/10 bg-zinc-950 p-6 border-glow">
-                  <div className="flex items-center justify-between border-b border-white/10 pb-4">
-                    <h3 className="font-heading font-extrabold text-[18px]">
+                <div className="rounded-[24px] border border-slate-200 bg-white p-6">
+                  <div className="flex items-center justify-between border-b border-slate-200 pb-4">
+                    <h3 className="font-heading font-extrabold text-[24px] text-slate-800">
                       My Posted Ideas ({myIdeas.length})
                     </h3>
                     <button
                       onClick={() => setIdeaModalOpen(true)}
-                      className="text-xs text-white font-bold hover:underline"
+                      className="text-xs text-slate-700 font-bold hover:underline"
                     >
                       + Add Idea
                     </button>
@@ -1369,15 +2060,15 @@ export default function App() {
                     {myIdeas.map((idea) => (
                       <div
                         key={idea.id}
-                        className="p-4 rounded-xl bg-zinc-900 border border-white/5 flex items-center justify-between"
+                        className="p-4 rounded-xl bg-slate-50 border border-slate-200 flex items-center justify-between"
                       >
                         <div>
-                          <div className="font-bold text-white text-[14px]">{idea.title}</div>
-                          <div className="text-[11.5px] text-zinc-400 mt-0.5">
+                          <div className="font-bold text-slate-800 text-[14px]">{idea.title}</div>
+                          <div className="text-[11.5px] text-slate-500 mt-0.5">
                             Category: {idea.category} • Seeking: {idea.seeking}
                           </div>
                         </div>
-                        <span className="px-2.5 py-1 rounded-full bg-zinc-800 border border-white/10 text-[10.5px] text-zinc-300 font-medium">
+                        <span className="px-2.5 py-1 rounded-full bg-slate-100 border border-slate-200 text-[10.5px] text-slate-600 font-medium">
                           {idea.status}
                         </span>
                       </div>
@@ -1391,24 +2082,21 @@ export default function App() {
       )}
 
       {/* FOOTER */}
-      <footer className="border-t border-white/10 bg-[#121214] text-zinc-400 py-10">
+      <footer className="border-t border-slate-200 bg-white text-slate-500 py-10">
         <div className="mx-auto max-w-[1200px] px-5 md:px-8 flex flex-col md:flex-row items-center justify-between gap-6 text-[12.5px]">
           <div className="flex items-center gap-3.5">
             <img
               src={logoImg}
               alt="Startify Logo"
-              className="h-8 w-8 rounded-full border border-white/20 object-cover"
+              className="h-9 w-auto object-contain"
             />
             <div>
-              <span className="font-bold text-white font-heading text-[15px]">
-                STARTIFY
-              </span>
-              <span className="text-zinc-500 ml-2">© {new Date().getFullYear()}</span>
+              <span className="text-zinc-500">© {new Date().getFullYear()}</span>
             </div>
           </div>
 
           <div className="text-zinc-500 text-center md:text-left text-[11.5px]">
-            Open Community Ecosystem • Powered for UoH members & startup collaborators
+            An initiative for <strong className="text-slate-600">University of Hyderabad</strong> students • Founder/Builder @uohyd.ac.in • <a href="/admin.html" className="underline decoration-slate-300 underline-offset-2 hover:text-slate-700">Admin</a>
           </div>
 
           <div className="flex items-center gap-6">
@@ -1420,12 +2108,6 @@ export default function App() {
             >
               WhatsApp Group
             </a>
-            <button onClick={() => setActiveTab("ideas")} className="hover:text-white transition">
-              Ideas
-            </button>
-            <button onClick={() => setActiveTab("events")} className="hover:text-white transition">
-              Meetups
-            </button>
           </div>
         </div>
       </footer>
@@ -1436,35 +2118,40 @@ export default function App() {
 
       {/* MODAL 1: AUTH / SIGN IN / SINGLE ROLE REGISTRATION */}
       {authModalOpen && (
-        <div className="fixed inset-0 z-50 grid place-items-center p-4">
+        <div className="fixed inset-0 z-50 grid place-items-center p-4 overflow-y-auto">
           <div
             className="absolute inset-0 bg-black/85 backdrop-blur-md"
             onClick={() => setAuthModalOpen(false)}
           />
-          <div className="relative w-full max-w-[460px] rounded-[28px] bg-zinc-950 border border-white/20 shadow-2xl p-6 sm:p-8 text-white">
-            <div className="flex items-center justify-between border-b border-white/10 pb-4">
-              <div>
-                <div className="font-heading font-extrabold text-[22px]">
-                  {authMode === "signin" ? "Sign In to Startify" : "Register Single Role Account"}
+          <div className="relative w-full max-w-[560px] rounded-[28px] overflow-hidden bg-white border border-slate-200 shadow-2xl text-slate-800 my-4 max-h-[90vh] overflow-y-auto">
+            {/* Clean header — no color background */}
+            <div className="bg-white p-6 sm:p-7 border-b border-slate-200 relative">
+              <div className="flex items-start justify-between gap-4">
+                <div>
+                  <img src={logoImg} alt="Startify" className="h-8 w-auto object-contain" />
+                  <div className="font-heading font-extrabold text-[22px] sm:text-[24px] mt-3 leading-tight text-slate-900">
+                    {authMode === "signin" ? "Welcome back to Startify" : "Join the builders"}
+                  </div>
+                  <p className="text-[12.5px] text-slate-600 mt-1.5 leading-5 max-w-[380px]">
+                    {authMode === "signin" ? "Sign in and continue where you left off." : "A space to connect, build, and launch — where every idea finds its team."}
+                  </p>
                 </div>
-                <div className="text-[12px] text-zinc-400 mt-0.5">
-                  Must be logged in to post, send requests, or chat.
-                </div>
+                <button
+                  onClick={() => setAuthModalOpen(false)}
+                  className="h-8 w-8 rounded-full bg-slate-100 border border-slate-200 grid place-items-center text-slate-600 hover:bg-slate-200 shrink-0"
+                >
+                  ✕
+                </button>
               </div>
-              <button
-                onClick={() => setAuthModalOpen(false)}
-                className="h-8 w-8 rounded-full border border-white/20 grid place-items-center text-zinc-400 hover:text-white"
-              >
-                ✕
-              </button>
             </div>
 
+            <div className="p-6 sm:p-7">
             {/* Mode Switcher Buttons */}
-            <div className="mt-5 grid grid-cols-2 gap-2 p-1 bg-zinc-900 rounded-full border border-white/10 text-xs font-semibold text-center">
+            <div className="grid grid-cols-2 gap-2 p-1 bg-slate-100 rounded-full border border-slate-200 text-xs font-semibold text-center">
               <button
                 onClick={() => setAuthMode("signin")}
                 className={`py-2 rounded-full transition ${
-                  authMode === "signin" ? "bg-white text-black font-bold" : "text-zinc-400"
+                  authMode === "signin" ? "bg-white text-slate-900 font-bold shadow-sm border border-slate-200" : "text-slate-500"
                 }`}
               >
                 Sign In
@@ -1472,7 +2159,7 @@ export default function App() {
               <button
                 onClick={() => setAuthMode("register")}
                 className={`py-2 rounded-full transition ${
-                  authMode === "register" ? "bg-white text-black font-bold" : "text-zinc-400"
+                  authMode === "register" ? "bg-slate-900 text-white font-bold shadow-sm border border-slate-900" : "text-slate-500"
                 }`}
               >
                 Create Account
@@ -1482,50 +2169,36 @@ export default function App() {
             <form onSubmit={handleAuthSubmit} className="mt-5 space-y-4">
               {authMode === "register" && (
                 <div>
-                  <label className="block text-[12px] font-semibold text-zinc-300 mb-1.5">
-                    Select Your Single Account Role *
+                  <label className="block text-[12px] font-semibold text-slate-700 mb-1.5">
+                    Choose your role — <span className="font-normal text-slate-500">one role per student</span> *
                   </label>
-                  <div className="grid grid-cols-3 gap-2">
-                    <button
-                      type="button"
-                      onClick={() => setSelectedRegisterRole("founder")}
-                      className={`py-2 px-3 rounded-xl border text-[11px] font-bold text-center transition ${
-                        selectedRegisterRole === "founder"
-                          ? "bg-white text-black border-white"
-                          : "bg-zinc-900 text-zinc-400 border-white/10"
-                      }`}
-                    >
-                      💡 Founder
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => setSelectedRegisterRole("talent")}
-                      className={`py-2 px-3 rounded-xl border text-[11px] font-bold text-center transition ${
-                        selectedRegisterRole === "talent"
-                          ? "bg-white text-black border-white"
-                          : "bg-zinc-900 text-zinc-400 border-white/10"
-                      }`}
-                    >
-                      ⚡ Builder
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => setSelectedRegisterRole("backer")}
-                      className={`py-2 px-3 rounded-xl border text-[11px] font-bold text-center transition ${
-                        selectedRegisterRole === "backer"
-                          ? "bg-white text-black border-white"
-                          : "bg-zinc-900 text-zinc-400 border-white/10"
-                      }`}
-                    >
-                      💼 Backer
-                    </button>
+                  <div className="grid grid-cols-3 gap-1.5 sm:gap-2">
+                    {[
+                      ["founder", "Founder", "Post ideas"],
+                      ["talent", "Builder", "Build teams"],
+                      ["backer", "Backer", "Fund people"],
+                    ].map(([role, label, sub]) => (
+                      <button
+                        key={role}
+                        type="button"
+                        onClick={() => setSelectedRegisterRole(role)}
+                        className={`p-2.5 sm:p-4 rounded-2xl border text-center transition flex flex-col items-center justify-center gap-1 min-h-[68px] sm:min-h-[74px] w-full max-w-full overflow-hidden ${
+                          selectedRegisterRole === role
+                            ? "bg-slate-900 text-white border-slate-900 shadow-lg scale-[1.02]"
+                            : "bg-white text-slate-700 border-slate-200 hover:border-slate-300 hover:bg-slate-50"
+                        }`}
+                      >
+                        <span className={`text-[11px] sm:text-[13px] font-bold leading-none break-words ${selectedRegisterRole === role ? "text-white" : "text-slate-800"}`}>{label}</span>
+                        <span className={`text-[9px] sm:text-[11px] leading-none break-words ${selectedRegisterRole === role ? "text-white/70" : "text-slate-500"}`}>{sub}</span>
+                      </button>
+                    ))}
                   </div>
                 </div>
               )}
 
               {authMode === "register" && (
                 <div>
-                  <label className="block text-[12px] font-semibold text-zinc-300 mb-1">
+                  <label className="block text-[12px] font-semibold text-slate-600 mb-1">
                     Full Name *
                   </label>
                   <input
@@ -1533,46 +2206,43 @@ export default function App() {
                     value={authForm.name}
                     onChange={(e) => setAuthForm({ ...authForm, name: e.target.value })}
                     placeholder="Your Full Name"
-                    className="w-full h-11 rounded-full bg-zinc-900 border border-white/15 px-4 text-[13px] text-white outline-none focus:border-white"
+                    className="w-full h-11 rounded-full bg-slate-50 border border-slate-200 px-4 text-[13px] text-slate-800 outline-none focus:border-indigo-300 focus:ring-2 focus:ring-indigo-100"
                   />
                 </div>
               )}
 
               <div>
-                <label className="block text-[12px] font-semibold text-zinc-300 mb-1">
-                  Email Address *
+                <label className="block text-[12px] font-semibold text-slate-600 mb-1">
+                  Email Address * {selectedRegisterRole === "backer" ? <span className="font-normal text-slate-500">— any email</span> : <span className="font-normal text-indigo-600">— @uohyd.ac.in</span>}
                 </label>
                 <input
                   required
                   type="email"
                   value={authForm.email}
                   onChange={(e) => setAuthForm({ ...authForm, email: e.target.value })}
-                  placeholder="name@domain.com"
-                  className="w-full h-11 rounded-full bg-zinc-900 border border-white/15 px-4 text-[13px] text-white outline-none focus:border-white"
+                  placeholder={selectedRegisterRole === "backer" ? "name@company.com (any domain)" : "name@uohyd.ac.in"}
+                  className="w-full h-11 rounded-full bg-slate-50 border border-slate-200 px-4 text-[13px] text-slate-800 outline-none focus:border-indigo-300 focus:ring-2 focus:ring-indigo-100"
                 />
+                <p className="mt-1.5 text-[11px] leading-4 text-slate-500">
+                  {selectedRegisterRole === "backer"
+                    ? "Backers may be outside UoH — any verified email works."
+                    : "Founder & Builder accounts are UoH-only. No verification hassle."}
+                </p>
               </div>
-
-              {authMode === "register" && (
-                <div>
-                  <label className="block text-[12px] font-semibold text-zinc-300 mb-1">
-                    Student ID No. (Verification)
-                  </label>
-                  <input
-                    value={authForm.studentId}
-                    onChange={(e) => setAuthForm({ ...authForm, studentId: e.target.value })}
-                    placeholder="e.g. UOH-2024-CS101"
-                    className="w-full h-11 rounded-full bg-zinc-900 border border-white/15 px-4 text-[13px] text-white outline-none focus:border-white"
-                  />
-                </div>
-              )}
 
               <button
                 type="submit"
-                className="w-full h-12 rounded-full bg-white text-black font-bold text-[14px] hover:bg-zinc-200 transition"
+                className="w-full h-12 rounded-full bg-slate-900 text-white font-bold text-[14px] hover:bg-black transition shadow-md"
               >
                 {authMode === "signin" ? "Sign In & Continue →" : `Create ${selectedRegisterRole.toUpperCase()} Account →`}
               </button>
+              <div className="rounded-2xl border border-slate-200 bg-slate-50 p-3 flex items-start gap-2.5">
+                <span className="h-6 w-6 rounded-full bg-emerald-500 text-white grid place-items-center text-[11px] shrink-0">✓</span>
+                <div className="text-[11px] leading-4 text-slate-600"><strong className="text-slate-800">Verified community</strong> — connect and collaborate with confidence.</div>
+              </div>
+              <p className="text-center text-[11px] text-slate-400">Be respectful — misuse leads to removal. Ecosystem workflow guides every collaboration.</p>
             </form>
+            </div>
           </div>
         </div>
       )}
@@ -1584,19 +2254,19 @@ export default function App() {
             className="absolute inset-0 bg-black/85 backdrop-blur-md"
             onClick={() => setIdeaModalOpen(false)}
           />
-          <div className="relative w-full max-w-[480px] rounded-[28px] bg-zinc-950 border border-white/20 shadow-2xl p-6 sm:p-8 text-white">
-            <div className="flex items-center justify-between border-b border-white/10 pb-4">
+          <div className="relative w-full max-w-[480px] rounded-[28px] bg-white border border-slate-200 shadow-2xl p-6 sm:p-8 text-slate-800">
+            <div className="flex items-center justify-between border-b border-slate-200 pb-4">
               <div>
                 <div className="font-heading font-extrabold text-[22px]">
                   Post Startup Idea
                 </div>
-                <div className="text-[12px] text-zinc-400 mt-0.5">
-                  Posting as <strong>{currentUser?.name}</strong> (Student ID Verified)
+                <div className="text-[12px] text-slate-500 mt-0.5">
+                  Posting as <strong>{currentUser?.name}</strong> • No ID needed — just your vision
                 </div>
               </div>
               <button
                 onClick={() => setIdeaModalOpen(false)}
-                className="h-8 w-8 rounded-full border border-white/20 grid place-items-center text-zinc-400 hover:text-white"
+                className="h-8 w-8 rounded-full border border-slate-200 grid place-items-center text-slate-500 hover:text-slate-800"
               >
                 ✕
               </button>
@@ -1604,7 +2274,7 @@ export default function App() {
 
             <form onSubmit={handleIdeaSubmit} className="mt-5 space-y-4">
               <div>
-                <label className="block text-[12px] font-semibold text-zinc-300 mb-1">
+                <label className="block text-[12px] font-semibold text-slate-600 mb-1">
                   Idea / Project Title *
                 </label>
                 <input
@@ -1612,19 +2282,19 @@ export default function App() {
                   value={newIdeaForm.title}
                   onChange={(e) => setNewIdeaForm({ ...newIdeaForm, title: e.target.value })}
                   placeholder="e.g. CampusKart, StudyBuddy AI..."
-                  className="w-full h-11 rounded-full bg-zinc-900 border border-white/15 px-4 text-[13px] text-white outline-none focus:border-white"
+                  className="w-full h-11 rounded-full bg-slate-50 border border-slate-200 px-4 text-[13px] text-slate-800 outline-none focus:border-slate-400"
                 />
               </div>
 
               <div className="grid grid-cols-2 gap-3">
                 <div>
-                  <label className="block text-[12px] font-semibold text-zinc-300 mb-1">
+                  <label className="block text-[12px] font-semibold text-slate-600 mb-1">
                     Category
                   </label>
                   <select
                     value={newIdeaForm.category}
                     onChange={(e) => setNewIdeaForm({ ...newIdeaForm, category: e.target.value })}
-                    className="w-full h-11 rounded-full bg-zinc-900 border border-white/15 px-4 text-[13px] text-white outline-none focus:border-white"
+                    className="w-full h-11 rounded-full bg-slate-50 border border-slate-200 px-4 text-[13px] text-slate-800 outline-none focus:border-slate-400"
                   >
                     <option>Tech / AI</option>
                     <option>E-Commerce / D2C</option>
@@ -1634,13 +2304,13 @@ export default function App() {
                 </div>
 
                 <div>
-                  <label className="block text-[12px] font-semibold text-zinc-300 mb-1">
+                  <label className="block text-[12px] font-semibold text-slate-600 mb-1">
                     Seeking Role
                   </label>
                   <select
                     value={newIdeaForm.seeking}
                     onChange={(e) => setNewIdeaForm({ ...newIdeaForm, seeking: e.target.value })}
-                    className="w-full h-11 rounded-full bg-zinc-900 border border-white/15 px-4 text-[13px] text-white outline-none focus:border-white"
+                    className="w-full h-11 rounded-full bg-slate-50 border border-slate-200 px-4 text-[13px] text-slate-800 outline-none focus:border-slate-400"
                   >
                     <option>Tech Co-Founder</option>
                     <option>UI/UX Designer</option>
@@ -1651,20 +2321,7 @@ export default function App() {
               </div>
 
               <div>
-                <label className="block text-[12px] font-semibold text-zinc-300 mb-1">
-                  Student ID No. * (Verification)
-                </label>
-                <input
-                  required
-                  value={newIdeaForm.studentId || currentUser?.studentId || ""}
-                  onChange={(e) => setNewIdeaForm({ ...newIdeaForm, studentId: e.target.value })}
-                  placeholder="e.g. UOH-2024-XX"
-                  className="w-full h-11 rounded-full bg-zinc-900 border border-white/15 px-4 text-[13px] text-white outline-none focus:border-white"
-                />
-              </div>
-
-              <div>
-                <label className="block text-[12px] font-semibold text-zinc-300 mb-1">
+                <label className="block text-[12px] font-semibold text-slate-600 mb-1">
                   Idea Description & Vision *
                 </label>
                 <textarea
@@ -1672,13 +2329,13 @@ export default function App() {
                   value={newIdeaForm.desc}
                   onChange={(e) => setNewIdeaForm({ ...newIdeaForm, desc: e.target.value })}
                   placeholder="Describe your startup idea in 2-3 clear sentences..."
-                  className="w-full min-h-[90px] rounded-[20px] bg-zinc-900 border border-white/15 p-4 text-[13px] text-white outline-none focus:border-white"
+                  className="w-full min-h-[90px] rounded-[20px] bg-slate-50 border border-slate-200 p-4 text-[13px] text-slate-800 outline-none focus:border-indigo-300 focus:ring-2 focus:ring-indigo-100"
                 />
               </div>
 
               <button
                 type="submit"
-                className="w-full h-12 rounded-full bg-white text-black font-bold text-[14px] hover:bg-zinc-200 transition"
+                className="w-full h-12 rounded-full bg-slate-900 text-white font-bold text-[14px] hover:bg-slate-800 transition"
               >
                 Publish Idea to Board →
               </button>
@@ -1695,18 +2352,18 @@ export default function App() {
             onClick={() => setConnectModalOpen(false)}
           />
           <div className="relative w-full max-w-[440px] rounded-[28px] bg-zinc-950 border border-white/20 shadow-2xl p-6 sm:p-8 text-white">
-            <div className="flex items-center justify-between border-b border-white/10 pb-4">
+            <div className="flex items-center justify-between border-b border-slate-200 pb-4">
               <div>
                 <div className="font-heading font-extrabold text-[20px]">
                   Send Connection Request
                 </div>
-                <div className="text-[12px] text-zinc-400 mt-0.5">
+                <div className="text-[12px] text-slate-500 mt-0.5">
                   To: <strong>{targetConnectItem?.founder || targetConnectItem?.name}</strong> ({targetConnectItem?.title || targetConnectItem?.role})
                 </div>
               </div>
               <button
                 onClick={() => setConnectModalOpen(false)}
-                className="h-8 w-8 rounded-full border border-white/20 grid place-items-center text-zinc-400 hover:text-white"
+                className="h-8 w-8 rounded-full border border-slate-200 grid place-items-center text-slate-500 hover:text-slate-800"
               >
                 ✕
               </button>
@@ -1714,7 +2371,7 @@ export default function App() {
 
             <form onSubmit={handleConnectSubmit} className="mt-5 space-y-4">
               <div>
-                <label className="block text-[12px] font-semibold text-zinc-300 mb-1">
+                <label className="block text-[12px] font-semibold text-slate-600 mb-1">
                   Introduction / Proposal Message *
                 </label>
                 <textarea
@@ -1728,7 +2385,7 @@ export default function App() {
 
               <button
                 type="submit"
-                className="w-full h-12 rounded-full bg-white text-black font-bold text-[14px] hover:bg-zinc-200 transition"
+                className="w-full h-12 rounded-full bg-slate-900 text-white font-bold text-[14px] hover:bg-slate-800 transition"
               >
                 Send Request →
               </button>
@@ -1737,43 +2394,39 @@ export default function App() {
         </div>
       )}
 
-      {/* MODAL 4: DIRECT CHAT / LIVE MESSAGING MODAL */}
+      {/* MODAL 4: DIRECT CHAT / LIVE MESSAGING MODAL — light theme, UoH misuse note */}
       {chatModalOpen && activeChatRequest && (
         <div className="fixed inset-0 z-50 grid place-items-center p-4">
           <div
-            className="absolute inset-0 bg-black/85 backdrop-blur-md"
+            className="absolute inset-0 bg-black/40 backdrop-blur-md"
             onClick={() => setChatModalOpen(false)}
           />
-          <div className="relative w-full max-w-[540px] h-[540px] rounded-[28px] bg-zinc-950 border border-white/20 shadow-2xl flex flex-col justify-between overflow-hidden text-white">
+          <div className="relative w-full max-w-[540px] h-[560px] rounded-[28px] bg-white border border-slate-200 shadow-2xl flex flex-col justify-between overflow-hidden text-slate-800">
             {/* Chat Top Header */}
-            <div className="p-5 bg-zinc-900 border-b border-white/10 flex items-center justify-between">
+            <div className="p-5 bg-slate-50 border-b border-slate-200 flex items-center justify-between">
               <div className="flex items-center gap-3">
-                <div className="h-10 w-10 rounded-full bg-white text-black grid place-items-center font-bold font-heading text-[15px]">
-                  {activeChatRequest.senderId === currentUser.id
-                    ? activeChatRequest.receiverName[0]
-                    : activeChatRequest.senderName[0]}
-                </div>
+                <div className="h-10 w-10 rounded-full bg-slate-100 border border-slate-200 grid place-items-center text-[18px] shrink-0">👤</div>
                 <div>
-                  <div className="font-heading font-bold text-[16px]">
+                  <div className="font-heading font-bold text-[16px] text-slate-800">
                     {activeChatRequest.senderId === currentUser.id
                       ? activeChatRequest.receiverName
                       : activeChatRequest.senderName}
                   </div>
-                  <div className="text-[11px] text-zinc-400">
-                    Topic: {activeChatRequest.targetTitle} • Connection Accepted ✓
+                  <div className="text-[11px] text-slate-500">
+                    Topic: {activeChatRequest.targetTitle} • Connection Accepted ✓ • UoH community
                   </div>
                 </div>
               </div>
               <button
                 onClick={() => setChatModalOpen(false)}
-                className="h-8 w-8 rounded-full border border-white/20 grid place-items-center text-zinc-400 hover:text-white"
+                className="h-8 w-8 rounded-full border border-slate-200 bg-white grid place-items-center text-slate-500 hover:text-slate-800 hover:border-slate-300"
               >
                 ✕
               </button>
             </div>
 
             {/* Chat Messages Body */}
-            <div className="p-5 flex-1 overflow-y-auto space-y-3 bg-[#121214]">
+            <div className="p-5 flex-1 overflow-y-auto space-y-3 bg-slate-50/70">
               {messages
                 .filter((m) => m.requestId === activeChatRequest.id)
                 .map((msg) => {
@@ -1783,14 +2436,14 @@ export default function App() {
                       key={msg.id}
                       className={`flex flex-col ${isMe ? "items-end" : "items-start"}`}
                     >
-                      <div className="text-[10px] text-zinc-500 mb-1 px-1">
+                      <div className="text-[10px] text-slate-400 mb-1 px-1">
                         {isMe ? "You" : msg.senderName} • {msg.createdAt}
                       </div>
                       <div
-                        className={`max-w-[80%] px-4 py-2.5 rounded-2xl text-[13.5px] leading-[1.5] ${
+                        className={`max-w-[80%] px-4 py-2.5 rounded-2xl text-[13.5px] leading-[1.5] shadow-sm ${
                           isMe
-                            ? "bg-white text-black font-medium"
-                            : "bg-zinc-900 text-zinc-100 border border-white/10"
+                            ? "bg-slate-900 text-white font-medium"
+                            : "bg-white text-slate-800 border border-slate-200"
                         }`}
                       >
                         {msg.text}
@@ -1800,8 +2453,9 @@ export default function App() {
                 })}
 
               {messages.filter((m) => m.requestId === activeChatRequest.id).length === 0 && (
-                <div className="text-center py-10 text-zinc-500 text-xs">
-                  Connection request accepted! Send the first message to start talking.
+                <div className="text-center py-8">
+                  <div className="inline-flex items-center gap-2 rounded-full bg-white border border-slate-200 px-3 py-1 text-xs text-slate-500">Only accepted connections can chat</div>
+                  <p className="mt-3 text-xs text-slate-500 px-6 leading-5">Be respectful. This is a University of Hyderabad student community — misuse can lead to removal. Start with a clear intro!</p>
                 </div>
               )}
             </div>
@@ -1809,22 +2463,94 @@ export default function App() {
             {/* Chat Input Bar */}
             <form
               onSubmit={handleSendChatMessage}
-              className="p-4 bg-zinc-900 border-t border-white/10 flex items-center gap-3"
+              className="p-4 bg-white border-t border-slate-200 flex items-center gap-3"
             >
               <input
                 required
                 type="text"
                 value={chatInputText}
                 onChange={(e) => setChatInputText(e.target.value)}
-                placeholder="Type a message..."
-                className="flex-1 h-11 rounded-full bg-zinc-950 border border-white/15 px-4 text-[13.5px] text-white outline-none focus:border-white"
+                placeholder="Type a respectful message..."
+                className="flex-1 h-11 rounded-full bg-slate-50 border border-slate-200 px-4 text-[13.5px] text-slate-800 placeholder-slate-400 outline-none focus:border-slate-300 focus:bg-white"
               />
               <button
                 type="submit"
-                className="h-11 px-6 rounded-full bg-white text-black font-bold text-[13px] hover:bg-zinc-200 transition"
+                className="h-11 px-6 rounded-full bg-slate-900 text-white font-bold text-[13px] hover:bg-slate-800 transition shadow"
               >
-                Send 💬
+                Send
               </button>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* MODAL 5: ADD EVENT */}
+      {eventAddModalOpen && (
+        <div className="fixed inset-0 z-50 grid place-items-center p-4">
+          <div
+            className="absolute inset-0 bg-black/85 backdrop-blur-md"
+            onClick={() => setEventAddModalOpen(false)}
+          />
+          <div className="relative w-full max-w-[480px] rounded-[28px] bg-white border border-slate-200 shadow-2xl p-6 sm:p-8 text-slate-800">
+            <div className="flex items-center justify-between border-b border-slate-200 pb-4">
+              <div>
+                <div className="font-heading font-extrabold text-[22px]">Add Community Event</div>
+                <div className="text-[12px] text-slate-500 mt-0.5">Create a new public meetup or pitch event.</div>
+              </div>
+              <button onClick={() => setEventAddModalOpen(false)} className="h-8 w-8 rounded-full border border-slate-200 grid place-items-center text-slate-500 hover:text-slate-800">✕</button>
+            </div>
+
+            <form
+              onSubmit={(e) => {
+                e.preventDefault();
+                const newEvent = {
+                  id: `e_${Date.now()}`,
+                  title: eventForm.title,
+                  date: eventForm.date,
+                  time: eventForm.time,
+                  venue: eventForm.venue,
+                  category: eventForm.category,
+                  desc: eventForm.desc
+                };
+                setEvents([newEvent, ...events]);
+                setEventAddModalOpen(false);
+                setEventForm({ title: "", date: "", time: "", venue: "", category: "Pitch Night", desc: "" });
+                showToast("Event created and published.");
+              }}
+              className="mt-5 space-y-4"
+            >
+              <div>
+                <label className="block text-[12px] font-semibold text-slate-600 mb-1">Event Title *</label>
+                <input required value={eventForm.title} onChange={(e) => setEventForm({ ...eventForm, title: e.target.value })} placeholder="Launch Week Meetup" className="w-full h-11 rounded-full bg-slate-50 border border-slate-200 px-4 text-[13px] text-slate-800 outline-none focus:border-slate-400" />
+              </div>
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-[12px] font-semibold text-slate-600 mb-1">Date *</label>
+                  <input required value={eventForm.date} onChange={(e) => setEventForm({ ...eventForm, date: e.target.value })} placeholder="Saturday, Sep 12" className="w-full h-11 rounded-full bg-slate-50 border border-slate-200 px-4 text-[13px] text-slate-800 outline-none focus:border-slate-400" />
+                </div>
+                <div>
+                  <label className="block text-[12px] font-semibold text-slate-600 mb-1">Time *</label>
+                  <input required value={eventForm.time} onChange={(e) => setEventForm({ ...eventForm, time: e.target.value })} placeholder="5:00 PM - 7:30 PM" className="w-full h-11 rounded-full bg-slate-50 border border-slate-200 px-4 text-[13px] text-slate-800 outline-none focus:border-slate-400" />
+                </div>
+              </div>
+              <div>
+                <label className="block text-[12px] font-semibold text-slate-600 mb-1">Venue *</label>
+                <input required value={eventForm.venue} onChange={(e) => setEventForm({ ...eventForm, venue: e.target.value })} placeholder="Main Innovation Auditorium" className="w-full h-11 rounded-full bg-slate-50 border border-slate-200 px-4 text-[13px] text-slate-800 outline-none focus:border-slate-400" />
+              </div>
+              <div>
+                <label className="block text-[12px] font-semibold text-slate-600 mb-1">Category</label>
+                <select value={eventForm.category} onChange={(e) => setEventForm({ ...eventForm, category: e.target.value })} className="w-full h-11 rounded-full bg-slate-50 border border-slate-200 px-4 text-[13px] text-slate-800 outline-none focus:border-slate-400">
+                  <option>Pitch Night</option>
+                  <option>Networking</option>
+                  <option>Workshop</option>
+                  <option>Demo Day</option>
+                </select>
+              </div>
+              <div>
+                <label className="block text-[12px] font-semibold text-slate-600 mb-1">Description *</label>
+                <textarea required value={eventForm.desc} onChange={(e) => setEventForm({ ...eventForm, desc: e.target.value })} placeholder="Give a short description of the event." className="w-full min-h-[90px] rounded-[20px] bg-zinc-900 border border-white/15 p-4 text-[13px] text-white outline-none focus:border-white" />
+              </div>
+              <button type="submit" className="w-full h-12 rounded-full bg-slate-900 text-white font-bold text-[14px] hover:bg-slate-800 transition">Publish Event →</button>
             </form>
           </div>
         </div>
@@ -1838,18 +2564,18 @@ export default function App() {
             onClick={() => setEventModalOpen(false)}
           />
           <div className="relative w-full max-w-[440px] rounded-[28px] bg-zinc-950 border border-white/20 shadow-2xl p-6 sm:p-8 text-white">
-            <div className="flex items-center justify-between border-b border-white/10 pb-4">
+            <div className="flex items-center justify-between border-b border-slate-200 pb-4">
               <div>
                 <div className="font-heading font-extrabold text-[20px]">
                   RSVP: {targetEvent?.title}
                 </div>
-                <div className="text-[12px] text-zinc-400 mt-0.5">
+                <div className="text-[12px] text-slate-500 mt-0.5">
                   {targetEvent?.date} • {targetEvent?.venue}
                 </div>
               </div>
               <button
                 onClick={() => setEventModalOpen(false)}
-                className="h-8 w-8 rounded-full border border-white/20 grid place-items-center text-zinc-400 hover:text-white"
+                className="h-8 w-8 rounded-full border border-slate-200 grid place-items-center text-slate-500 hover:text-slate-800"
               >
                 ✕
               </button>
@@ -1864,7 +2590,7 @@ export default function App() {
               className="mt-5 space-y-4"
             >
               <div>
-                <label className="block text-[12px] font-semibold text-zinc-300 mb-1">
+                <label className="block text-[12px] font-semibold text-slate-600 mb-1">
                   Full Name *
                 </label>
                 <input
@@ -1874,12 +2600,12 @@ export default function App() {
                     setEventRegisterForm({ ...eventRegisterForm, name: e.target.value })
                   }
                   placeholder="Your Name"
-                  className="w-full h-11 rounded-full bg-zinc-900 border border-white/15 px-4 text-[13px] text-white outline-none focus:border-white"
+                  className="w-full h-11 rounded-full bg-slate-50 border border-slate-200 px-4 text-[13px] text-slate-800 outline-none focus:border-slate-400"
                 />
               </div>
 
               <div>
-                <label className="block text-[12px] font-semibold text-zinc-300 mb-1">
+                <label className="block text-[12px] font-semibold text-slate-600 mb-1">
                   Email *
                 </label>
                 <input
@@ -1890,16 +2616,46 @@ export default function App() {
                     setEventRegisterForm({ ...eventRegisterForm, email: e.target.value })
                   }
                   placeholder="name@domain.com"
-                  className="w-full h-11 rounded-full bg-zinc-900 border border-white/15 px-4 text-[13px] text-white outline-none focus:border-white"
+                  className="w-full h-11 rounded-full bg-slate-50 border border-slate-200 px-4 text-[13px] text-slate-800 outline-none focus:border-slate-400"
                 />
               </div>
 
               <button
                 type="submit"
-                className="w-full h-12 rounded-full bg-white text-black font-bold text-[14px] hover:bg-zinc-200 transition"
+                className="w-full h-12 rounded-full bg-slate-900 text-white font-bold text-[14px] hover:bg-slate-800 transition"
               >
                 Confirm Event Registration →
               </button>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* MODAL 6: OTP VERIFICATION (mock — swap with real OTP service) */}
+      {otpModalOpen && (
+        <div className="fixed inset-0 z-50 grid place-items-center p-4">
+          <div className="absolute inset-0 bg-black/60 backdrop-blur-md" onClick={() => setOtpModalOpen(false)} />
+          <div className="relative w-full max-w-[420px] rounded-[28px] bg-white border border-slate-200 shadow-2xl p-6 sm:p-8 text-slate-800">
+            <div className="flex items-center justify-between border-b border-slate-200 pb-4">
+              <div>
+                <div className="font-heading font-extrabold text-[20px]">Verify your email</div>
+                <div className="text-[12px] text-slate-500 mt-0.5">OTP sent to <strong className="text-slate-800">{otpEmail}</strong> • {otpRole.toUpperCase()} • {otpRole !== "backer" ? "UoH @uohyd.ac.in required" : "Backer — any email + admin approval"}</div>
+              </div>
+              <button onClick={() => setOtpModalOpen(false)} className="h-8 w-8 rounded-full border border-slate-200 grid place-items-center text-slate-500 hover:text-slate-800">✕</button>
+            </div>
+            <div className="mt-4 rounded-xl bg-indigo-50 border border-indigo-200 p-3 text-xs leading-4 text-indigo-800">
+              <strong>Demo OTP (no email service yet):</strong> <span className="font-mono font-bold tracking-widest text-[14px]">{otpCode}</span> — use this code. In production, replace <code className="bg-white px-1 py-0.5 rounded border">sendOtp()</code> with your provider (MSG91 / Twilio / SendGrid / Supabase Auth OTP).
+            </div>
+            <form onSubmit={handleOtpVerify} className="mt-5 space-y-4">
+              <div>
+                <label className="block text-[12px] font-semibold text-slate-600 mb-1">Enter 6-digit OTP *</label>
+                <input required value={otpInput} onChange={(e)=> setOtpInput(e.target.value.replace(/\D/g,"").slice(0,6))} placeholder="••••••" inputMode="numeric" className="w-full h-12 rounded-2xl bg-slate-50 border border-slate-200 px-4 text-center text-[22px] tracking-[0.4em] font-bold outline-none focus:border-slate-900" />
+              </div>
+              <button type="submit" className="w-full h-12 rounded-full bg-slate-900 text-white font-bold text-[14px] hover:bg-slate-800 transition">Verify & Continue →</button>
+              <div className="flex items-center justify-between text-xs">
+                <button type="button" onClick={handleOtpResend} className="text-slate-600 hover:text-slate-900 underline">Resend OTP</button>
+                <span className="text-slate-400">Backer accounts need OTP + admin approval</span>
+              </div>
             </form>
           </div>
         </div>

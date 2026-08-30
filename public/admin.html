@@ -1,20 +1,628 @@
-
 <!doctype html>
 <html lang="en">
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Startify Admin - Daksh</title>
+<title>Startify Admin — University of Hyderabad</title>
 <script src="https://cdn.tailwindcss.com"></script>
-<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Outfit:wght@600;700&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Outfit:wght@600;700;800&display=swap" rel="stylesheet">
+<style>body{font-family:Inter,sans-serif} .font-heading{font-family:Outfit,sans-serif}</style>
 </head>
-<body class="bg-[#F8FAFC]">
+<body class="bg-[#f1f5f9] text-slate-800">
 <div id="app"></div>
-<script type="module">
-const adminApp = `
-<!DOCTYPE html><html><body>Admin panel is in separate artifact. Use admin artifact link for now. This local build focuses on main site. To add admin, copy admin artifact source into src/Admin.jsx and add route.</body></html>
-`;
-document.getElementById('app').innerHTML = '<div class="p-8">Admin panel code is in artifact 3. Open <a href="https://meta.ai" class="underline">admin artifact</a> or integrate: copy src/Admin.jsx from previous generation. For local dev, main site already includes admin link.</div>';
+<script>
+const LS_KEYS = {
+  ideas: "startify_submitted_ideas",
+  regs: "startify_registrations",
+  payments: "startify_payments",
+  builders: "startify_admin_builders",
+  funders: "startify_admin_funders",
+  requests: "startify_requests",
+  messages: "startify_messages",
+  events: "startify_events",
+  pendingBackers: "startify_pending_backers",
+  otpMap: "startify_otp_map",
+  verifiedEmails: "startify_verified_emails",
+  adminSession: "startify_admin_session"
+};
+const ADMIN_EMAIL = "admin@startify.net";
+const ADMIN_PASS = "startifyUoH2025";
+
+// Demo seed (mirrors src/App.jsx)
+const DEMO_USERS = [
+  {id:"user_priya", name:"Priya Sharma", email:"priya@uohyd.ac.in", role:"founder", studentId:"UOH-2023-CS042"},
+  {id:"user_vikram", name:"Vikram Singh", email:"vikram@uohyd.ac.in", role:"talent", roleTitle:"Full-Stack Engineer", skills:"React, Node.js, Python"},
+  {id:"user_backer", name:"Campus Angel Network", email:"angels@startify.net", role:"backer"},
+  {id:"user_admin", name:"Startify Admin", email:"admin@startify.net", role:"admin"},
+];
+const SEED_IDEAS = [
+  {id:"idea_1", title:"CampusKart", category:"E-Commerce / Logistics", founder:"Priya Sharma", founderId:"user_priya", status:"Approved & Live", createdDate:"2 days ago"},
+  {id:"idea_2", title:"HostelX Food Tech", category:"Food & Services", founder:"Aarav Patel", founderId:"user_aarav", status:"MVP Live", createdDate:"3 days ago"},
+  {id:"idea_3", title:"StudyBuddy AI", category:"EdTech / AI", founder:"Rohan Verma", founderId:"user_rohan", status:"Prototype Ready", createdDate:"Just now"},
+];
+const SEED_BUILDERS = [
+  {id:"user_vikram", name:"Vikram Singh", role:"Full-Stack Engineer", skills:"React, Node.js, Python, PostgreSQL"},
+  {id:"builder_2", name:"Sneha Reddy", role:"UI/UX Product Designer", skills:"Figma, Framer"},
+];
+const SEED_FUNDERS = [
+  {id:"user_backer", name:"Campus Angel Network", role:"Early-Stage Micro Angel Syndicate", focus:"EdTech, AI & Consumer SaaS", ticketSize:"Pre-Seed & Seed Focus"},
+  {id:"backer_2", name:"Venture Catalyst Circle", role:"Pre-Seed & Seed Backer", focus:"B2B SaaS, Logistics", ticketSize:"Idea & Prototype Funding"},
+];
+const SEED_REQUESTS = [
+  {id:"req_1", senderName:"Vikram Singh", senderRole:"talent", receiverName:"Priya Sharma", targetTitle:"CampusKart", status:"accepted", createdAt:"Yesterday"},
+  {id:"req_2", senderName:"Campus Angel Network", senderRole:"backer", receiverName:"Priya Sharma", targetTitle:"CampusKart", status:"pending", createdAt:"2 hours ago"},
+];
+const SEED_MESSAGES = [
+  {id:"msg_1", requestId:"req_1", senderName:"Vikram Singh", text:"Hey Priya, thanks for accepting! Have you setup the DB schema?"},
+  {id:"msg_2", requestId:"req_1", senderName:"Priya Sharma", text:"Hi Vikram! Yes, basic mockup ready."},
+];
+const SEED_EVENTS = [
+  {id:"e1", title:"Campus Demo Day & Idea Showcase", date:"Saturday, Sep 12", category:"Pitch Night", venue:"Main Innovation Auditorium & Online Stage"},
+  {id:"e2", title:"Co-Founder & Builder Speed Networking", date:"Wednesday, Sep 16", category:"Networking", venue:"Student Hub Lounge"},
+];
+
+function load(key, fallback){ try{ const v=localStorage.getItem(key); return v? JSON.parse(v): fallback; }catch(e){return fallback;} }
+function save(key, val){ localStorage.setItem(key, JSON.stringify(val)); }
+function deleteUserByEmail(email, id){
+  if(!confirm(`Delete user ${email} ? This will remove from all stores for testing.`)) return;
+  let regs=load(LS_KEYS.regs, []);
+  regs=regs.filter(r=> r.email.toLowerCase()!==email.toLowerCase());
+  save(LS_KEYS.regs, regs);
+  let builders=load(LS_KEYS.builders, []);
+  builders=builders.filter(b=> b.id!==id && (b.email||"").toLowerCase()!==email.toLowerCase());
+  save(LS_KEYS.builders, builders);
+  let funders=load(LS_KEYS.funders, []);
+  funders=funders.filter(f=> f.id!==id && (f.email||"").toLowerCase()!==email.toLowerCase());
+  save(LS_KEYS.funders, funders);
+  let pending=load(LS_KEYS.pendingBackers, []);
+  pending=pending.filter(p=> p.id!==id && p.email.toLowerCase()!==email.toLowerCase());
+  save(LS_KEYS.pendingBackers, pending);
+  try{
+    const profs=JSON.parse(localStorage.getItem("startify_user_profiles")||"[]");
+    localStorage.setItem("startify_user_profiles", JSON.stringify(profs.filter(p=> p.email.toLowerCase()!==email.toLowerCase() && p.id!==id)));
+  }catch{}
+  try{
+    const verified=load(LS_KEYS.verifiedEmails, []);
+    save(LS_KEYS.verifiedEmails, verified.filter(e=> e.toLowerCase()!==email.toLowerCase()));
+  }catch{}
+  alert("Deleted: "+email);
+  render();
+}
+function deleteBuilderById(id){
+  if(!confirm(`Delete builder ${id} ?`)) return;
+  let builders=load(LS_KEYS.builders, []);
+  const target=builders.find(b=> b.id===id);
+  builders=builders.filter(b=> b.id!==id);
+  save(LS_KEYS.builders, builders);
+  if(target && target.email){
+    let regs=load(LS_KEYS.regs, []);
+    regs=regs.filter(r=> r.email.toLowerCase()!==target.email.toLowerCase());
+    save(LS_KEYS.regs, regs);
+    try{
+      const profs=JSON.parse(localStorage.getItem("startify_user_profiles")||"[]");
+      localStorage.setItem("startify_user_profiles", JSON.stringify(profs.filter(p=> p.id!==id && (p.email||"").toLowerCase()!==target.email.toLowerCase())));
+    }catch{}
+  }
+  alert("Deleted builder: "+(target?target.name:id));
+  render();
+}
+function deleteFunderById(id){
+  if(!confirm(`Delete backer ${id} ?`)) return;
+  let funders=load(LS_KEYS.funders, []);
+  const target=funders.find(f=> f.id===id);
+  funders=funders.filter(f=> f.id!==id);
+  save(LS_KEYS.funders, funders);
+  if(target && target.email){
+    let regs=load(LS_KEYS.regs, []);
+    regs=regs.filter(r=> r.email.toLowerCase()!==target.email.toLowerCase());
+    save(LS_KEYS.regs, regs);
+    try{
+      const profs=JSON.parse(localStorage.getItem("startify_user_profiles")||"[]");
+      localStorage.setItem("startify_user_profiles", JSON.stringify(profs.filter(p=> p.id!==id && (p.email||"").toLowerCase()!==target.email.toLowerCase())));
+    }catch{}
+    try{
+      const verified=load(LS_KEYS.verifiedEmails, []);
+      save(LS_KEYS.verifiedEmails, verified.filter(e=> e.toLowerCase()!==target.email.toLowerCase()));
+    }catch{}
+  }
+  alert("Deleted backer: "+(target?target.name:id));
+  render();
+}
+
+function getAllData(){
+  const ideas = [...load(LS_KEYS.ideas, []), ...SEED_IDEAS];
+  const regs = load(LS_KEYS.regs, null) || [
+    {name:"Rahul Sharma", email:"rahul@uohyd.ac.in", role:"founder", registeredAt:"2026-08-23"},
+    {name:"Aditi Rao", email:"aditi@uohyd.ac.in", role:"builder", registeredAt:"2026-08-22"},
+    {name:"Karan Patel", email:"karan@angelnet.in", role:"funder", registeredAt:"2026-08-21"},
+  ];
+  const builders = [...load(LS_KEYS.builders, []), ...SEED_BUILDERS];
+  const funders = [...load(LS_KEYS.funders, []), ...SEED_FUNDERS];
+  const requests = [...load(LS_KEYS.requests, []), ...SEED_REQUESTS];
+  const messages = [...load(LS_KEYS.messages, []), ...SEED_MESSAGES];
+  const events = [...load(LS_KEYS.events, []), ...SEED_EVENTS];
+  const pendingBackers = load(LS_KEYS.pendingBackers, []);
+  const otpMap = load(LS_KEYS.otpMap, {});
+  const verifiedEmails = load(LS_KEYS.verifiedEmails, []);
+  const allUsers = [...DEMO_USERS.map(u=>({...u, source:"demo"})), ...regs.map(r=>({id:r.email, name:r.name, email:r.email, role: r.role==="builder"?"talent":r.role==="funder"?"backer":r.role, createdAt:r.registeredAt, source:"registration"})), ...builders.map(b=>({id:b.id, name:b.name, email:b.email||b.id+"@uohyd.ac.in", role:"talent", source:"builder"})), ...funders.map(f=>({id:f.id, name:f.name, email:f.email||f.id+"@startify.net", role:"backer", source:"funder"})), ...pendingBackers.map(p=>({id:p.id, name:p.name, email:p.email, role:"backer", createdAt:p.createdAt, pending:true, source:"pending"}))];
+  // de-dupe by email
+  const seen=new Set(); const uniqUsers=[];
+  for(const u of allUsers){ if(!seen.has(u.email.toLowerCase())){ seen.add(u.email.toLowerCase()); uniqUsers.push(u); } }
+  return {ideas, regs, builders, funders, requests, messages, events, pendingBackers, otpMap, verifiedEmails, uniqUsers};
+}
+
+let currentTab = "overview";
+
+function isLogged(){ return localStorage.getItem(LS_KEYS.adminSession)==="true"; }
+
+function render(){
+  const root=document.getElementById("app");
+  if(!isLogged()){
+    root.innerHTML = `
+      <div class="min-h-screen grid place-items-center p-6 bg-gradient-to-br from-slate-900 via-indigo-900 to-slate-800">
+        <div class="w-full max-w-[420px] rounded-[28px] bg-white p-8 shadow-2xl">
+          <div class="text-center">
+            <div class="inline-flex items-center gap-2 rounded-full bg-indigo-50 border border-indigo-200 px-3 py-1 text-[11px] font-bold uppercase tracking-widest text-indigo-700">University of Hyderabad • Admin</div>
+            <h1 class="font-heading text-[28px] font-extrabold mt-3 text-slate-900">Startify Admin</h1>
+            <p class="text-sm text-slate-500 mt-1">Sole admin access • You have all data</p>
+          </div>
+          <form id="loginForm" class="mt-6 space-y-4">
+            <div>
+              <label class="block text-xs font-semibold text-slate-600 mb-1">Admin Email</label>
+              <input id="loginEmail" required type="email" value="admin@startify.net" class="w-full h-11 rounded-full bg-slate-50 border border-slate-200 px-4 text-sm outline-none focus:border-slate-300" placeholder="admin@startify.net">
+            </div>
+            <div>
+              <label class="block text-xs font-semibold text-slate-600 mb-1">Password</label>
+              <input id="loginPass" required type="password" value="startifyUoH2025" class="w-full h-11 rounded-full bg-slate-50 border border-slate-200 px-4 text-sm outline-none focus:border-slate-300" placeholder="••••••••">
+              <p class="mt-1.5 text-[11px] text-slate-500">Default: <strong>admin@startify.net</strong> / <strong>startifyUoH2025</strong> — change after launch.</p>
+            </div>
+            <button type="submit" class="w-full h-11 rounded-full bg-slate-900 text-white font-bold text-sm hover:bg-slate-800 transition">Enter Admin →</button>
+            <a href="/" class="block text-center text-xs text-slate-500 hover:text-slate-700 underline">← Back to Startify</a>
+          </form>
+          <div class="mt-6 rounded-2xl bg-amber-50 border border-amber-200 p-3 text-[11px] leading-4 text-amber-800">This page is <strong>not linked publicly</strong> except via footer “Admin”. Share only with you. Students register with <strong>@uohyd.ac.in</strong> (Founder/Builder); Backers may use any email.</div>
+        </div>
+      </div>`;
+    document.getElementById("loginForm").addEventListener("submit", (e)=>{
+      e.preventDefault();
+      const email=document.getElementById("loginEmail").value.trim().toLowerCase();
+      const pass=document.getElementById("loginPass").value;
+      if(email===ADMIN_EMAIL && pass===ADMIN_PASS){
+        localStorage.setItem(LS_KEYS.adminSession,"true");
+        render();
+      } else {
+        alert("Invalid admin credentials. Use admin@startify.net / startifyUoH2025");
+      }
+    });
+    return;
+  }
+
+  const data=getAllData();
+  const totalUsers=data.uniqUsers.length;
+  const founders=data.uniqUsers.filter(u=>u.role==="founder").length;
+  const talents=data.uniqUsers.filter(u=>u.role==="talent").length;
+  const backers=data.uniqUsers.filter(u=>u.role==="backer").length;
+  const activeUsers=data.verifiedEmails.length + DEMO_USERS.length; // verified = active
+  const pendingBackersCount=data.pendingBackers.length;
+  const pendingIdeas=data.ideas.filter(i=>i.status==="Pending Review").length;
+  const liveIdeas=data.ideas.filter(i=>i.status!=="Pending Review" && i.status!=="Rejected").length;
+  const totalRequests=data.requests.length;
+  const acceptedRequests=data.requests.filter(r=>r.status==="accepted").length;
+  const pendingRequests=data.requests.filter(r=>r.status==="pending").length;
+  const totalMessages=data.messages.length;
+  // messages "today" — mock: count last 24h as total for demo
+  const messagesToday=Math.max(1, Math.round(totalMessages*0.6));
+
+  const tabs = [
+    ["overview","Overview"],
+    ["users","Users"],
+    ["ideas","Ideas"],
+    ["talent","Talent"],
+    ["backers","Backers"],
+    ["pending","Backer Approvals"],
+    ["otp","OTP Logs"],
+    ["chats","Chats"],
+    ["events","Events"],
+    ["create","Create Account"],
+  ];
+
+  root.innerHTML = `
+    <div class="min-h-screen">
+      <header class="sticky top-0 z-30 backdrop-blur bg-white/80 border-b border-slate-200">
+        <div class="mx-auto max-w-[1280px] px-6 h-[64px] flex items-center justify-between">
+          <div class="flex items-center gap-3">
+            <div class="h-9 w-9 rounded-xl bg-slate-900 text-white grid place-items-center font-extrabold text-sm">S</div>
+            <div>
+              <div class="font-heading font-extrabold leading-none">Startify Admin</div>
+              <div class="text-[11px] text-slate-500 font-semibold">University of Hyderabad • An initiative for UoH students</div>
+            </div>
+          </div>
+          <div class="flex items-center gap-3">
+            <a href="/" class="hidden sm:inline-flex h-9 px-4 rounded-full border border-slate-200 bg-white text-xs font-semibold hover:bg-slate-50">← View Site</a>
+            <span class="hidden sm:inline text-xs text-slate-500">admin@startify.net</span>
+            <button id="logoutBtn" class="h-9 px-4 rounded-full bg-slate-900 text-white text-xs font-bold hover:bg-slate-800">Sign out</button>
+          </div>
+        </div>
+      </header>
+
+      <div class="mx-auto max-w-[1280px] px-6 py-6">
+        <div class="flex flex-wrap gap-2 mb-6">
+          ${tabs.map(([k,label])=>`<button data-tab="${k}" class="tab-btn h-9 px-4 rounded-full border text-xs font-bold transition ${currentTab===k?"bg-slate-900 text-white border-slate-900 shadow":"bg-white text-slate-600 border-slate-200 hover:border-slate-300"}">${label}</button>`).join("")}
+        </div>
+
+        <div id="tabContent"></div>
+      </div>
+    </div>
+  `;
+
+  document.querySelectorAll(".tab-btn").forEach(btn=>{
+    btn.addEventListener("click", ()=>{ currentTab=btn.dataset.tab; render(); });
+  });
+  document.getElementById("logoutBtn").addEventListener("click", ()=>{
+    localStorage.removeItem(LS_KEYS.adminSession);
+    render();
+  });
+
+  const content=document.getElementById("tabContent");
+  if(currentTab==="overview"){
+    content.innerHTML = `
+      <div class="grid sm:grid-cols-2 lg:grid-cols-4 gap-4">
+        ${[
+          ["Total Users", totalUsers, "All roles incl. demo", "bg-slate-900 text-white"],
+          ["Founders", founders, "@uohyd.ac.in only", "bg-white"],
+          ["Builders (Talent)", talents, "@uohyd.ac.in + skills", "bg-white"],
+          ["Backers (approved)", backers - pendingBackersCount, `+ ${pendingBackersCount} pending`, "bg-white"],
+          ["Backers Pending", pendingBackersCount, "OTP verified → need approval", pendingBackersCount>0?"bg-amber-500 text-white border-amber-500":"bg-white"],
+          ["Pending Ideas", pendingIdeas, "Needs your approval", pendingIdeas>0?"bg-amber-50 border-amber-200":"bg-white"],
+          ["Verified Active", activeUsers, "OTP verified emails", "bg-white"],
+          ["Messages Today", messagesToday, `Total ${totalMessages} all-time`, "bg-white"],
+        ].map(([label,val,sub,cls])=>`
+          <div class="rounded-[22px] border border-slate-200 p-5 shadow-sm ${cls.includes("bg-slate-900")? "bg-slate-900 text-white border-slate-900": cls.includes("bg-amber-500")? "bg-amber-500 text-white border-amber-500": cls}">
+            <div class="text-[11px] font-bold uppercase tracking-widest ${cls.includes("bg-slate-900")||cls.includes("bg-amber-500")?"text-white/80":"text-slate-500"}">${label}</div>
+            <div class="font-heading text-3xl font-extrabold mt-2 ${cls.includes("bg-slate-900")||cls.includes("bg-amber-500")?"text-white":"text-slate-800"}">${val}</div>
+            <div class="text-[11px] mt-1 ${cls.includes("bg-slate-900")||cls.includes("bg-amber-500")?"text-white/80":"text-slate-500"}">${sub}</div>
+          </div>
+        `).join("")}
+      </div>
+
+      <div class="mt-6 grid lg:grid-cols-3 gap-4">
+        <div class="lg:col-span-2 rounded-[24px] border border-slate-200 bg-white p-6">
+          <div class="flex items-center justify-between">
+            <h3 class="font-heading font-extrabold text-lg">Role Distribution</h3>
+            <span class="text-xs text-slate-500">${totalUsers} users total</span>
+          </div>
+          <div class="mt-5 space-y-3">
+            ${[
+              ["Founder", founders, totalUsers],
+              ["Builder", talents, totalUsers],
+              ["Backer", backers, totalUsers],
+            ].map(([role,count,total])=>{
+              const pct= total? Math.round(count/total*100):0;
+              return `<div class="flex items-center gap-3"><div class="w-20 text-xs font-semibold text-slate-600">${role}</div><div class="flex-1 h-3 rounded-full bg-slate-100 overflow-hidden"><div class="h-full bg-slate-900" style="width:${pct}%"></div></div><div class="w-12 text-right text-xs font-bold">${pct}%</div></div>`;
+            }).join("")}
+          </div>
+          <div class="mt-6 grid grid-cols-3 gap-3 text-center">
+            <div class="rounded-xl bg-slate-50 border border-slate-200 p-3"><div class="text-xs text-slate-500">Requests</div><div class="font-extrabold text-lg">${totalRequests}</div><div class="text-[11px] text-slate-500">${pendingRequests} pending • ${acceptedRequests} accepted</div></div>
+            <div class="rounded-xl bg-slate-50 border border-slate-200 p-3"><div class="text-xs text-slate-500">Messages</div><div class="font-extrabold text-lg">${totalMessages}</div><div class="text-[11px] text-slate-500">${messagesToday} today (est.)</div></div>
+            <div class="rounded-xl bg-slate-50 border border-slate-200 p-3"><div class="text-xs text-slate-500">Events</div><div class="font-extrabold text-lg">${data.events.length}</div><div class="text-[11px] text-slate-500">Campus meetups</div></div>
+          </div>
+        </div>
+
+        <div class="rounded-[24px] border border-slate-200 bg-white p-6">
+          <h3 class="font-heading font-extrabold">Quick Actions</h3>
+          <div class="mt-4 space-y-2">
+            <button data-go="create" class="go-btn w-full h-11 rounded-full bg-slate-900 text-white font-bold text-sm">+ Create Account →</button>
+            <button data-go="ideas" class="go-btn w-full h-11 rounded-full bg-amber-50 border border-amber-200 text-amber-800 font-bold text-sm">Review Pending Ideas (${pendingIdeas})</button>
+            <button data-go="chats" class="go-btn w-full h-11 rounded-full bg-white border border-slate-200 font-semibold text-sm">View Conversations</button>
+            <button id="exportBtn" class="w-full h-11 rounded-full bg-white border border-slate-200 font-semibold text-sm">Export JSON →</button>
+          </div>
+          <div class="mt-6 rounded-xl bg-indigo-50 border border-indigo-200 p-3 text-xs leading-5 text-indigo-800">
+            <strong>UoH policy:</strong> Founder/Builder require <strong>@uohyd.ac.in</strong>. Backers may use any email. Chat misuse = removal.
+          </div>
+        </div>
+      </div>
+
+      <div class="mt-6 rounded-[24px] border border-slate-200 bg-white p-6">
+        <h3 class="font-heading font-extrabold">Recent Registrations</h3>
+        <div class="mt-4 space-y-2">
+          ${data.regs.slice(0,6).map(r=>`<div class="flex items-center justify-between p-3 rounded-xl bg-slate-50 border border-slate-200 text-sm"><div><div class="font-semibold">${r.name} <span class="text-xs text-slate-500">(${r.role})</span></div><div class="text-xs text-slate-500">${r.email} • ${r.registeredAt||"—"}</div></div><span class="text-[11px] px-2 py-1 rounded-full bg-white border border-slate-200">${r.role}</span></div>`).join("")}
+        </div>
+      </div>
+    `;
+    content.querySelectorAll(".go-btn").forEach(b=> b.addEventListener("click", ()=>{ currentTab=b.dataset.go; render(); }));
+    document.getElementById("exportBtn").addEventListener("click", ()=>{
+      const blob=new Blob([JSON.stringify(getAllData(), null, 2)], {type:"application/json"});
+      const url=URL.createObjectURL(blob);
+      const a=document.createElement("a"); a.href=url; a.download="startify-admin-export.json"; a.click(); URL.revokeObjectURL(url);
+    });
+
+  } else if(currentTab==="users"){
+    content.innerHTML = `
+      <div class="rounded-[24px] border border-slate-200 bg-white p-6">
+        <div class="flex items-center justify-between"><h3 class="font-heading font-extrabold text-xl">All Users (${totalUsers})</h3><span class="text-xs text-slate-500">Deduped by email • Founder/Builder = @uohyd.ac.in • <span class="text-amber-600 font-semibold">Delete for testing</span></span></div>
+        <div class="mt-4 overflow-x-auto">
+          <table class="w-full text-sm">
+            <thead><tr class="text-xs text-slate-500 text-left border-b"><th class="pb-2">Name</th><th class="pb-2">Email</th><th class="pb-2">Role</th><th class="pb-2">Source</th><th class="pb-2">Action</th></tr></thead>
+            <tbody class="divide-y">
+              ${data.uniqUsers.map(u=>{
+                const isDemo = DEMO_USERS.some(d=> d.email.toLowerCase()===u.email.toLowerCase());
+                const escEmail = u.email.replace(/'/g, "\\'");
+                const escId = (u.id||"").toString().replace(/'/g, "\\'");
+                const delBtn = isDemo ? '<span class="text-[11px] text-slate-400">protected</span>' : `<button onclick="deleteUserByEmail('${escEmail}','${escId}')" class="h-7 px-3 rounded-full bg-white border border-red-200 text-red-600 text-xs font-bold hover:bg-red-50">Delete</button>`;
+                return `<tr><td class="py-3 font-semibold">${u.name||'<span class="text-slate-400 italic">no name</span>'}</td><td class="py-3 text-slate-600">${u.email}</td><td class="py-3"><span class="px-2 py-1 rounded-full text-xs font-bold border ${u.role==="founder"?"bg-indigo-50 border-indigo-200 text-indigo-700": u.role==="talent"?"bg-sky-50 border-sky-200 text-sky-700": u.role==="backer"?"bg-violet-50 border-violet-200 text-violet-700":"bg-slate-100 border-slate-200"}">${u.role}</span></td><td class="py-3 text-xs text-slate-500">${u.source||u.registeredAt||u.createdAt||"demo"}</td><td class="py-3">${delBtn}</td></tr>`;
+              }).join("")}
+            </tbody>
+          </table>
+        </div>
+        <p class="mt-3 text-[11px] text-slate-500">Delete removes user from <code>startify_registrations</code>, <code>startify_admin_builders</code>, <code>startify_admin_funders</code>, <code>startify_pending_backers</code> and unified profiles — useful for testing.</p>
+      </div>
+    `;
+  } else if(currentTab==="ideas"){
+    content.innerHTML = `
+      <div class="rounded-[24px] border border-slate-200 bg-white p-6">
+        <div class="flex items-center justify-between"><h3 class="font-heading font-extrabold text-xl">Ideas (${data.ideas.length})</h3><span class="text-xs px-3 py-1 rounded-full bg-amber-50 border border-amber-200 text-amber-800">${pendingIdeas} pending review</span></div>
+        <div class="mt-4 space-y-3">
+          ${data.ideas.map(idea=>`
+            <div class="p-4 rounded-2xl border ${idea.status==="Pending Review"?"bg-amber-50 border-amber-200":"bg-slate-50 border-slate-200"} flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+              <div>
+                <div class="font-bold">${idea.title} <span class="text-xs font-normal text-slate-500">• ${idea.category}</span></div>
+                <div class="text-xs text-slate-500 mt-1">By ${idea.founder} • ${idea.status} • ${idea.createdDate||""}</div>
+                <div class="text-sm text-slate-600 mt-1">${idea.desc||""}</div>
+              </div>
+              <div class="flex gap-2 shrink-0">
+                ${idea.status==="Pending Review" ? `<button data-approve="${idea.id}" class="approveBtn h-8 px-3 rounded-full bg-slate-900 text-white text-xs font-bold">Approve</button><button data-reject="${idea.id}" class="rejectBtn h-8 px-3 rounded-full bg-white border border-slate-200 text-xs font-bold">Reject</button>` : `<span class="text-xs px-3 py-1 rounded-full bg-white border border-slate-200">${idea.status}</span>`}
+              </div>
+            </div>
+          `).join("")}
+        </div>
+      </div>
+    `;
+    content.querySelectorAll(".approveBtn").forEach(b=> b.addEventListener("click", ()=>{
+      const id=b.dataset.approve;
+      const stored=load(LS_KEYS.ideas, []);
+      // if idea is seed, we need to add override
+      const all=getAllData().ideas;
+      const target=all.find(i=>i.id===id);
+      if(target){ target.status="Approved & Live"; target.createdDate="Just now"; }
+      // persist seed change as new entry
+      save(LS_KEYS.ideas, [ {...target, status:"Approved & Live", createdDate:"Just now" }, ...stored ]);
+      alert("Approved: "+target.title);
+      render();
+    }));
+    content.querySelectorAll(".rejectBtn").forEach(b=> b.addEventListener("click", ()=>{
+      const id=b.dataset.reject;
+      const stored=load(LS_KEYS.ideas, []);
+      const all=getAllData().ideas;
+      const target=all.find(i=>i.id===id);
+      if(target){ target.status="Rejected"; }
+      save(LS_KEYS.ideas, [ {...target, status:"Rejected"}, ...stored ]);
+      alert("Rejected");
+      render();
+    }));
+
+  } else if(currentTab==="talent"){
+    content.innerHTML = `
+      <div class="rounded-[24px] border border-slate-200 bg-white p-6">
+        <div class="flex items-center justify-between"><h3 class="font-heading font-extrabold text-xl">Skilled Talent (${data.builders.length})</h3><span class="text-xs text-slate-500">Admin-created • delete for testing</span></div>
+        <p class="text-sm text-slate-500 mt-1">UoH students with skills — Builder accounts require @uohyd.ac.in</p>
+        <div class="mt-4 grid sm:grid-cols-2 lg:grid-cols-3 gap-4">
+          ${data.builders.map(b=>{
+            const isSeed = SEED_BUILDERS.some(s=> s.id===b.id);
+            const displayName = b.name && b.name.trim() ? b.name : '<span class="text-amber-600 italic">missing name — check creation</span>';
+            const displayEmail = b.email ? `<div class="text-[11px] text-slate-400 break-all">${b.email}</div>` : '';
+            const escId = (b.id||"").toString().replace(/'/g, "\\'");
+            const delBtn = isSeed ? '<span class="text-[11px] text-slate-400">seed</span>' : `<button onclick="deleteBuilderById('${escId}')" class="h-7 px-3 rounded-full bg-white border border-red-200 text-red-600 text-xs font-bold hover:bg-red-50">Delete</button>`;
+            return `<div class="p-4 rounded-2xl border ${isSeed?"border-amber-200 bg-amber-50":"border-slate-200 bg-slate-50"} flex flex-col justify-between"><div><div class="font-bold flex items-center justify-between gap-2"><span>${displayName}</span>${delBtn}</div><div class="text-xs text-slate-500">${b.role||"Builder"}</div>${displayEmail}<div class="text-xs mt-2 bg-white border border-slate-200 rounded-xl p-2 break-words">${b.skills||"no skills"}</div></div><div class="mt-2 text-[11px] text-slate-400">ID: ${b.id}</div></div>`;
+          }).join("")}
+        </div>
+        ${data.builders.length===0 ? '<div class="mt-4 text-center text-sm text-slate-500">No builders yet — create via Create Account tab.</div>' : ''}
+      </div>
+    `;
+  } else if(currentTab==="backers"){
+    content.innerHTML = `
+      <div class="rounded-[24px] border border-slate-200 bg-white p-6">
+        <div class="flex items-center justify-between"><h3 class="font-heading font-extrabold text-xl">Backers (${data.funders.length})</h3><span class="text-xs text-slate-500">Approved • delete for testing</span></div>
+        <p class="text-sm text-slate-500 mt-1">Open to outside — any verified email allowed</p>
+        <div class="mt-4 grid md:grid-cols-2 gap-4">
+          ${data.funders.map(f=>{
+            const isSeed = SEED_FUNDERS.some(s=> s.id===f.id);
+            const displayName = f.name && f.name.trim() ? f.name : '<span class="text-amber-600 italic">missing name</span>';
+            const displayEmail = f.email ? `<div class="text-[11px] text-slate-400 break-all">${f.email}</div>` : '';
+            const escId = (f.id||"").toString().replace(/'/g, "\\'");
+            const delBtn = isSeed ? '<span class="text-[11px] text-slate-400">seed</span>' : `<button onclick="deleteFunderById('${escId}')" class="h-7 px-3 rounded-full bg-white border border-red-200 text-red-600 text-xs font-bold hover:bg-red-50">Delete</button>`;
+            return `<div class="p-4 rounded-2xl border ${isSeed?"border-amber-200 bg-amber-50":"border-slate-200 bg-slate-50"} flex flex-col justify-between"><div><div class="font-bold flex items-center justify-between gap-2"><span>${displayName}</span>${delBtn}</div><div class="text-xs text-slate-500">${f.role||"Backer"} • ${f.ticketSize||""}</div>${displayEmail}<div class="text-xs mt-2">${f.focus||""}</div><div class="text-sm mt-2 text-slate-600 break-words">${f.bio||""}</div></div><div class="mt-2 text-[11px] text-slate-400">ID: ${f.id}</div></div>`;
+          }).join("")}
+        </div>
+        ${data.funders.length===0 ? '<div class="mt-4 text-center text-sm text-slate-500">No backers yet.</div>' : ''}
+      </div>
+    `;
+  } else if(currentTab==="pending"){
+    content.innerHTML = `
+      <div class="rounded-[24px] border border-amber-200 bg-amber-50 p-6">
+        <div class="flex items-center justify-between"><h3 class="font-heading font-extrabold text-xl text-amber-900">Backers Pending Approval (${pendingBackersCount})</h3><span class="text-xs px-3 py-1 rounded-full bg-amber-500 text-white font-bold">OTP verified → need you</span></div>
+        <p class="text-sm text-amber-800 mt-1">Backer IDs require OTP verification + your approval before they appear in Backers Hub. Founder/Builder are auto-active after OTP (UoH gate).</p>
+        <div class="mt-4 space-y-3">
+          ${pendingBackersCount===0 ? `<div class="py-8 text-center text-sm text-amber-700 bg-white rounded-xl border border-amber-200">No pending backers — all clear.</div>` : data.pendingBackers.map(b=>`
+            <div class="p-4 rounded-2xl border border-amber-200 bg-white flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+              <div>
+                <div class="font-bold text-slate-800">${b.name} <span class="text-xs font-normal text-slate-500">• ${b.email}</span></div>
+                <div class="text-xs text-slate-500 mt-1">Focus: ${b.focus||b.bio||"—"} • OTP ✓ • ${new Date(b.createdAt).toLocaleString()}</div>
+              </div>
+              <div class="flex gap-2 shrink-0">
+                <button data-approve-backer="${b.id}" class="approveBackerBtn h-9 px-4 rounded-full bg-slate-900 text-white text-xs font-bold">Approve →</button>
+                <button data-reject-backer="${b.id}" class="rejectBackerBtn h-9 px-4 rounded-full bg-white border border-slate-200 text-xs font-bold">Reject</button>
+              </div>
+            </div>
+          `).join("")}
+        </div>
+      </div>
+    `;
+    content.querySelectorAll(".approveBackerBtn").forEach(btn=> btn.addEventListener("click", ()=>{
+      const id=btn.dataset.approveBacker;
+      const pending=load(LS_KEYS.pendingBackers, []);
+      const target=pending.find(p=>p.id===id);
+      if(target){
+        const funders=load(LS_KEYS.funders, []);
+        save(LS_KEYS.funders, [{id:target.id, name:target.name, role:target.roleTitle||"Angel Backer", focus:target.focus||"Tech & AI", bio:target.bio||"Approved backer.", ticketSize:"Pre-Seed & Seed"}, ...funders]);
+        save(LS_KEYS.pendingBackers, pending.filter(p=>p.id!==id));
+        // also update registrations status
+        const regs=load(LS_KEYS.regs, []);
+        const updated=regs.map(r=> r.email.toLowerCase()===target.email.toLowerCase() ? {...r, status:"approved"} : r);
+        save(LS_KEYS.regs, updated);
+        alert("Approved backer: "+target.name);
+        render();
+      }
+    }));
+    content.querySelectorAll(".rejectBackerBtn").forEach(btn=> btn.addEventListener("click", ()=>{
+      const id=btn.dataset.rejectBacker;
+      const pending=load(LS_KEYS.pendingBackers, []);
+      save(LS_KEYS.pendingBackers, pending.filter(p=>p.id!==id));
+      alert("Rejected");
+      render();
+    }));
+  } else if(currentTab==="otp"){
+    const otpEntries=Object.entries(data.otpMap);
+    content.innerHTML = `
+      <div class="rounded-[24px] border border-slate-200 bg-white p-6">
+        <div class="flex items-center justify-between"><h3 class="font-heading font-extrabold text-xl">OTP Verification Logs</h3><span class="text-xs text-slate-500">${otpEntries.length} emails • ${data.verifiedEmails.length} verified</span></div>
+        <p class="text-sm text-slate-500 mt-1">Mock OTP service — in production replace <code class="bg-slate-100 px-1 rounded">sendOtp()</code> with MSG91 / Twilio / SendGrid / Supabase Auth. Codes shown here for debugging.</p>
+        <div class="mt-4 overflow-x-auto">
+          <table class="w-full text-sm">
+            <thead><tr class="text-xs text-slate-500 text-left border-b"><th class="pb-2">Email</th><th class="pb-2">Role</th><th class="pb-2">Code</th><th class="pb-2">Verified</th><th class="pb-2">Time</th></tr></thead>
+            <tbody class="divide-y">
+              ${otpEntries.length===0 ? `<tr><td colspan="5" class="py-6 text-center text-slate-500">No OTP sent yet — create an account to see logs.</td></tr>` : otpEntries.map(([email, v])=>`<tr><td class="py-3 font-mono text-xs">${email}</td><td class="py-3"><span class="px-2 py-1 rounded-full text-xs font-bold border ${v.role==="backer"?"bg-violet-50 border-violet-200 text-violet-700":"bg-indigo-50 border-indigo-200 text-indigo-700"}">${v.role}</span></td><td class="py-3 font-mono font-bold tracking-widest">${v.code}</td><td class="py-3">${v.verified?'<span class="px-2 py-1 rounded-full bg-emerald-50 border border-emerald-200 text-emerald-700 text-xs font-bold">✓ Verified</span>':'<span class="px-2 py-1 rounded-full bg-amber-50 border border-amber-200 text-amber-700 text-xs font-bold">Pending</span>'}</td><td class="py-3 text-xs text-slate-500">${new Date(v.at).toLocaleString()}</td></tr>`).join("")}
+            </tbody>
+          </table>
+        </div>
+        <div class="mt-6 rounded-xl bg-slate-900 text-white p-4 text-xs leading-5">
+          <div class="font-bold">Integrate real OTP</div>
+          <div class="mt-1 text-white/70">Replace mock in <code class="bg-white/10 px-1 rounded">src/App.jsx: sendOtp()</code> and <code>public/admin.html</code> with your provider API. Keep <code>@uohyd.ac.in</code> gate for Founder/Builder.</div>
+        </div>
+      </div>
+    `;
+  } else if(currentTab==="chats"){
+    content.innerHTML = `
+      <div class="grid lg:grid-cols-2 gap-4">
+        <div class="rounded-[24px] border border-slate-200 bg-white p-6">
+          <h3 class="font-heading font-extrabold">Conversations</h3>
+          <p class="text-sm text-slate-500">Requests • ${totalRequests} total • ${pendingRequests} pending • ${acceptedRequests} accepted</p>
+          <div class="mt-4 space-y-2">
+            ${data.requests.map(r=>`<div class="p-3 rounded-xl border ${r.status==="accepted"?"bg-emerald-50 border-emerald-200": r.status==="pending"?"bg-amber-50 border-amber-200":"bg-slate-50 border-slate-200"} text-sm"><div class="font-semibold">${r.senderName} → ${r.receiverName} <span class="text-xs font-normal text-slate-500">(${r.status})</span></div><div class="text-xs text-slate-500">Re: ${r.targetTitle} • ${r.createdAt}</div><div class="text-xs mt-1">${r.message||""}</div></div>`).join("")}
+          </div>
+        </div>
+        <div class="rounded-[24px] border border-slate-200 bg-white p-6">
+          <h3 class="font-heading font-extrabold">Messages</h3>
+          <p class="text-sm text-slate-500">${totalMessages} total • ~${messagesToday} today (estimated)</p>
+          <div class="mt-4 space-y-2 max-h-[520px] overflow-auto pr-1">
+            ${data.messages.map(m=>`<div class="p-3 rounded-xl bg-slate-50 border border-slate-200"><div class="text-xs font-semibold text-slate-700">${m.senderName}</div><div class="text-sm text-slate-600 mt-1">${m.text}</div><div class="text-[11px] text-slate-400 mt-1">${m.requestId||""}</div></div>`).join("")}
+          </div>
+        </div>
+      </div>
+    `;
+  } else if(currentTab==="events"){
+    content.innerHTML = `
+      <div class="rounded-[24px] border border-slate-200 bg-white p-6">
+        <div class="flex items-center justify-between"><h3 class="font-heading font-extrabold text-xl">Events (${data.events.length})</h3><button id="addEventBtn" class="h-9 px-4 rounded-full bg-slate-900 text-white text-xs font-bold">+ Add Event</button></div>
+        <div class="mt-4 grid md:grid-cols-2 gap-4">
+          ${data.events.map(ev=>`<div class="p-4 rounded-2xl border border-slate-200 bg-slate-50"><div class="text-xs font-bold uppercase tracking-widest text-slate-500">${ev.category}</div><div class="font-bold mt-1">${ev.title}</div><div class="text-xs text-slate-500 mt-1">${ev.date||ev.time||""} • ${ev.venue||""}</div><div class="text-sm text-slate-600 mt-2">${ev.desc||""}</div></div>`).join("")}
+        </div>
+      </div>
+    `;
+    document.getElementById("addEventBtn").addEventListener("click", ()=>{
+      const title=prompt("Event title?");
+      if(!title) return;
+      const date=prompt("Date (e.g. Saturday, Sep 20)","Saturday, Sep 20")||"TBA";
+      const venue=prompt("Venue?","Main Innovation Auditorium")||"TBA";
+      const category=prompt("Category?","Pitch Night")||"Pitch Night";
+      const desc=prompt("Description?","Campus event")||"";
+      const ev={id:"e_"+Date.now(), title, date, time:"", venue, category, desc};
+      const stored=load(LS_KEYS.events, []);
+      save(LS_KEYS.events, [ev, ...stored]);
+      render();
+    });
+  } else if(currentTab==="create"){
+    content.innerHTML = `
+      <div class="grid lg:grid-cols-[1.1fr_.9fr] gap-6">
+        <div class="rounded-[24px] border border-slate-200 bg-white p-6">
+          <h3 class="font-heading font-extrabold text-xl">Create Account</h3>
+          <p class="text-sm text-slate-500 mt-1">Founder/Builder require <strong>@uohyd.ac.in</strong>. Backers may use any email.</p>
+          <form id="createForm" class="mt-5 space-y-4">
+            <div class="grid sm:grid-cols-2 gap-4">
+              <div>
+                <label class="block text-xs font-semibold text-slate-600 mb-1">Full Name *</label>
+                <input required id="cName" placeholder="Full Name" class="w-full h-11 rounded-full bg-slate-50 border border-slate-200 px-4 text-sm outline-none">
+              </div>
+              <div>
+                <label class="block text-xs font-semibold text-slate-600 mb-1">Role *</label>
+                <select id="cRole" class="w-full h-11 rounded-full bg-slate-50 border border-slate-200 px-4 text-sm">
+                  <option value="founder">Founder (@uohyd.ac.in)</option>
+                  <option value="talent">Builder / Talent (@uohyd.ac.in)</option>
+                  <option value="backer">Backer (any email)</option>
+                </select>
+              </div>
+            </div>
+            <div>
+              <label class="block text-xs font-semibold text-slate-600 mb-1">Email *</label>
+              <input required id="cEmail" type="email" placeholder="name@uohyd.ac.in or name@company.com" class="w-full h-11 rounded-full bg-slate-50 border border-slate-200 px-4 text-sm outline-none">
+              <p class="mt-1 text-[11px] text-slate-500">Founder/Builder blocked if not @uohyd.ac.in</p>
+            </div>
+            <div>
+              <label class="block text-xs font-semibold text-slate-600 mb-1">Student ID (for Founder/Builder)</label>
+              <input id="cSid" placeholder="UOH-2024-XXXX" class="w-full h-11 rounded-full bg-slate-50 border border-slate-200 px-4 text-sm outline-none">
+            </div>
+            <div>
+              <label class="block text-xs font-semibold text-slate-600 mb-1">Skills / Focus / Bio</label>
+              <input id="cSkills" placeholder="e.g. React, Node, Design or EdTech focus" class="w-full h-11 rounded-full bg-slate-50 border border-slate-200 px-4 text-sm outline-none">
+            </div>
+            <button type="submit" class="w-full h-11 rounded-full bg-slate-900 text-white font-bold text-sm">Create Account →</button>
+          </form>
+        </div>
+        <div class="rounded-[24px] border border-slate-200 bg-white p-6">
+          <h4 class="font-bold">What happens?</h4>
+          <ul class="mt-3 space-y-2 text-sm text-slate-600 list-disc pl-5">
+            <li>Account saved to <code class="text-xs bg-slate-100 px-1 py-0.5 rounded">localStorage</code> (<code>startify_registrations</code> + role stores).</li>
+            <li>Student roles validated to @uohyd.ac.in — matches main site gate.</li>
+            <li>New founders appear in Ideas flow after they post; builders/backers appear in directories.</li>
+            <li>For production DB (Supabase), connect <code>VITE_SUPABASE_URL</code> — admin will also POST to /api/bookings.</li>
+          </ul>
+          <div class="mt-6 rounded-xl bg-slate-900 text-white p-4 text-xs leading-5">
+            <div class="font-bold">Launch checklist</div>
+            <div class="mt-1 text-white/70">Preview bar removed • Chat light theme • Domain gate live • Admin at <strong class="text-white">/admin.html</strong> with <strong class="text-white">admin@startify.net / startifyUoH2025</strong></div>
+          </div>
+        </div>
+      </div>
+    `;
+    document.getElementById("createForm").addEventListener("submit", (e)=>{
+      e.preventDefault();
+      const name=document.getElementById("cName").value.trim();
+      const role=document.getElementById("cRole").value;
+      const email=document.getElementById("cEmail").value.trim();
+      const sid=document.getElementById("cSid").value.trim();
+      const skills=document.getElementById("cSkills").value.trim();
+      if(!name || !email){ alert("Name & email required"); return; }
+      const isUoH=email.toLowerCase().endsWith("@uohyd.ac.in");
+      if((role==="founder"||role==="talent") && !isUoH){ alert("Founder/Builder must use @uohyd.ac.in"); return; }
+      const reg={name, email, role: role==="talent"?"builder": role==="backer"?"funder":role, year:sid||"", ideaOrSkills:skills, contact:"", registeredAt: new Date().toISOString().slice(0,10)};
+      const regs=load(LS_KEYS.regs, []);
+      save(LS_KEYS.regs, [reg, ...regs]);
+      if(role==="talent"){
+        const builders=load(LS_KEYS.builders, []);
+        save(LS_KEYS.builders, [{id:"user_"+Date.now(), name, email, role: "Builder", roleTitle: skills||"Builder", skills: skills||"General", year:"Campus Builder", verifiedStudent:true }, ...builders]);
+      }
+      if(role==="backer"){
+        const pending=load(LS_KEYS.pendingBackers, []);
+        const entry={id:"user_"+Date.now(), name, email, role:"backer", roleTitle: skills||"Angel Backer", focus:skills, bio:"", status:"pending_admin_approval", createdAt: new Date().toISOString(), otpVerified:true};
+        save(LS_KEYS.pendingBackers, [entry, ...pending]);
+        alert("Created: "+name+" (backer) — pending your approval in 'Backer Approvals' tab");
+      } else {
+        alert("Created: "+name+" ("+role+")");
+      }
+      document.getElementById("createForm").reset();
+      render();
+    });
+  }
+}
+
+render();
 </script>
 </body>
 </html>
