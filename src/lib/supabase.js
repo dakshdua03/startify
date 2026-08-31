@@ -1,9 +1,11 @@
 // Startify Database Service (Supabase & Cloud Storage with Local Fallback)
 import { createClient } from '@supabase/supabase-js';
 
-export const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL || "";
+export const SUPABASE_URL = (import.meta.env.VITE_SUPABASE_URL || "").replace(/\/$/, "");
 export const SUPABASE_KEY = import.meta.env.VITE_SUPABASE_ANON_KEY || "";
 
+// Supabase publishable keys (sb_publishable_...) are shown in new UI but REST still expects anon JWT (eyJ...).
+// If you pasted sb_publishable_..., it will work with supabase-js but direct REST needs JWT. Use anon key from Data API -> Legacy anon.
 export const supabase = SUPABASE_URL && SUPABASE_KEY ? createClient(SUPABASE_URL, SUPABASE_KEY) : null;
 export const isSupabaseConfigured = !!supabase;
 
