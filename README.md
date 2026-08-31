@@ -162,5 +162,7 @@ If you already deployed to Vercel Hobby, migrate now before you start charging, 
 - Jan 2026: Add Razorpay checkout in `src/App.jsx` handleSubmit → call `functions/api/bookings.js` which creates Razorpay order
 - Still on Cloudflare Pages free tier - no need to pay Cloudflare
 
+<!-- deploy-trigger: 2026-08-31 rebake VITE_SUPABASE envs for CORS fix -->
+
 ---
 
