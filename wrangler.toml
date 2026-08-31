@@ -1,23 +1,13 @@
 name = "startify-daksh-accelerator"
-type = "javascript"
 compatibility_date = "2024-01-01"
 
-# Cloudflare Pages config
-[site]
-bucket = "./dist"
+# For Cloudflare Pages, static assets are auto-deployed from ./dist
+# Do NOT use [site] - deprecated for Workers Sites
+# Deploy via: `npm run build` then `npx wrangler pages publish dist` OR connect Git to Pages
 
-# For Pages Functions (optional backend)
-# [build]
-# command = "npm run build"
+# Pages Functions in ./functions are auto-deployed
+# Build handled by Pages: npm run build -> dist
 
-# Environment variables - set in Cloudflare dashboard, not here
-# VITE_RAZORPAY_KEY_ID
+# Environment variables - set in Cloudflare dashboard > Pages > Settings > Variables
 # VITE_SUPABASE_URL
 # VITE_SUPABASE_ANON_KEY
-
-# KV namespace for bookings if you want serverless storage (optional)
-# [[kv_namespaces]]
-# binding = "BOOKINGS_KV"
-# id = "your-kv-id"
-
-# Pages will use dist folder
