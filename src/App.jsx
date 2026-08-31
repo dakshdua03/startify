@@ -1015,11 +1015,10 @@ export default function App() {
             </div>
             <div className="flex flex-col gap-4 w-full max-w-full overflow-hidden">
               <div className="role-choice-panel rounded-[28px] border border-slate-200 bg-white p-5 sm:p-7 shadow-sm flex flex-col w-full max-w-full overflow-hidden">
-                <div className="mb-3 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
+                <div className="mb-4 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
                   <div className="text-xs font-bold uppercase tracking-[.16em] text-slate-500">Choose how you participate</div>
                   <span className="text-xs px-3 py-1 rounded-full bg-slate-50 border border-slate-200 text-slate-600 shrink-0 self-start sm:self-auto">3 roles • One ecosystem</span>
                 </div>
-                <p className="mb-5 text-[13px] leading-5 text-slate-600 break-words">Pick your path — every idea finds a team, every skill finds a mission, and every supporter finds promising builders.</p>
                 <div className="space-y-4">
                   {[
                     ["Founder", "Post and manage ideas", "Meet verified UoH builders and campus backers.", "founder", "bg-white border-slate-200 hover:border-slate-300 hover:shadow-md shadow-sm"],

@@ -627,3 +627,20 @@ nav .scrollbar-hide::-webkit-scrollbar { display: none !important; }
 .bg-slate-50 .text-zinc-400 {
   color: #555555 !important;
 }
+
+/* Fix white text on white inputs — ensure typed text is dark and visible */
+input.bg-slate-50,
+input.bg-white,
+textarea.bg-slate-50,
+textarea.bg-white,
+select.bg-slate-50 {
+  color: #0f172a !important;
+  -webkit-text-fill-color: #0f172a !important;
+}
+input.bg-slate-50::placeholder,
+input.bg-white::placeholder,
+textarea.bg-slate-50::placeholder,
+textarea.bg-white::placeholder {
+  color: #94a3b8 !important;
+  opacity: 1 !important;
+}

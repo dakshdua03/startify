@@ -1,0 +1,7 @@
+node_modules/
+dist/
+.env
+.env.local
+ADMIN_CREDENTIALS.local.md
+*.local.md
+.DS_Store
