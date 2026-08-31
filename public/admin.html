@@ -21,8 +21,8 @@ const LS_KEYS = {
   messages: "startify_messages",
   events: "startify_events",
   pendingBackers: "startify_pending_backers",
-  otpMap: "startify_otp_map",
-  verifiedEmails: "startify_verified_emails",
+  credentials: "startify_credentials",
+  profiles: "startify_user_profiles",
   adminSession: "startify_admin_session"
 };
 const ADMIN_EMAIL = "admin@startify.net";
@@ -82,8 +82,13 @@ function deleteUserByEmail(email, id){
     localStorage.setItem("startify_user_profiles", JSON.stringify(profs.filter(p=> p.email.toLowerCase()!==email.toLowerCase() && p.id!==id)));
   }catch{}
   try{
-    const verified=load(LS_KEYS.verifiedEmails, []);
-    save(LS_KEYS.verifiedEmails, verified.filter(e=> e.toLowerCase()!==email.toLowerCase()));
+    const creds=load(LS_KEYS.credentials, {});
+    delete creds[email.toLowerCase()];
+    save(LS_KEYS.credentials, creds);
+  }catch{}
+  try{
+    const profiles=load(LS_KEYS.profiles, []);
+    save(LS_KEYS.profiles, profiles.filter(p=> p.email.toLowerCase()!==email.toLowerCase() && p.id!==id));
   }catch{}
   alert("Deleted: "+email);
   render();
@@ -101,6 +106,11 @@ function deleteBuilderById(id){
     try{
       const profs=JSON.parse(localStorage.getItem("startify_user_profiles")||"[]");
       localStorage.setItem("startify_user_profiles", JSON.stringify(profs.filter(p=> p.id!==id && (p.email||"").toLowerCase()!==target.email.toLowerCase())));
+    }catch{}
+    try{
+      const creds=load(LS_KEYS.credentials, {});
+      delete creds[target.email.toLowerCase()];
+      save(LS_KEYS.credentials, creds);
     }catch{}
   }
   alert("Deleted builder: "+(target?target.name:id));
@@ -121,8 +131,9 @@ function deleteFunderById(id){
       localStorage.setItem("startify_user_profiles", JSON.stringify(profs.filter(p=> p.id!==id && (p.email||"").toLowerCase()!==target.email.toLowerCase())));
     }catch{}
     try{
-      const verified=load(LS_KEYS.verifiedEmails, []);
-      save(LS_KEYS.verifiedEmails, verified.filter(e=> e.toLowerCase()!==target.email.toLowerCase()));
+      const creds=load(LS_KEYS.credentials, {});
+      delete creds[target.email.toLowerCase()];
+      save(LS_KEYS.credentials, creds);
     }catch{}
   }
   alert("Deleted backer: "+(target?target.name:id));
@@ -142,13 +153,13 @@ function getAllData(){
   const messages = [...load(LS_KEYS.messages, []), ...SEED_MESSAGES];
   const events = [...load(LS_KEYS.events, []), ...SEED_EVENTS];
   const pendingBackers = load(LS_KEYS.pendingBackers, []);
-  const otpMap = load(LS_KEYS.otpMap, {});
-  const verifiedEmails = load(LS_KEYS.verifiedEmails, []);
+  const credentials = load(LS_KEYS.credentials, {});
+  const profiles = load(LS_KEYS.profiles, []);
   const allUsers = [...DEMO_USERS.map(u=>({...u, source:"demo"})), ...regs.map(r=>({id:r.email, name:r.name, email:r.email, role: r.role==="builder"?"talent":r.role==="funder"?"backer":r.role, createdAt:r.registeredAt, source:"registration"})), ...builders.map(b=>({id:b.id, name:b.name, email:b.email||b.id+"@uohyd.ac.in", role:"talent", source:"builder"})), ...funders.map(f=>({id:f.id, name:f.name, email:f.email||f.id+"@startify.net", role:"backer", source:"funder"})), ...pendingBackers.map(p=>({id:p.id, name:p.name, email:p.email, role:"backer", createdAt:p.createdAt, pending:true, source:"pending"}))];
   // de-dupe by email
   const seen=new Set(); const uniqUsers=[];
   for(const u of allUsers){ if(!seen.has(u.email.toLowerCase())){ seen.add(u.email.toLowerCase()); uniqUsers.push(u); } }
-  return {ideas, regs, builders, funders, requests, messages, events, pendingBackers, otpMap, verifiedEmails, uniqUsers};
+  return {ideas, regs, builders, funders, requests, messages, events, pendingBackers, credentials, profiles, uniqUsers};
 }
 
 let currentTab = "overview";
@@ -200,7 +211,7 @@ function render(){
   const founders=data.uniqUsers.filter(u=>u.role==="founder").length;
   const talents=data.uniqUsers.filter(u=>u.role==="talent").length;
   const backers=data.uniqUsers.filter(u=>u.role==="backer").length;
-  const activeUsers=data.verifiedEmails.length + DEMO_USERS.length; // verified = active
+  const activeUsers=Object.keys(data.credentials).length + DEMO_USERS.length; // password accounts = active
   const pendingBackersCount=data.pendingBackers.length;
   const pendingIdeas=data.ideas.filter(i=>i.status==="Pending Review").length;
   const liveIdeas=data.ideas.filter(i=>i.status!=="Pending Review" && i.status!=="Rejected").length;
@@ -218,7 +229,7 @@ function render(){
     ["talent","Talent"],
     ["backers","Backers"],
     ["pending","Backer Approvals"],
-    ["otp","OTP Logs"],
+    ["passwords","Passwords"],
     ["chats","Chats"],
     ["events","Events"],
     ["create","Create Account"],
@@ -270,9 +281,9 @@ function render(){
           ["Founders", founders, "@uohyd.ac.in only", "bg-white"],
           ["Builders (Talent)", talents, "@uohyd.ac.in + skills", "bg-white"],
           ["Backers (approved)", backers - pendingBackersCount, `+ ${pendingBackersCount} pending`, "bg-white"],
-          ["Backers Pending", pendingBackersCount, "OTP verified → need approval", pendingBackersCount>0?"bg-amber-500 text-white border-amber-500":"bg-white"],
+          ["Backers Pending", pendingBackersCount, "Need approval", pendingBackersCount>0?"bg-amber-500 text-white border-amber-500":"bg-white"],
           ["Pending Ideas", pendingIdeas, "Needs your approval", pendingIdeas>0?"bg-amber-50 border-amber-200":"bg-white"],
-          ["Verified Active", activeUsers, "OTP verified emails", "bg-white"],
+          ["Active Accounts", activeUsers, "Password accounts", "bg-white"],
           ["Messages Today", messagesToday, `Total ${totalMessages} all-time`, "bg-white"],
         ].map(([label,val,sub,cls])=>`
           <div class="rounded-[22px] border border-slate-200 p-5 shadow-sm ${cls.includes("bg-slate-900")? "bg-slate-900 text-white border-slate-900": cls.includes("bg-amber-500")? "bg-amber-500 text-white border-amber-500": cls}">
@@ -437,14 +448,14 @@ function render(){
   } else if(currentTab==="pending"){
     content.innerHTML = `
       <div class="rounded-[24px] border border-amber-200 bg-amber-50 p-6">
-        <div class="flex items-center justify-between"><h3 class="font-heading font-extrabold text-xl text-amber-900">Backers Pending Approval (${pendingBackersCount})</h3><span class="text-xs px-3 py-1 rounded-full bg-amber-500 text-white font-bold">OTP verified → need you</span></div>
-        <p class="text-sm text-amber-800 mt-1">Backer IDs require OTP verification + your approval before they appear in Backers Hub. Founder/Builder are auto-active after OTP (UoH gate).</p>
+        <div class="flex items-center justify-between"><h3 class="font-heading font-extrabold text-xl text-amber-900">Backers Pending Approval (${pendingBackersCount})</h3><span class="text-xs px-3 py-1 rounded-full bg-amber-500 text-white font-bold">Need your approval</span></div>
+        <p class="text-sm text-amber-800 mt-1">Backer IDs require your approval before they appear in Backers Hub. Founder/Builder are auto-active (UoH gate with password).</p>
         <div class="mt-4 space-y-3">
           ${pendingBackersCount===0 ? `<div class="py-8 text-center text-sm text-amber-700 bg-white rounded-xl border border-amber-200">No pending backers — all clear.</div>` : data.pendingBackers.map(b=>`
             <div class="p-4 rounded-2xl border border-amber-200 bg-white flex flex-col sm:flex-row sm:items-center justify-between gap-3">
               <div>
                 <div class="font-bold text-slate-800">${b.name} <span class="text-xs font-normal text-slate-500">• ${b.email}</span></div>
-                <div class="text-xs text-slate-500 mt-1">Focus: ${b.focus||b.bio||"—"} • OTP ✓ • ${new Date(b.createdAt).toLocaleString()}</div>
+                <div class="text-xs text-slate-500 mt-1">Focus: ${b.focus||b.bio||"—"} • ${new Date(b.createdAt).toLocaleString()}</div>
               </div>
               <div class="flex gap-2 shrink-0">
                 <button data-approve-backer="${b.id}" class="approveBackerBtn h-9 px-4 rounded-full bg-slate-900 text-white text-xs font-bold">Approve →</button>
@@ -478,26 +489,53 @@ function render(){
       alert("Rejected");
       render();
     }));
-  } else if(currentTab==="otp"){
-    const otpEntries=Object.entries(data.otpMap);
+  } else if(currentTab==="passwords"){
+    const credEntries=Object.entries(data.credentials);
+    const profileMap={}; data.profiles.forEach(p=> profileMap[p.email.toLowerCase()]=p);
     content.innerHTML = `
       <div class="rounded-[24px] border border-slate-200 bg-white p-6">
-        <div class="flex items-center justify-between"><h3 class="font-heading font-extrabold text-xl">OTP Verification Logs</h3><span class="text-xs text-slate-500">${otpEntries.length} emails • ${data.verifiedEmails.length} verified</span></div>
-        <p class="text-sm text-slate-500 mt-1">Mock OTP service — in production replace <code class="bg-slate-100 px-1 rounded">sendOtp()</code> with MSG91 / Twilio / SendGrid / Supabase Auth. Codes shown here for debugging.</p>
+        <div class="flex items-center justify-between"><h3 class="font-heading font-extrabold text-xl">Passwords</h3><span class="text-xs text-slate-500">${credEntries.length} accounts • plain for demo (hash in prod)</span></div>
+        <p class="text-sm text-slate-500 mt-1">Local password store <code class="bg-slate-100 px-1 rounded">startify_credentials</code> — created on Register / first Sign In. Use to help users reset.</p>
         <div class="mt-4 overflow-x-auto">
           <table class="w-full text-sm">
-            <thead><tr class="text-xs text-slate-500 text-left border-b"><th class="pb-2">Email</th><th class="pb-2">Role</th><th class="pb-2">Code</th><th class="pb-2">Verified</th><th class="pb-2">Time</th></tr></thead>
+            <thead><tr class="text-xs text-slate-500 text-left border-b"><th class="pb-2">Email</th><th class="pb-2">Name / Role</th><th class="pb-2">Password</th><th class="pb-2">Action</th></tr></thead>
             <tbody class="divide-y">
-              ${otpEntries.length===0 ? `<tr><td colspan="5" class="py-6 text-center text-slate-500">No OTP sent yet — create an account to see logs.</td></tr>` : otpEntries.map(([email, v])=>`<tr><td class="py-3 font-mono text-xs">${email}</td><td class="py-3"><span class="px-2 py-1 rounded-full text-xs font-bold border ${v.role==="backer"?"bg-violet-50 border-violet-200 text-violet-700":"bg-indigo-50 border-indigo-200 text-indigo-700"}">${v.role}</span></td><td class="py-3 font-mono font-bold tracking-widest">${v.code}</td><td class="py-3">${v.verified?'<span class="px-2 py-1 rounded-full bg-emerald-50 border border-emerald-200 text-emerald-700 text-xs font-bold">✓ Verified</span>':'<span class="px-2 py-1 rounded-full bg-amber-50 border border-amber-200 text-amber-700 text-xs font-bold">Pending</span>'}</td><td class="py-3 text-xs text-slate-500">${new Date(v.at).toLocaleString()}</td></tr>`).join("")}
+              ${credEntries.length===0 ? `<tr><td colspan="4" class="py-6 text-center text-slate-500">No passwords yet — create an account to see entries.</td></tr>` : credEntries.map(([email, pwd])=>{
+                const prof=profileMap[email]||{};
+                const name=prof.name|| data.regs.find(r=>r.email.toLowerCase()===email)?.name || "—";
+                const role=prof.role|| data.regs.find(r=>r.email.toLowerCase()===email)?.role || "founder";
+                const escEmail=email.replace(/'/g,"\\'");
+                return `<tr><td class="py-3 font-mono text-xs">${email}</td><td class="py-3 text-xs"><span class="font-semibold">${name}</span> <span class="ml-1 px-1.5 py-0.5 rounded-full bg-slate-100 border text-[10px]">${role}</span></td><td class="py-3 font-mono text-xs"><span class="pwd-val" data-email="${email}">••••••••</span> <button data-show-pwd="${email}" data-pwd="${pwd.replace(/"/g,'&quot;')}" class="ml-2 text-[11px] px-2 py-1 rounded-full bg-white border hover:bg-slate-50">Show</button></td><td class="py-3"><button data-reset-pwd="${escEmail}" class="h-7 px-3 rounded-full bg-amber-50 border border-amber-200 text-amber-700 text-xs font-bold hover:bg-amber-100">Reset</button></td></tr>`;
+              }).join("")}
             </tbody>
           </table>
         </div>
         <div class="mt-6 rounded-xl bg-slate-900 text-white p-4 text-xs leading-5">
-          <div class="font-bold">Integrate real OTP</div>
-          <div class="mt-1 text-white/70">Replace mock in <code class="bg-white/10 px-1 rounded">src/App.jsx: sendOtp()</code> and <code>public/admin.html</code> with your provider API. Keep <code>@uohyd.ac.in</code> gate for Founder/Builder.</div>
+          <div class="font-bold">Password auth (local)</div>
+          <div class="mt-1 text-white/70">Passwords stored plain in localStorage for demo. In production hash with bcrypt and move to Supabase <code class="bg-white/10 px-1 rounded">auth.users</code>. Keep <code>@uohyd.ac.in</code> gate for Founder/Builder.</div>
         </div>
       </div>
     `;
+    content.querySelectorAll("[data-show-pwd]").forEach(btn=>{
+      btn.addEventListener("click", ()=>{
+        const email=btn.dataset.showPwd;
+        const pwd=btn.dataset.pwd;
+        const span=content.querySelector(`.pwd-val[data-email="${email}"]`);
+        if(span.textContent==="••••••••"){ span.textContent=pwd; btn.textContent="Hide"; } else { span.textContent="••••••••"; btn.textContent="Show"; }
+      });
+    });
+    content.querySelectorAll("[data-reset-pwd]").forEach(btn=>{
+      btn.addEventListener("click", ()=>{
+        const email=btn.dataset.resetPwd;
+        const next=prompt("New password for "+email+" (min 6 chars):");
+        if(!next || next.length<6){ alert("Need at least 6 characters"); return; }
+        const creds=load(LS_KEYS.credentials, {});
+        creds[email.toLowerCase()]=next;
+        save(LS_KEYS.credentials, creds);
+        alert("Password updated for "+email);
+        render();
+      });
+    });
   } else if(currentTab==="chats"){
     content.innerHTML = `
       <div class="grid lg:grid-cols-2 gap-4">
@@ -607,13 +645,22 @@ function render(){
         const builders=load(LS_KEYS.builders, []);
         save(LS_KEYS.builders, [{id:"user_"+Date.now(), name, email, role: "Builder", roleTitle: skills||"Builder", skills: skills||"General", year:"Campus Builder", verifiedStudent:true }, ...builders]);
       }
+      const creds=load(LS_KEYS.credentials, {});
+      // admin creates with default password; user can change later
+      if(!creds[email.toLowerCase()]){ creds[email.toLowerCase()]="startify123"; save(LS_KEYS.credentials, creds); }
+      try{
+        const profs=load(LS_KEYS.profiles, []);
+        const normalized={id: role==="talent" ? "user_"+Date.now() : email, name, email: email.toLowerCase(), role: role==="talent"?"talent":role, studentId:sid||"", roleTitle: skills||"", skills: role==="talent"?skills:"", focus: role==="backer"?skills:"", bio:"", createdAt: new Date().toISOString()};
+        const filtered=profs.filter(p=> !(p.email.toLowerCase()===normalized.email.toLowerCase() && p.role===normalized.role));
+        save(LS_KEYS.profiles, [normalized, ...filtered]);
+      }catch{}
       if(role==="backer"){
         const pending=load(LS_KEYS.pendingBackers, []);
-        const entry={id:"user_"+Date.now(), name, email, role:"backer", roleTitle: skills||"Angel Backer", focus:skills, bio:"", status:"pending_admin_approval", createdAt: new Date().toISOString(), otpVerified:true};
+        const entry={id:"user_"+Date.now(), name, email, role:"backer", roleTitle: skills||"Angel Backer", focus:skills, bio:"", status:"pending_admin_approval", createdAt: new Date().toISOString()};
         save(LS_KEYS.pendingBackers, [entry, ...pending]);
-        alert("Created: "+name+" (backer) — pending your approval in 'Backer Approvals' tab");
+        alert("Created: "+name+" (backer) — password: startify123 — pending your approval in 'Backer Approvals' tab");
       } else {
-        alert("Created: "+name+" ("+role+")");
+        alert("Created: "+name+" ("+role+") — password: startify123");
       }
       document.getElementById("createForm").reset();
       render();
