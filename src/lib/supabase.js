@@ -1,7 +1,33 @@
 // Startify Database Service (Supabase & Cloud Storage with Local Fallback)
+import { createClient } from '@supabase/supabase-js';
 
-const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL || "";
-const SUPABASE_KEY = import.meta.env.VITE_SUPABASE_ANON_KEY || "";
+export const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL || "";
+export const SUPABASE_KEY = import.meta.env.VITE_SUPABASE_ANON_KEY || "";
+
+export const supabase = SUPABASE_URL && SUPABASE_KEY ? createClient(SUPABASE_URL, SUPABASE_KEY) : null;
+export const isSupabaseConfigured = !!supabase;
+
+export const authService = {
+  async sendOtp(email) {
+    if (!isSupabaseConfigured) throw new Error("Supabase not configured");
+    const { error } = await supabase.auth.signInWithOtp({
+      email,
+      options: { shouldCreateUser: true }
+    });
+    if (error) throw error;
+    return true;
+  },
+  async verifyOtp(email, token) {
+    if (!isSupabaseConfigured) throw new Error("Supabase not configured");
+    const { data, error } = await supabase.auth.verifyOtp({
+      email,
+      token,
+      type: 'email'
+    });
+    if (error) throw error;
+    return !!data.session;
+  }
+};
 
 const headers = {
   "Content-Type": "application/json",

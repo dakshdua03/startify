@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import logoImg from "./assets/startify-wordmark-full.png";
-import { dbService } from "./lib/supabase";
+import { dbService, isSupabaseConfigured, authService } from "./lib/supabase";
 
 /* ==========================================================================
    PRE-CREATED TEST ACCOUNTS & DEMO DATA FOR EASY TESTING
@@ -355,24 +355,46 @@ export default function App() {
   }, [verifiedEmails]);
 
   const generateOtp = () => Math.floor(100000 + Math.random() * 900000).toString();
-  const sendOtp = (email, role) => {
-    const code = generateOtp();
-    setOtpCode(code);
+  const sendOtp = async (email, role) => {
     setOtpEmail(email);
     setOtpRole(role);
     setOtpInput("");
     setOtpModalOpen(true);
-    // Mock: in production call /api/otp to send via email/SMS (e.g., MSG91, SendGrid, Supabase OTP)
-    // For now we reveal code in toast so you can test without email service
-    setTimeout(() => showToast(`OTP for ${email}: ${code} (demo — replace with real email/SMS)`), 400);
-    // Persist for admin visibility
+    if (isSupabaseConfigured) {
+      try {
+        await authService.sendOtp(email);
+        showToast(`OTP sent to ${email} — check inbox (and spam)`);
+      } catch (err) {
+        showToast(`Failed to send OTP: ${err.message || "try again"}`);
+      }
+      try {
+        const map = JSON.parse(localStorage.getItem("startify_otp_map") || "{}");
+        map[email.toLowerCase()] = { code: "supabase", role, at: new Date().toISOString(), verified: false };
+        localStorage.setItem("startify_otp_map", JSON.stringify(map));
+      } catch {}
+      return;
+    }
+    // Mock fallback for local dev without Supabase
+    const code = generateOtp();
+    setOtpCode(code);
+    setTimeout(() => showToast(`OTP for ${email}: ${code} (demo — configure Supabase for real email)`), 400);
     try {
       const map = JSON.parse(localStorage.getItem("startify_otp_map") || "{}");
       map[email.toLowerCase()] = { code, role, at: new Date().toISOString(), verified: false };
       localStorage.setItem("startify_otp_map", JSON.stringify(map));
     } catch {}
   };
-  const verifyOtp = (input, expected) => input.trim() === expected.trim();
+  const verifyOtp = async (input, expected) => {
+    if (isSupabaseConfigured && otpEmail) {
+      try {
+        const ok = await authService.verifyOtp(otpEmail, input);
+        return ok;
+      } catch {
+        return false;
+      }
+    }
+    return input.trim() === expected.trim();
+  };
 
   const showToast = (msg) => {
     setToastMessage(msg);
@@ -463,7 +485,7 @@ export default function App() {
     setAuthForm({ name: "", email: "", studentId: "", roleTitle: "", skills: "", focus: "", bio: "" });
   };
 
-  const handleAuthSubmit = (e) => {
+  const handleAuthSubmit = async (e) => {
     e.preventDefault();
     const targetRole = selectedRegisterRole;
     const email = authForm.email.trim();
@@ -530,7 +552,7 @@ export default function App() {
       }
       setOtpPendingUser(reuseUser);
       setOtpRole(reuseUser.role);
-      sendOtp(email, reuseUser.role);
+      await sendOtp(email, reuseUser.role);
       return;
     }
 
@@ -577,13 +599,14 @@ export default function App() {
 
     setOtpPendingUser(pendingUser);
     setOtpRole(targetRole);
-    sendOtp(email, targetRole);
+    await sendOtp(email, targetRole);
   };
 
-  const handleOtpVerify = (e) => {
+  const handleOtpVerify = async (e) => {
     e.preventDefault();
-    if (!verifyOtp(otpInput, otpCode)) {
-      showToast("Invalid OTP. Please check the 6-digit code (demo code shown in toast).");
+    const ok = await verifyOtp(otpInput, otpCode);
+    if (!ok) {
+      showToast(isSupabaseConfigured ? "Invalid or expired OTP — check email and try again." : "Invalid OTP. Please check the 6-digit code (demo code shown in toast).");
       return;
     }
     const user = otpPendingUser;
@@ -599,9 +622,9 @@ export default function App() {
     setOtpPendingUser(null);
   };
 
-  const handleOtpResend = () => {
+  const handleOtpResend = async () => {
     if (!otpEmail) return;
-    sendOtp(otpEmail, otpRole);
+    await sendOtp(otpEmail, otpRole);
   };
 
   // Submit New Idea (Requires Login & Founder Role)
@@ -2642,9 +2665,15 @@ export default function App() {
               </div>
               <button onClick={() => setOtpModalOpen(false)} className="h-8 w-8 rounded-full border border-slate-200 grid place-items-center text-slate-500 hover:text-slate-800">✕</button>
             </div>
-            <div className="mt-4 rounded-xl bg-indigo-50 border border-indigo-200 p-3 text-xs leading-4 text-indigo-800">
-              <strong>Demo OTP (no email service yet):</strong> <span className="font-mono font-bold tracking-widest text-[14px]">{otpCode}</span> — use this code. In production, replace <code className="bg-white px-1 py-0.5 rounded border">sendOtp()</code> with your provider (MSG91 / Twilio / SendGrid / Supabase Auth OTP).
-            </div>
+            {isSupabaseConfigured ? (
+              <div className="mt-4 rounded-xl bg-emerald-50 border border-emerald-200 p-3 text-xs leading-4 text-emerald-800">
+                <strong>Check your email:</strong> OTP sent to <strong>{otpEmail}</strong> via Supabase — valid 5 min. Check inbox & spam. No code shown for security.
+              </div>
+            ) : (
+              <div className="mt-4 rounded-xl bg-indigo-50 border border-indigo-200 p-3 text-xs leading-4 text-indigo-800">
+                <strong>Demo OTP (no email service yet):</strong> <span className="font-mono font-bold tracking-widest text-[14px]">{otpCode}</span> — use this code. Configure Supabase in Cloudflare (see docs/OTP_INTEGRATION_GUIDE.md) for real email.
+              </div>
+            )}
             <form onSubmit={handleOtpVerify} className="mt-5 space-y-4">
               <div>
                 <label className="block text-[12px] font-semibold text-slate-600 mb-1">Enter 6-digit OTP *</label>

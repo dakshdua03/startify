@@ -12,6 +12,7 @@
     "cf:deploy": "wrangler pages publish dist --project-name=startify-daksh-accelerator"
   },
   "dependencies": {
+    "@supabase/supabase-js": "^2.112.4",
     "react": "^18.2.0",
     "react-dom": "^18.2.0",
     "react-router-dom": "^6.22.0"
