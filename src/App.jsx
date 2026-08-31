@@ -278,11 +278,16 @@ export default function App() {
   const [activeChatRequest, setActiveChatRequest] = useState(null);
   const [targetEvent, setTargetEvent] = useState(null);
 
-  // Password auth (local — no Supabase OTP)
+  // Password auth (local — no Supabase OTP) + unified email verification
   const [showPassword, setShowPassword] = useState(false);
   const [pendingBackers, setPendingBackers] = useState(() => {
     try { return JSON.parse(localStorage.getItem("startify_pending_backers") || "[]"); } catch { return []; }
   });
+  const [verificationCode, setVerificationCode] = useState("");
+  const [verificationInput, setVerificationInput] = useState("");
+  const [verificationSent, setVerificationSent] = useState(false);
+  const [verifiedEmail, setVerifiedEmail] = useState("");
+  const [resetMode, setResetMode] = useState(false);
 
   // Toast
   const [toastMessage, setToastMessage] = useState("");
@@ -358,6 +363,41 @@ export default function App() {
   const checkCredential = (email, password) => {
     const map = getCredentials();
     return map[email.toLowerCase()] === password;
+  };
+
+  // --- Unified email verification (one button for first-time + reset) ---
+  const isValidEmail = (email) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim());
+  const sendVerificationCode = (email) => {
+    const target = email.trim().toLowerCase();
+    if (!isValidEmail(target)) { showToast("Enter a valid email first."); return; }
+    const code = Math.floor(100000 + Math.random()*900000).toString();
+    setVerificationCode(code);
+    setVerificationSent(true);
+    setVerificationInput("");
+    setVerifiedEmail("");
+    try {
+      const store = JSON.parse(localStorage.getItem("startify_email_verification")||"{}");
+      store[target] = { code, at: Date.now(), verified: false };
+      localStorage.setItem("startify_email_verification", JSON.stringify(store));
+    } catch {}
+    // demo: show code in toast — replace with real email (Resend/Supabase) in prod
+    showToast(`Verification code for ${target}: ${code} (demo — check toast)`);
+  };
+  const verifyEmailCode = () => {
+    const target = authForm.email.trim().toLowerCase();
+    if (!verificationSent) { showToast("Click 'Send verification code' first."); return false; }
+    if (verificationInput.trim() === verificationCode) {
+      setVerifiedEmail(target);
+      try {
+        const store = JSON.parse(localStorage.getItem("startify_email_verification")||"{}");
+        if (store[target]) { store[target].verified = true; localStorage.setItem("startify_email_verification", JSON.stringify(store)); }
+      } catch {}
+      showToast(`✓ Email verified: ${target}`);
+      return true;
+    } else {
+      showToast("Invalid code. Check the 6-digit code in toast.");
+      return false;
+    }
   };
 
   const showToast = (msg) => {
@@ -437,6 +477,7 @@ export default function App() {
     }
     setAuthModalOpen(false);
     setAuthForm({ name: "", email: "", password: "", studentId: "", roleTitle: "", skills: "", focus: "", bio: "" });
+    setVerificationSent(false); setVerificationCode(""); setVerificationInput(""); setVerifiedEmail(""); setResetMode(false);
   };
 
   const handleAuthSubmit = async (e) => {
@@ -452,6 +493,30 @@ export default function App() {
       showToast("Use your University of Hyderabad email ending in @uohyd.ac.in for Founder/Builder accounts. Backers can use any email.");
       return;
     }
+    // Unified email verification: required for first-time register + for reset
+    if (resetMode) {
+      if (verifiedEmail !== email.toLowerCase()) { showToast("Please verify your email first (click Send code → Verify)."); return; }
+      // reset password flow
+      saveCredential(email, password);
+      try {
+        const store = JSON.parse(localStorage.getItem("startify_email_verification")||"{}");
+        delete store[email.toLowerCase()];
+        localStorage.setItem("startify_email_verification", JSON.stringify(store));
+      } catch {}
+      setResetMode(false);
+      setVerificationSent(false);
+      setVerificationCode("");
+      setVerificationInput("");
+      setVerifiedEmail("");
+      showToast(`✓ Password reset for ${email}. Please sign in with new password.`);
+      setAuthMode("signin");
+      setAuthForm({ name: "", email: email, password: "", studentId: "", roleTitle: "", skills: "", focus: "", bio: "" });
+      return;
+    }
+    if (authMode === "register" && verifiedEmail !== email.toLowerCase()) {
+      showToast("Please verify your email first (Send code → enter 6-digit code → Verify).");
+      return;
+    }
     const creds = getCredentials();
     const hasStoredPassword = !!creds[email.toLowerCase()];
     // Demo accounts: allow sign-in with any 6+ char password if no stored credential yet
@@ -459,7 +524,7 @@ export default function App() {
     if (authMode === "signin") {
       if (demoUser) {
         if (hasStoredPassword && !checkCredential(email, password)) {
-          showToast("Incorrect password for this account.");
+          showToast("Incorrect password for this account. Use Verify Email to reset.");
           return;
         }
         if (!hasStoredPassword) saveCredential(email, password);
@@ -468,6 +533,7 @@ export default function App() {
         showToast(`Welcome back, ${demoUser.name}!`);
         setAuthModalOpen(false);
         setAuthForm({ name: "", email: "", password: "", studentId: "", roleTitle: "", skills: "", focus: "", bio: "" });
+        setVerificationSent(false); setVerificationCode(""); setVerificationInput(""); setVerifiedEmail(""); setResetMode(false);
         return;
       }
       // Existing profile sign-in
@@ -494,7 +560,7 @@ export default function App() {
       } catch {}
       if (existingProfile) {
         if (hasStoredPassword && !checkCredential(email, password)) {
-          showToast("Incorrect password. Try again.");
+          showToast("Incorrect password. Click 'Forgot password? Verify Email to reset' below.");
           return;
         }
         if (!hasStoredPassword) saveCredential(email, password);
@@ -514,6 +580,7 @@ export default function App() {
         showToast(`Welcome back, ${reuseUser.name}!`);
         setAuthModalOpen(false);
         setAuthForm({ name: "", email: "", password: "", studentId: "", roleTitle: "", skills: "", focus: "", bio: "" });
+        setVerificationSent(false); setVerificationCode(""); setVerificationInput(""); setVerifiedEmail(""); setResetMode(false);
         return;
       }
       // No existing account — prompt to create
@@ -2169,7 +2236,7 @@ export default function App() {
                   required
                   type="email"
                   value={authForm.email}
-                  onChange={(e) => setAuthForm({ ...authForm, email: e.target.value })}
+                  onChange={(e) => { setAuthForm({ ...authForm, email: e.target.value }); setVerificationSent(false); setVerifiedEmail(""); setVerificationCode(""); }}
                   placeholder={selectedRegisterRole === "backer" ? "name@company.com (any domain)" : "name@uohyd.ac.in"}
                   className="w-full h-11 rounded-full bg-slate-50 border border-slate-200 px-4 text-[13px] text-slate-800 outline-none focus:border-indigo-300 focus:ring-2 focus:ring-indigo-100"
                 />
@@ -2180,9 +2247,29 @@ export default function App() {
                 </p>
               </div>
 
+              {/* Single unified Verify Email button — for first-time creation + password reset */}
+              <div className="rounded-2xl border border-slate-200 bg-slate-50 p-3">
+                <div className="flex items-center justify-between gap-2">
+                  <div className="text-[11px] font-bold text-slate-700">Email verification *</div>
+                  {verifiedEmail === authForm.email.trim().toLowerCase() && verifiedEmail ? <span className="text-[11px] px-2 py-1 rounded-full bg-emerald-500 text-white font-bold">✓ Verified</span> : <span className="text-[11px] text-slate-500">{authMode==="register" ? "Required for new account" : "Use for password reset"}</span>}
+                </div>
+                <p className="text-[11px] text-slate-500 mt-1">One button for both: new accounts & forgot password. Code shown in toast (demo) — replace with Resend in prod.</p>
+                <div className="mt-2 flex gap-2">
+                  <button type="button" onClick={()=> sendVerificationCode(authForm.email)} className="h-9 px-4 rounded-full bg-white border border-slate-200 text-xs font-bold text-slate-700 hover:bg-slate-900 hover:text-white transition shrink-0">
+                    {verificationSent ? "Resend code" : "Send verification code"}
+                  </button>
+                  {verificationSent && verifiedEmail !== authForm.email.trim().toLowerCase() && (
+                    <div className="flex gap-2 flex-1">
+                      <input value={verificationInput} onChange={(e)=> setVerificationInput(e.target.value.replace(/\D/g,"").slice(0,6))} placeholder="6-digit code" inputMode="numeric" className="flex-1 h-9 rounded-full bg-white border border-slate-200 px-3 text-xs text-center tracking-widest font-bold outline-none focus:border-slate-900" />
+                      <button type="button" onClick={verifyEmailCode} className="h-9 px-4 rounded-full bg-slate-900 text-white text-xs font-bold hover:bg-black shrink-0">Verify</button>
+                    </div>
+                  )}
+                </div>
+              </div>
+
               <div>
                 <label className="block text-[12px] font-semibold text-slate-600 mb-1">
-                  Password * <span className="font-normal text-slate-400">— min 6 characters</span>
+                  {resetMode ? "New Password * — min 6 characters" : <>Password * <span className="font-normal text-slate-400">— min 6 characters</span></>}
                 </label>
                 <div className="relative">
                   <input
@@ -2190,20 +2277,32 @@ export default function App() {
                     type={showPassword ? "text" : "password"}
                     value={authForm.password}
                     onChange={(e) => setAuthForm({ ...authForm, password: e.target.value })}
-                    placeholder={authMode === "signin" ? "Enter your password" : "Create a password"}
+                    placeholder={resetMode ? "Enter new password" : authMode === "signin" ? "Enter your password" : "Create a password"}
                     className="w-full h-11 rounded-full bg-slate-50 border border-slate-200 px-4 pr-12 text-[13px] text-slate-800 outline-none focus:border-indigo-300 focus:ring-2 focus:ring-indigo-100"
                   />
                   <button type="button" onClick={()=> setShowPassword(!showPassword)} className="absolute right-1.5 top-1.5 h-8 px-3 rounded-full bg-white border border-slate-200 text-[11px] font-bold text-slate-600 hover:bg-slate-50">
                     {showPassword ? "Hide" : "Show"}
                   </button>
                 </div>
+                {authMode==="signin" && !resetMode && (
+                  <button type="button" onClick={()=>{
+                    if(!isValidEmail(authForm.email)){ showToast("Enter your email above first."); return; }
+                    setResetMode(true);
+                    setAuthForm({...authForm, password:""});
+                    sendVerificationCode(authForm.email);
+                    showToast("Verify email to reset password — code sent.");
+                  }} className="mt-1.5 text-[11px] text-indigo-600 hover:underline font-semibold">Forgot password? Verify Email to reset →</button>
+                )}
+                {resetMode && (
+                  <button type="button" onClick={()=> { setResetMode(false); setVerificationSent(false); setVerifiedEmail(""); setVerificationInput(""); }} className="mt-1.5 text-[11px] text-slate-500 hover:underline">Cancel reset — back to sign in</button>
+                )}
               </div>
 
               <button
                 type="submit"
                 className="w-full h-12 rounded-full bg-slate-900 text-white font-bold text-[14px] hover:bg-black transition shadow-md"
               >
-                {authMode === "signin" ? "Sign In & Continue →" : `Create ${selectedRegisterRole.toUpperCase()} Account →`}
+                {resetMode ? "Verify & Reset Password →" : authMode === "signin" ? "Sign In & Continue →" : `Create ${selectedRegisterRole.toUpperCase()} Account →`}
               </button>
               <div className="rounded-2xl border border-slate-200 bg-slate-50 p-3 flex items-start gap-2.5">
                 <span className="h-6 w-6 rounded-full bg-emerald-500 text-white grid place-items-center text-[11px] shrink-0">✓</span>
