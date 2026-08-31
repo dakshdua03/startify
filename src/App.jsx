@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import logoImg from "./assets/startify-wordmark-full.png";
-import { dbService, isSupabaseConfigured, authService } from "./lib/supabase";
+import { dbService } from "./lib/supabase";
 
 /* ==========================================================================
    PRE-CREATED TEST ACCOUNTS & DEMO DATA FOR EASY TESTING
@@ -278,18 +278,10 @@ export default function App() {
   const [activeChatRequest, setActiveChatRequest] = useState(null);
   const [targetEvent, setTargetEvent] = useState(null);
 
-  // OTP verification (mock service — replace with real SMS/email API)
-  const [otpModalOpen, setOtpModalOpen] = useState(false);
-  const [otpEmail, setOtpEmail] = useState("");
-  const [otpCode, setOtpCode] = useState("");
-  const [otpInput, setOtpInput] = useState("");
-  const [otpPendingUser, setOtpPendingUser] = useState(null);
-  const [otpRole, setOtpRole] = useState("founder");
+  // Password auth (local — no Supabase OTP)
+  const [showPassword, setShowPassword] = useState(false);
   const [pendingBackers, setPendingBackers] = useState(() => {
     try { return JSON.parse(localStorage.getItem("startify_pending_backers") || "[]"); } catch { return []; }
-  });
-  const [verifiedEmails, setVerifiedEmails] = useState(() => {
-    try { return JSON.parse(localStorage.getItem("startify_verified_emails") || "[]"); } catch { return []; }
   });
 
   // Toast
@@ -299,6 +291,7 @@ export default function App() {
   const [authForm, setAuthForm] = useState({
     name: "",
     email: "",
+    password: "",
     studentId: "",
     roleTitle: "",
     skills: "",
@@ -350,50 +343,21 @@ export default function App() {
   useEffect(() => {
     try { localStorage.setItem("startify_pending_backers", JSON.stringify(pendingBackers)); } catch {}
   }, [pendingBackers]);
-  useEffect(() => {
-    try { localStorage.setItem("startify_verified_emails", JSON.stringify(verifiedEmails)); } catch {}
-  }, [verifiedEmails]);
 
-  const generateOtp = () => Math.floor(100000 + Math.random() * 900000).toString();
-  const sendOtp = async (email, role) => {
-    setOtpEmail(email);
-    setOtpRole(role);
-    setOtpInput("");
-    setOtpModalOpen(true);
-    if (isSupabaseConfigured) {
-      try {
-        await authService.sendOtp(email);
-        showToast(`OTP sent to ${email} — check inbox (and spam)`);
-      } catch (err) {
-        showToast(`Failed to send OTP: ${err.message || "try again"}`);
-      }
-      try {
-        const map = JSON.parse(localStorage.getItem("startify_otp_map") || "{}");
-        map[email.toLowerCase()] = { code: "supabase", role, at: new Date().toISOString(), verified: false };
-        localStorage.setItem("startify_otp_map", JSON.stringify(map));
-      } catch {}
-      return;
-    }
-    // Mock fallback for local dev without Supabase
-    const code = generateOtp();
-    setOtpCode(code);
-    setTimeout(() => showToast(`OTP for ${email}: ${code} (demo — configure Supabase for real email)`), 400);
+  // --- Password auth helpers (localStorage) ---
+  const getCredentials = () => {
+    try { return JSON.parse(localStorage.getItem("startify_credentials") || "{}"); } catch { return {}; }
+  };
+  const saveCredential = (email, password) => {
     try {
-      const map = JSON.parse(localStorage.getItem("startify_otp_map") || "{}");
-      map[email.toLowerCase()] = { code, role, at: new Date().toISOString(), verified: false };
-      localStorage.setItem("startify_otp_map", JSON.stringify(map));
+      const map = getCredentials();
+      map[email.toLowerCase()] = password; // plain for demo — replace with hash if needed
+      localStorage.setItem("startify_credentials", JSON.stringify(map));
     } catch {}
   };
-  const verifyOtp = async (input, expected) => {
-    if (isSupabaseConfigured && otpEmail) {
-      try {
-        const ok = await authService.verifyOtp(otpEmail, input);
-        return ok;
-      } catch {
-        return false;
-      }
-    }
-    return input.trim() === expected.trim();
+  const checkCredential = (email, password) => {
+    const map = getCredentials();
+    return map[email.toLowerCase()] === password;
   };
 
   const showToast = (msg) => {
@@ -418,7 +382,7 @@ export default function App() {
     showToast(`Logged in as ${user.name} (${user.role.toUpperCase()})`);
   };
 
-  // Sign In / Registration Handler — UoH students must use @uohyd.ac.in (backer open to outside) + OTP + backer admin approval
+  // Sign In / Registration Handler — UoH students must use @uohyd.ac.in (backer open to outside) + password (no OTP)
   const isUoHEmail = (email) => email.trim().toLowerCase().endsWith("@uohyd.ac.in");
   const completeRegistration = (newUser, targetRole) => {
     // Persist to unified profile store so same-email switching works
@@ -426,11 +390,11 @@ export default function App() {
       const key="startify_user_profiles";
       const existing=JSON.parse(localStorage.getItem(key)||"[]");
       const normalized={ id:newUser.id, name:newUser.name, email:newUser.email.toLowerCase(), role:newUser.role, studentId:newUser.studentId||"", roleTitle:newUser.roleTitle||"", skills:newUser.skills||"", focus:newUser.focus||"", bio:newUser.bio||"", createdAt:new Date().toISOString() };
-      // allow same email with different roles — keep both, replace if same email+role
       const filtered=existing.filter(p=> !(p.email.toLowerCase()===normalized.email.toLowerCase() && p.role===normalized.role));
       localStorage.setItem(key, JSON.stringify([normalized, ...filtered]));
     } catch {}
-    // Founder/Talent: verified via OTP → active immediately. Backer: OTP verified but pending admin approval
+    // Save password for this email
+    if (authForm.password) saveCredential(newUser.email, authForm.password);
     if (targetRole === "backer") {
       const pending = {
         id: newUser.id,
@@ -443,18 +407,14 @@ export default function App() {
         studentId: newUser.studentId,
         status: "pending_admin_approval",
         createdAt: new Date().toISOString(),
-        otpVerified: true,
       };
       setPendingBackers((prev) => [pending, ...prev]);
-      // Also persist to registrations for admin
       dbService.saveRegistration({ name: newUser.name, email: newUser.email, role: "funder", ideaOrSkills: newUser.focus || newUser.bio || "Backer", contact: "", registeredAt: new Date().toISOString().slice(0,10), status: "pending_admin_approval" });
-      showToast(`✓ OTP verified. Backer account "${newUser.name}" is pending admin approval. You'll be visible after approval.`);
-      // Still log in but mark as pending
+      showToast(`Backer account "${newUser.name}" is pending admin approval. You'll be visible after approval.`);
       const pendingUser = { ...newUser, _backerPending: true };
       setCurrentUser(pendingUser);
       setActiveTab("dashboard");
     } else {
-      // Founder / Talent active
       if (targetRole === "talent") {
         setBuilders([
           {
@@ -470,161 +430,128 @@ export default function App() {
           ...builders
         ]);
       }
-      // persist verified email
-      setVerifiedEmails((prev) => prev.includes(newUser.email.toLowerCase()) ? prev : [...prev, newUser.email.toLowerCase()]);
-      try {
-        const map = JSON.parse(localStorage.getItem("startify_otp_map") || "{}");
-        if (map[newUser.email.toLowerCase()]) { map[newUser.email.toLowerCase()].verified = true; localStorage.setItem("startify_otp_map", JSON.stringify(map)); }
-      } catch {}
       dbService.saveRegistration({ name: newUser.name, email: newUser.email, role: targetRole==="talent"?"builder":"founder", ideaOrSkills: targetRole==="talent"? (authForm.skills||"Talent") : "Founder", contact:"", registeredAt: new Date().toISOString().slice(0,10), status:"verified" });
       setCurrentUser(newUser);
       setActiveTab("dashboard");
-      showToast(`✓ OTP verified. Registered as ${targetRole.toUpperCase()}! Welcome, ${newUser.name}.`);
+      showToast(`Registered as ${targetRole.toUpperCase()}! Welcome, ${newUser.name}.`);
     }
     setAuthModalOpen(false);
-    setAuthForm({ name: "", email: "", studentId: "", roleTitle: "", skills: "", focus: "", bio: "" });
+    setAuthForm({ name: "", email: "", password: "", studentId: "", roleTitle: "", skills: "", focus: "", bio: "" });
   };
 
   const handleAuthSubmit = async (e) => {
     e.preventDefault();
     const targetRole = selectedRegisterRole;
     const email = authForm.email.trim();
-
+    const password = authForm.password.trim();
+    if (!password || password.length < 6) {
+      showToast("Password must be at least 6 characters.");
+      return;
+    }
     if ((targetRole === "founder" || targetRole === "talent") && !isUoHEmail(email)) {
       showToast("Use your University of Hyderabad email ending in @uohyd.ac.in for Founder/Builder accounts. Backers can use any email.");
       return;
     }
-
-    // If email already verified via OTP before, skip OTP for faster demo login
-    const alreadyVerified = verifiedEmails.includes(email.toLowerCase());
-    const found = DEMO_USERS.find((u) => u.email.toLowerCase() === email.toLowerCase());
-    if (authMode === "signin" && found) {
-      setCurrentUser(found);
-      setActiveTab("dashboard");
-      showToast(`Welcome back, ${found.name}!`);
-      setAuthModalOpen(false);
-      setAuthForm({ name: "", email: "", studentId: "", roleTitle: "", skills: "", focus: "", bio: "" });
-      return;
-    }
-
-    // Reuse existing profile for same email (admin-created or previous registration) so name and id are correct and chats are visible
-    let existingProfile = null;
-    try {
-      const profiles = JSON.parse(localStorage.getItem("startify_user_profiles") || "[]");
-      existingProfile = profiles.find(p => p.email.toLowerCase() === email.toLowerCase() && p.role === targetRole) || profiles.find(p => p.email.toLowerCase() === email.toLowerCase()) || null;
-      if (!existingProfile) {
-        const buildersLocal = JSON.parse(localStorage.getItem("startify_admin_builders") || "[]");
-        const b = buildersLocal.find(b => (b.email||"").toLowerCase() === email.toLowerCase());
-        if (b) existingProfile = { id: b.id, name: b.name, email: b.email, role: targetRole, roleTitle: b.roleTitle || b.role, skills: b.skills, bio: b.bio || "" };
+    const creds = getCredentials();
+    const hasStoredPassword = !!creds[email.toLowerCase()];
+    // Demo accounts: allow sign-in with any 6+ char password if no stored credential yet
+    const demoUser = DEMO_USERS.find((u) => u.email.toLowerCase() === email.toLowerCase());
+    if (authMode === "signin") {
+      if (demoUser) {
+        if (hasStoredPassword && !checkCredential(email, password)) {
+          showToast("Incorrect password for this account.");
+          return;
+        }
+        if (!hasStoredPassword) saveCredential(email, password);
+        setCurrentUser(demoUser);
+        setActiveTab("dashboard");
+        showToast(`Welcome back, ${demoUser.name}!`);
+        setAuthModalOpen(false);
+        setAuthForm({ name: "", email: "", password: "", studentId: "", roleTitle: "", skills: "", focus: "", bio: "" });
+        return;
       }
-      if (!existingProfile) {
-        const regsLocal = JSON.parse(localStorage.getItem("startify_registrations") || "[]");
-        const r = regsLocal.find(r => r.email.toLowerCase() === email.toLowerCase());
-        if (r) existingProfile = { id: r.email, name: r.name, email: r.email, role: r.role==="builder"?"talent":r.role==="funder"?"backer":r.role, bio: "" };
-      }
-      // handle fake email user_...@uohyd.ac.in where local part is builder id
-      if (!existingProfile && email.toLowerCase().endsWith("@uohyd.ac.in") && email.toLowerCase().startsWith("user_")) {
-        const fakeId = email.split("@")[0];
-        const buildersLocal2 = JSON.parse(localStorage.getItem("startify_admin_builders") || "[]");
-        const b2 = buildersLocal2.find(b => b.id === fakeId);
-        if (b2) existingProfile = { id: b2.id, name: b2.name, email: b2.email || email, role: targetRole, roleTitle: b2.roleTitle || b2.role, skills: b2.skills, bio: b2.bio || "" };
-      }
-    } catch {}
-    if (authMode === "signin" && existingProfile) {
-      const reuseUser = {
-        id: existingProfile.id,
-        name: existingProfile.name || authForm.name || email.split("@")[0],
-        email: existingProfile.email,
-        role: existingProfile.role || targetRole,
-        studentId: existingProfile.studentId || authForm.studentId,
-        bio: existingProfile.bio || authForm.bio || "",
-        roleTitle: existingProfile.roleTitle || authForm.roleTitle,
-        skills: existingProfile.skills || authForm.skills,
-        focus: existingProfile.focus || authForm.focus,
-      };
-      if (alreadyVerified) {
+      // Existing profile sign-in
+      let existingProfile = null;
+      try {
+        const profiles = JSON.parse(localStorage.getItem("startify_user_profiles") || "[]");
+        existingProfile = profiles.find(p => p.email.toLowerCase() === email.toLowerCase() && p.role === targetRole) || profiles.find(p => p.email.toLowerCase() === email.toLowerCase()) || null;
+        if (!existingProfile) {
+          const buildersLocal = JSON.parse(localStorage.getItem("startify_admin_builders") || "[]");
+          const b = buildersLocal.find(b => (b.email||"").toLowerCase() === email.toLowerCase());
+          if (b) existingProfile = { id: b.id, name: b.name, email: b.email, role: targetRole, roleTitle: b.roleTitle || b.role, skills: b.skills, bio: b.bio || "" };
+        }
+        if (!existingProfile) {
+          const regsLocal = JSON.parse(localStorage.getItem("startify_registrations") || "[]");
+          const r = regsLocal.find(r => r.email.toLowerCase() === email.toLowerCase());
+          if (r) existingProfile = { id: r.email, name: r.name, email: r.email, role: r.role==="builder"?"talent":r.role==="funder"?"backer":r.role, bio: "" };
+        }
+        if (!existingProfile && email.toLowerCase().endsWith("@uohyd.ac.in") && email.toLowerCase().startsWith("user_")) {
+          const fakeId = email.split("@")[0];
+          const buildersLocal2 = JSON.parse(localStorage.getItem("startify_admin_builders") || "[]");
+          const b2 = buildersLocal2.find(b => b.id === fakeId);
+          if (b2) existingProfile = { id: b2.id, name: b2.name, email: b2.email || email, role: targetRole, roleTitle: b2.roleTitle || b2.role, skills: b2.skills, bio: b2.bio || "" };
+        }
+      } catch {}
+      if (existingProfile) {
+        if (hasStoredPassword && !checkCredential(email, password)) {
+          showToast("Incorrect password. Try again.");
+          return;
+        }
+        if (!hasStoredPassword) saveCredential(email, password);
+        const reuseUser = {
+          id: existingProfile.id,
+          name: existingProfile.name || authForm.name || email.split("@")[0],
+          email: existingProfile.email,
+          role: existingProfile.role || targetRole,
+          studentId: existingProfile.studentId || authForm.studentId,
+          bio: existingProfile.bio || authForm.bio || "",
+          roleTitle: existingProfile.roleTitle || authForm.roleTitle,
+          skills: existingProfile.skills || authForm.skills,
+          focus: existingProfile.focus || authForm.focus,
+        };
         setCurrentUser(reuseUser);
         setActiveTab("dashboard");
         showToast(`Welcome back, ${reuseUser.name}!`);
         setAuthModalOpen(false);
-        setAuthForm({ name: "", email: "", studentId: "", roleTitle: "", skills: "", focus: "", bio: "" });
+        setAuthForm({ name: "", email: "", password: "", studentId: "", roleTitle: "", skills: "", focus: "", bio: "" });
         return;
       }
-      setOtpPendingUser(reuseUser);
-      setOtpRole(reuseUser.role);
-      await sendOtp(email, reuseUser.role);
+      // No existing account — prompt to create
+      showToast("No account found for this email. Switch to Create Account.");
       return;
     }
-
-    // For any new account (signin create or register), require OTP
-    const pendingUser = authMode === "signin"
-      ? {
-          id: `user_${Date.now()}`,
-          name: authForm.name || email.split("@")[0],
-          email,
-          role: targetRole,
-          studentId: authForm.studentId,
-          bio: authForm.bio,
-          roleTitle: authForm.roleTitle,
-          skills: authForm.skills,
-          focus: authForm.focus,
+    // Register mode
+    if (authMode === "register") {
+      if (!authForm.name.trim()) { showToast("Please enter your full name."); return; }
+      // prevent duplicate same email+role
+      try {
+        const profiles = JSON.parse(localStorage.getItem("startify_user_profiles") || "[]");
+        if (profiles.some(p => p.email.toLowerCase()===email.toLowerCase() && p.role===targetRole)) {
+          showToast("An account with this email and role already exists. Please Sign In.");
+          return;
         }
-      : {
-          id: `user_${Date.now()}`,
-          name: authForm.name,
-          email,
-          role: targetRole,
-          studentId: authForm.studentId,
-          roleTitle: authForm.roleTitle,
-          skills: authForm.skills,
-          focus: authForm.focus,
-          bio: authForm.bio
-        };
-
-    if ((pendingUser.role === "founder" || pendingUser.role === "talent") && !isUoHEmail(pendingUser.email)) {
-      showToast("Founder/Builder requires @uohyd.ac.in. Switch to Backer for external email.");
-      return;
-    }
-
-    // If already OTP-verified earlier in this browser, complete directly (still enforce backer pending)
-    if (alreadyVerified && pendingUser.role !== "backer") {
+      } catch {}
+      if (hasStoredPassword && !checkCredential(email, password)) {
+        showToast("An account with this email already uses a different password. Use that password to Sign In, or use a different email.");
+        return;
+      }
+      const pendingUser = {
+        id: `user_${Date.now()}`,
+        name: authForm.name.trim(),
+        email,
+        role: targetRole,
+        studentId: authForm.studentId,
+        roleTitle: authForm.roleTitle,
+        skills: authForm.skills,
+        focus: authForm.focus,
+        bio: authForm.bio
+      };
+      if ((pendingUser.role === "founder" || pendingUser.role === "talent") && !isUoHEmail(pendingUser.email)) {
+        showToast("Founder/Builder requires @uohyd.ac.in. Switch to Backer for external email.");
+        return;
+      }
       completeRegistration(pendingUser, targetRole);
-      return;
     }
-    if (alreadyVerified && pendingUser.role === "backer") {
-      // backer still needs admin approval, but OTP already done
-      completeRegistration(pendingUser, targetRole);
-      return;
-    }
-
-    setOtpPendingUser(pendingUser);
-    setOtpRole(targetRole);
-    await sendOtp(email, targetRole);
-  };
-
-  const handleOtpVerify = async (e) => {
-    e.preventDefault();
-    const ok = await verifyOtp(otpInput, otpCode);
-    if (!ok) {
-      showToast(isSupabaseConfigured ? "Invalid or expired OTP — check email and try again." : "Invalid OTP. Please check the 6-digit code (demo code shown in toast).");
-      return;
-    }
-    const user = otpPendingUser;
-    if (!user) { setOtpModalOpen(false); return; }
-    setVerifiedEmails((prev) => prev.includes(user.email.toLowerCase()) ? prev : [...prev, user.email.toLowerCase()]);
-    try {
-      const map = JSON.parse(localStorage.getItem("startify_otp_map") || "{}");
-      if (map[user.email.toLowerCase()]) { map[user.email.toLowerCase()].verified = true; localStorage.setItem("startify_otp_map", JSON.stringify(map)); }
-    } catch {}
-    setOtpModalOpen(false);
-    setOtpInput("");
-    completeRegistration(user, otpRole);
-    setOtpPendingUser(null);
-  };
-
-  const handleOtpResend = async () => {
-    if (!otpEmail) return;
-    await sendOtp(otpEmail, otpRole);
   };
 
   // Submit New Idea (Requires Login & Founder Role)
@@ -1541,7 +1468,8 @@ export default function App() {
           {/* Profile Card — shows who you are + same-email role switcher */}
           {(() => {
             const initials = currentUser.name.split(" ").map(s=>s[0]).join("").slice(0,2).toUpperCase();
-            const isVerified = verifiedEmails.includes(currentUser.email.toLowerCase()) || ["admin","founder","talent","backer"].includes(currentUser.role) && DEMO_USERS.some(u=>u.email.toLowerCase()===currentUser.email.toLowerCase());
+            const creds = (()=>{ try{ return JSON.parse(localStorage.getItem("startify_credentials")||"{}"); }catch{return {};}})();
+            const isVerified = !!creds[currentUser.email.toLowerCase()] || DEMO_USERS.some(u=>u.email.toLowerCase()===currentUser.email.toLowerCase());
             const profilesKey = "startify_user_profiles";
             const allProfiles = (()=>{ try{
               const a=JSON.parse(localStorage.getItem(profilesKey)||"[]");
@@ -1639,7 +1567,7 @@ export default function App() {
                       {currentUser.role === "founder" && "Manage your posted startup ideas, view incoming talent & backer requests, and chat directly."}
                       {currentUser.role === "talent" && "View your builder profile, track incoming team invites, and talk to founders."}
                       {currentUser.role === "backer" && "View founder pitches, manage dealflow inquiries, and chat directly with student startups."}
-                      {currentUser.role === "admin" && "Sole admin — you have all data. Manage ideas, backers, and OTP logs at /admin.html."}
+                      {currentUser.role === "admin" && "Sole admin — you have all data. Manage ideas, backers, and accounts at /admin.html."}
                     </p>
                     {currentUser.role==="founder" && <div className="mt-2 sm:mt-3"><button onClick={()=> setIdeaModalOpen(true)} className="h-8 sm:h-9 px-3 sm:px-4 rounded-full bg-slate-900 text-white text-[11px] sm:text-xs font-bold hover:bg-slate-800">+ Post New Idea</button></div>}
                   </div>
@@ -1782,8 +1710,8 @@ export default function App() {
             <div className="mt-6 rounded-2xl border border-amber-200 bg-amber-50 p-4 flex items-start gap-3">
               <div className="h-8 w-8 rounded-full bg-amber-500 text-white grid place-items-center font-bold shrink-0">!</div>
               <div>
-                <div className="font-bold text-sm text-amber-900">Backer verification complete — pending admin approval</div>
-                <div className="text-xs text-amber-800 mt-1">Your OTP is verified. Admin will approve your backer ID shortly. You can browse ideas, but pitching & visibility in the Backers Hub will unlock after approval. For urgent approval, contact admin.</div>
+                <div className="font-bold text-sm text-amber-900">Backer registration complete — pending admin approval</div>
+                <div className="text-xs text-amber-800 mt-1">Admin will approve your backer ID shortly. You can browse ideas, but pitching & visibility in the Backers Hub will unlock after approval. For urgent approval, contact admin.</div>
               </div>
             </div>
           )}
@@ -1843,7 +1771,7 @@ export default function App() {
                 <h3 className="font-heading font-extrabold text-[24px] text-amber-900">Backers pending approval</h3>
                 <span className="rounded-full bg-amber-500 text-white px-3 py-1 text-xs font-bold">{pendingBackers.length} pending</span>
               </div>
-              <p className="text-xs text-amber-800 mt-2">Backer IDs require verification (OTP done) + your approval before they appear in the Backers Hub.</p>
+              <p className="text-xs text-amber-800 mt-2">Backer IDs require your approval before they appear in the Backers Hub.</p>
               <div className="mt-4 space-y-3">
                 {pendingBackers.length === 0 ? (
                   <div className="py-6 text-center text-sm text-amber-700">No backers pending — all verified.</div>
@@ -1852,7 +1780,7 @@ export default function App() {
                     <div key={b.id} className="flex flex-col gap-3 rounded-2xl border border-amber-200 bg-white p-4 md:flex-row md:items-center md:justify-between">
                       <div>
                         <div className="font-heading text-[16px] font-bold text-slate-800">{b.name} <span className="text-xs font-normal text-slate-500">• {b.email}</span></div>
-                        <div className="mt-1 text-[12px] text-slate-500">Focus: {b.focus || b.bio || "—"} • OTP ✓</div>
+                        <div className="mt-1 text-[12px] text-slate-500">Focus: {b.focus || b.bio || "—"}</div>
                       </div>
                       <div className="flex gap-2">
                         <button onClick={() => {
@@ -2248,8 +2176,27 @@ export default function App() {
                 <p className="mt-1.5 text-[11px] leading-4 text-slate-500">
                   {selectedRegisterRole === "backer"
                     ? "Backers may be outside UoH — any verified email works."
-                    : "Founder & Builder accounts are UoH-only. No verification hassle."}
+                    : "Founder & Builder accounts are UoH-only."}
                 </p>
+              </div>
+
+              <div>
+                <label className="block text-[12px] font-semibold text-slate-600 mb-1">
+                  Password * <span className="font-normal text-slate-400">— min 6 characters</span>
+                </label>
+                <div className="relative">
+                  <input
+                    required
+                    type={showPassword ? "text" : "password"}
+                    value={authForm.password}
+                    onChange={(e) => setAuthForm({ ...authForm, password: e.target.value })}
+                    placeholder={authMode === "signin" ? "Enter your password" : "Create a password"}
+                    className="w-full h-11 rounded-full bg-slate-50 border border-slate-200 px-4 pr-12 text-[13px] text-slate-800 outline-none focus:border-indigo-300 focus:ring-2 focus:ring-indigo-100"
+                  />
+                  <button type="button" onClick={()=> setShowPassword(!showPassword)} className="absolute right-1.5 top-1.5 h-8 px-3 rounded-full bg-white border border-slate-200 text-[11px] font-bold text-slate-600 hover:bg-slate-50">
+                    {showPassword ? "Hide" : "Show"}
+                  </button>
+                </div>
               </div>
 
               <button
@@ -2653,41 +2600,6 @@ export default function App() {
         </div>
       )}
 
-      {/* MODAL 6: OTP VERIFICATION (mock — swap with real OTP service) */}
-      {otpModalOpen && (
-        <div className="fixed inset-0 z-50 grid place-items-center p-4">
-          <div className="absolute inset-0 bg-black/60 backdrop-blur-md" onClick={() => setOtpModalOpen(false)} />
-          <div className="relative w-full max-w-[420px] rounded-[28px] bg-white border border-slate-200 shadow-2xl p-6 sm:p-8 text-slate-800">
-            <div className="flex items-center justify-between border-b border-slate-200 pb-4">
-              <div>
-                <div className="font-heading font-extrabold text-[20px]">Verify your email</div>
-                <div className="text-[12px] text-slate-500 mt-0.5">OTP sent to <strong className="text-slate-800">{otpEmail}</strong> • {otpRole.toUpperCase()} • {otpRole !== "backer" ? "UoH @uohyd.ac.in required" : "Backer — any email + admin approval"}</div>
-              </div>
-              <button onClick={() => setOtpModalOpen(false)} className="h-8 w-8 rounded-full border border-slate-200 grid place-items-center text-slate-500 hover:text-slate-800">✕</button>
-            </div>
-            {isSupabaseConfigured ? (
-              <div className="mt-4 rounded-xl bg-emerald-50 border border-emerald-200 p-3 text-xs leading-4 text-emerald-800">
-                <strong>Check your email:</strong> OTP sent to <strong>{otpEmail}</strong> via Supabase — valid 5 min. Check inbox & spam. No code shown for security.
-              </div>
-            ) : (
-              <div className="mt-4 rounded-xl bg-indigo-50 border border-indigo-200 p-3 text-xs leading-4 text-indigo-800">
-                <strong>Demo OTP (no email service yet):</strong> <span className="font-mono font-bold tracking-widest text-[14px]">{otpCode}</span> — use this code. Configure Supabase in Cloudflare (see docs/OTP_INTEGRATION_GUIDE.md) for real email.
-              </div>
-            )}
-            <form onSubmit={handleOtpVerify} className="mt-5 space-y-4">
-              <div>
-                <label className="block text-[12px] font-semibold text-slate-600 mb-1">Enter 6-digit OTP *</label>
-                <input required value={otpInput} onChange={(e)=> setOtpInput(e.target.value.replace(/\D/g,"").slice(0,6))} placeholder="••••••" inputMode="numeric" className="w-full h-12 rounded-2xl bg-slate-50 border border-slate-200 px-4 text-center text-[22px] tracking-[0.4em] font-bold outline-none focus:border-slate-900" />
-              </div>
-              <button type="submit" className="w-full h-12 rounded-full bg-slate-900 text-white font-bold text-[14px] hover:bg-slate-800 transition">Verify & Continue →</button>
-              <div className="flex items-center justify-between text-xs">
-                <button type="button" onClick={handleOtpResend} className="text-slate-600 hover:text-slate-900 underline">Resend OTP</button>
-                <span className="text-slate-400">Backer accounts need OTP + admin approval</span>
-              </div>
-            </form>
-          </div>
-        </div>
-      )}
     </div>
   );
 }
