@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import logoImg from "./assets/startify-wordmark-full.png";
-import { dbService } from "./lib/supabase";
+import { dbService, isSupabaseConfigured, authService } from "./lib/supabase";
 
 /* ==========================================================================
    PRE-CREATED TEST ACCOUNTS & DEMO DATA FOR EASY TESTING
@@ -283,7 +283,6 @@ export default function App() {
   const [pendingBackers, setPendingBackers] = useState(() => {
     try { return JSON.parse(localStorage.getItem("startify_pending_backers") || "[]"); } catch { return []; }
   });
-  const [verificationCode, setVerificationCode] = useState("");
   const [verificationInput, setVerificationInput] = useState("");
   const [verificationSent, setVerificationSent] = useState(false);
   const [verifiedEmail, setVerifiedEmail] = useState("");
@@ -365,28 +364,46 @@ export default function App() {
     return map[email.toLowerCase()] === password;
   };
 
-  // --- Unified email verification (one button for first-time + reset) ---
+  // --- Unified email verification (real Supabase OTP — one button for first-time + reset) ---
   const isValidEmail = (email) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim());
-  const sendVerificationCode = (email) => {
+  const sendVerificationCode = async (email) => {
     const target = email.trim().toLowerCase();
     if (!isValidEmail(target)) { showToast("Enter a valid email first."); return; }
-    const code = Math.floor(100000 + Math.random()*900000).toString();
-    setVerificationCode(code);
+    if (!isSupabaseConfigured) {
+      showToast("Email service not configured — set VITE_SUPABASE_URL and VITE_SUPABASE_ANON_KEY in Cloudflare Pages and redeploy.");
+      return;
+    }
     setVerificationSent(true);
     setVerificationInput("");
     setVerifiedEmail("");
     try {
-      const store = JSON.parse(localStorage.getItem("startify_email_verification")||"{}");
-      store[target] = { code, at: Date.now(), verified: false };
-      localStorage.setItem("startify_email_verification", JSON.stringify(store));
-    } catch {}
-    // demo: show code in toast — replace with real email (Resend/Supabase) in prod
-    showToast(`Verification code for ${target}: ${code} (demo — check toast)`);
+      await authService.sendOtp(target);
+      showToast(`✓ OTP sent to ${target} — check inbox and spam (valid 5 min).`);
+      // store pending locally without code (real code is in email only)
+      try {
+        const store = JSON.parse(localStorage.getItem("startify_email_verification")||"{}");
+        store[target] = { code: "supabase", at: Date.now(), verified: false };
+        localStorage.setItem("startify_email_verification", JSON.stringify(store));
+      } catch {}
+    } catch (err) {
+      const msg = err?.message || "Failed to send OTP";
+      if (msg.toLowerCase().includes("rate limit")) showToast("Rate limited — Supabase allows 3-4 OTPs/hr. Try again later.");
+      else showToast(`Failed to send OTP: ${msg}`);
+      setVerificationSent(false);
+    }
   };
-  const verifyEmailCode = () => {
+  const verifyEmailCode = async () => {
     const target = authForm.email.trim().toLowerCase();
+    const token = verificationInput.trim();
     if (!verificationSent) { showToast("Click 'Send verification code' first."); return false; }
-    if (verificationInput.trim() === verificationCode) {
+    if (!token || token.length !== 6) { showToast("Enter the 6-digit code from your email."); return false; }
+    if (!isSupabaseConfigured) {
+      showToast("Email service not configured.");
+      return false;
+    }
+    try {
+      const ok = await authService.verifyOtp(target, token);
+      if (!ok) { showToast("Invalid or expired OTP — check email and try again."); return false; }
       setVerifiedEmail(target);
       try {
         const store = JSON.parse(localStorage.getItem("startify_email_verification")||"{}");
@@ -394,8 +411,8 @@ export default function App() {
       } catch {}
       showToast(`✓ Email verified: ${target}`);
       return true;
-    } else {
-      showToast("Invalid code. Check the 6-digit code in toast.");
+    } catch (err) {
+      showToast(err?.message || "Invalid or expired OTP.");
       return false;
     }
   };
@@ -477,7 +494,7 @@ export default function App() {
     }
     setAuthModalOpen(false);
     setAuthForm({ name: "", email: "", password: "", studentId: "", roleTitle: "", skills: "", focus: "", bio: "" });
-    setVerificationSent(false); setVerificationCode(""); setVerificationInput(""); setVerifiedEmail(""); setResetMode(false);
+    setVerificationSent(false); setVerificationInput(""); setVerifiedEmail(""); setResetMode(false);
   };
 
   const handleAuthSubmit = async (e) => {
@@ -505,7 +522,6 @@ export default function App() {
       } catch {}
       setResetMode(false);
       setVerificationSent(false);
-      setVerificationCode("");
       setVerificationInput("");
       setVerifiedEmail("");
       showToast(`✓ Password reset for ${email}. Please sign in with new password.`);
@@ -533,7 +549,7 @@ export default function App() {
         showToast(`Welcome back, ${demoUser.name}!`);
         setAuthModalOpen(false);
         setAuthForm({ name: "", email: "", password: "", studentId: "", roleTitle: "", skills: "", focus: "", bio: "" });
-        setVerificationSent(false); setVerificationCode(""); setVerificationInput(""); setVerifiedEmail(""); setResetMode(false);
+        setVerificationSent(false); setVerificationInput(""); setVerifiedEmail(""); setResetMode(false);
         return;
       }
       // Existing profile sign-in
@@ -580,7 +596,7 @@ export default function App() {
         showToast(`Welcome back, ${reuseUser.name}!`);
         setAuthModalOpen(false);
         setAuthForm({ name: "", email: "", password: "", studentId: "", roleTitle: "", skills: "", focus: "", bio: "" });
-        setVerificationSent(false); setVerificationCode(""); setVerificationInput(""); setVerifiedEmail(""); setResetMode(false);
+        setVerificationSent(false); setVerificationInput(""); setVerifiedEmail(""); setResetMode(false);
         return;
       }
       // No existing account — prompt to create
@@ -2236,7 +2252,7 @@ export default function App() {
                   required
                   type="email"
                   value={authForm.email}
-                  onChange={(e) => { setAuthForm({ ...authForm, email: e.target.value }); setVerificationSent(false); setVerifiedEmail(""); setVerificationCode(""); }}
+                  onChange={(e) => { setAuthForm({ ...authForm, email: e.target.value }); setVerificationSent(false); setVerifiedEmail(""); }}
                   placeholder={selectedRegisterRole === "backer" ? "name@company.com (any domain)" : "name@uohyd.ac.in"}
                   className="w-full h-11 rounded-full bg-slate-50 border border-slate-200 px-4 text-[13px] text-slate-800 outline-none focus:border-indigo-300 focus:ring-2 focus:ring-indigo-100"
                 />
@@ -2253,7 +2269,7 @@ export default function App() {
                   <div className="text-[11px] font-bold text-slate-700">Email verification *</div>
                   {verifiedEmail === authForm.email.trim().toLowerCase() && verifiedEmail ? <span className="text-[11px] px-2 py-1 rounded-full bg-emerald-500 text-white font-bold">✓ Verified</span> : <span className="text-[11px] text-slate-500">{authMode==="register" ? "Required for new account" : "Use for password reset"}</span>}
                 </div>
-                <p className="text-[11px] text-slate-500 mt-1">One button for both: new accounts & forgot password. Code shown in toast (demo) — replace with Resend in prod.</p>
+                <p className="text-[11px] text-slate-500 mt-1">One button for both: new accounts & forgot password. Real OTP via Supabase email — check inbox & spam (valid 5 min).{!isSupabaseConfigured && " — configure VITE_SUPABASE_URL/ANON_KEY."}</p>
                 <div className="mt-2 flex gap-2">
                   <button type="button" onClick={()=> sendVerificationCode(authForm.email)} className="h-9 px-4 rounded-full bg-white border border-slate-200 text-xs font-bold text-slate-700 hover:bg-slate-900 hover:text-white transition shrink-0">
                     {verificationSent ? "Resend code" : "Send verification code"}
@@ -2285,12 +2301,11 @@ export default function App() {
                   </button>
                 </div>
                 {authMode==="signin" && !resetMode && (
-                  <button type="button" onClick={()=>{
+                  <button type="button" onClick={async ()=>{
                     if(!isValidEmail(authForm.email)){ showToast("Enter your email above first."); return; }
                     setResetMode(true);
                     setAuthForm({...authForm, password:""});
-                    sendVerificationCode(authForm.email);
-                    showToast("Verify email to reset password — code sent.");
+                    await sendVerificationCode(authForm.email);
                   }} className="mt-1.5 text-[11px] text-indigo-600 hover:underline font-semibold">Forgot password? Verify Email to reset →</button>
                 )}
                 {resetMode && (
