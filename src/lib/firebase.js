@@ -1,8 +1,7 @@
-// Startify Database Service (Firebase + Local Fallback)
-// Handles Firestore (ideas/registrations/payments) and Email OTP via Firestore with Firebase Auth fallback
+// Startify Database Service (Firebase + Local Fallback) — Password + Email Link
 import { initializeApp, getApps } from 'firebase/app';
-import { getFirestore, collection, addDoc, getDocs, query, orderBy, limit, serverTimestamp, doc, setDoc, getDoc } from 'firebase/firestore';
-import { getAuth, sendSignInLinkToEmail, isSignInWithEmailLink, signInWithEmailLink } from 'firebase/auth';
+import { getFirestore, collection, addDoc, getDocs, query, orderBy, limit, serverTimestamp } from 'firebase/firestore';
+import { getAuth, createUserWithEmailAndPassword, signInWithEmailAndPassword, sendEmailVerification, sendPasswordResetEmail, signOut, onAuthStateChanged } from 'firebase/auth';
 
 const firebaseConfig = {
   apiKey: import.meta.env.VITE_FIREBASE_API_KEY || "",
@@ -26,106 +25,54 @@ if (isFirebaseConfigured) {
 }
 
 export { app, db, auth };
-
-// Keep legacy export names for App.jsx compatibility
-export const isSupabaseConfigured = isFirebaseConfigured;
-
-const generateOtp = () => Math.floor(100000 + Math.random() * 900000).toString();
+export const isSupabaseConfigured = isFirebaseConfigured; // alias for App.jsx
 
 export const authService = {
-  async sendOtp(email) {
-    const target = email.trim().toLowerCase();
-    if (!isFirebaseConfigured || !db) throw new Error("Firebase not configured — set VITE_FIREBASE_API_KEY and VITE_FIREBASE_PROJECT_ID");
-    const code = generateOtp();
-    const expiresAt = Date.now() + 5 * 60 * 1000;
+  async signUp(email, password) {
+    if (!isFirebaseConfigured || !auth) throw new Error("Firebase not configured — set VITE_FIREBASE_*");
+    const cred = await createUserWithEmailAndPassword(auth, email.trim().toLowerCase(), password);
     try {
-      await setDoc(doc(db, "email_otps", target), {
-        code,
-        email: target,
-        createdAt: Date.now(),
-        expiresAt,
-        verified: false,
-      });
-    } catch (err) {
-      console.warn("Firestore OTP store failed, falling back to local", err);
-      // fallback to local storage for dev without Firestore rules
-      try {
-        const store = JSON.parse(localStorage.getItem("startify_email_verification") || "{}");
-        store[target] = { code, at: Date.now(), expiresAt, verified: false };
-        localStorage.setItem("startify_email_verification", JSON.stringify(store));
-      } catch {}
-      // still throw? No — allow demo toast with code
-      console.log(`[DEV OTP] ${target}: ${code}`);
-      return true;
+      await sendEmailVerification(cred.user, { url: window.location.origin, handleCodeInApp: false });
+    } catch (e) { console.warn("sendEmailVerification failed", e?.message); }
+    return cred.user;
+  },
+  async signIn(email, password) {
+    if (!isFirebaseConfigured || !auth) throw new Error("Firebase not configured");
+    const cred = await signInWithEmailAndPassword(auth, email.trim().toLowerCase(), password);
+    // Require verified email — except allow if user just signed up and hasn't clicked yet? We enforce here.
+    if (!cred.user.emailVerified) {
+      await signOut(auth);
+      throw new Error("Please verify your email first — click the link sent to your inbox (check spam). Click Resend link if needed.");
     }
-    // Best effort: try Firebase Email Link (sends real email via Firebase). If not configured, log code for dev.
-    if (auth) {
-      try {
-        const actionCodeSettings = {
-          url: window.location.href,
-          handleCodeInApp: true,
-        };
-        await sendSignInLinkToEmail(auth, target, actionCodeSettings);
-        // Firebase sent email link — we still keep 6-digit code as primary for this UI
-        window.localStorage.setItem("emailForSignIn", target);
-      } catch (e) {
-        console.warn("Firebase sendSignInLinkToEmail failed (using 6-digit code only)", e?.message || e);
+    return cred.user;
+  },
+  async resendVerification(email, password) {
+    if (!isFirebaseConfigured || !auth) throw new Error("Firebase not configured");
+    // Need to sign in temporarily to resend
+    try {
+      const cred = await signInWithEmailAndPassword(auth, email.trim().toLowerCase(), password);
+      if (cred.user.emailVerified) {
+        await signOut(auth);
+        throw new Error("Already verified — please Sign In.");
       }
+      await sendEmailVerification(cred.user, { url: window.location.origin, handleCodeInApp: false });
+      await signOut(auth);
+      return true;
+    } catch (e) {
+      if (e?.message?.includes("Already verified")) throw e;
+      // If wrong password, fall back to password reset flow hint
+      throw e;
     }
-    // In dev, show code in console/toast helper — App.jsx will show toast
-    console.log(`[Firebase OTP] ${target}: ${code} (valid 5 min)`);
-    // Also store code locally so demo can display if Firestore read fails due to rules
-    try {
-      const store = JSON.parse(localStorage.getItem("startify_email_verification") || "{}");
-      store[target] = { code, at: Date.now(), expiresAt, verified: false, cloud: true };
-      localStorage.setItem("startify_email_verification", JSON.stringify(store));
-    } catch {}
+  },
+  async sendPasswordReset(email) {
+    if (!isFirebaseConfigured || !auth) throw new Error("Firebase not configured");
+    await sendPasswordResetEmail(auth, email.trim().toLowerCase(), { url: window.location.origin, handleCodeInApp: false });
     return true;
   },
-  async verifyOtp(email, token) {
-    const target = email.trim().toLowerCase();
-    const input = token.trim();
-    if (!isFirebaseConfigured || !db) throw new Error("Firebase not configured");
-    // First: check if it's a Firebase email link (optional)
-    if (auth && isSignInWithEmailLink(auth, window.location.href)) {
-      try {
-        const emailForLink = window.localStorage.getItem("emailForSignIn") || target;
-        const result = await signInWithEmailLink(auth, emailForLink, window.location.href);
-        if (result.user) return true;
-      } catch (e) {
-        console.warn("Email link verification failed", e?.message);
-      }
-    }
-    // Primary: 6-digit code stored in Firestore
-    try {
-      const snap = await getDoc(doc(db, "email_otps", target));
-      if (snap.exists()) {
-        const data = snap.data();
-        if (Date.now() > data.expiresAt) throw new Error("OTP expired — request a new code");
-        if (data.code !== input) throw new Error("Invalid OTP");
-        await setDoc(doc(db, "email_otps", target), { ...data, verified: true }, { merge: true });
-        return true;
-      }
-    } catch (err) {
-      // If Firestore read fails (rules/network), fallback to local store
-      if (err?.message?.includes("Invalid OTP") || err?.message?.includes("expired")) throw err;
-      console.warn("Firestore OTP verify fallback to local", err?.message);
-    }
-    // Local fallback
-    try {
-      const store = JSON.parse(localStorage.getItem("startify_email_verification") || "{}");
-      const entry = store[target];
-      if (entry && entry.code === input) {
-        if (Date.now() > entry.expiresAt) throw new Error("OTP expired");
-        entry.verified = true;
-        localStorage.setItem("startify_email_verification", JSON.stringify(store));
-        return true;
-      }
-    } catch (e) {
-      if (e?.message?.includes("expired")) throw e;
-    }
-    // Dev helper: if code was logged, allow it? No strict fail
-    throw new Error("Invalid or expired OTP — check email / console for code");
+  // Call on app start to handle email link verification redirect
+  onAuthStateChanged(callback) {
+    if (!auth) return () => {};
+    return onAuthStateChanged(auth, callback);
   }
 };
 
@@ -152,26 +99,16 @@ const defaultServicesList = [
 export const dbService = {
   async getSiteContent() {
     const local = localStorage.getItem("startify_site_content");
-    if (local) {
-      try { return { ...defaultSiteContent, ...JSON.parse(local) }; } catch (e) { console.error(e); }
-    }
+    if (local) { try { return { ...defaultSiteContent, ...JSON.parse(local) }; } catch (e) { console.error(e); } }
     return defaultSiteContent;
   },
-  async saveSiteContent(content) {
-    localStorage.setItem("startify_site_content", JSON.stringify(content));
-    return true;
-  },
+  async saveSiteContent(content) { localStorage.setItem("startify_site_content", JSON.stringify(content)); return true; },
   async getServices() {
     const local = localStorage.getItem("startify_offered_services");
-    if (local) {
-      try { return JSON.parse(local); } catch (e) { console.error(e); }
-    }
+    if (local) { try { return JSON.parse(local); } catch (e) { console.error(e); } }
     return defaultServicesList;
   },
-  async saveServices(services) {
-    localStorage.setItem("startify_offered_services", JSON.stringify(services));
-    return true;
-  },
+  async saveServices(services) { localStorage.setItem("startify_offered_services", JSON.stringify(services)); return true; },
   async getIdeas(defaultIdeas = []) {
     if (isFirebaseConfigured && db) {
       try {
@@ -182,9 +119,7 @@ export const dbService = {
       } catch (err) { console.warn("Firestore fetch ideas failed, using local", err); }
     }
     const local = localStorage.getItem("startify_submitted_ideas");
-    if (local) {
-      try { return [...JSON.parse(local), ...defaultIdeas]; } catch (e) { console.error(e); }
-    }
+    if (local) { try { return [...JSON.parse(local), ...defaultIdeas]; } catch (e) { console.error(e); } }
     return defaultIdeas;
   },
   async saveIdea(idea) {
@@ -193,23 +128,13 @@ export const dbService = {
     if (isFirebaseConfigured && db) {
       try {
         await addDoc(collection(db, "ideas"), {
-          title: idea.title,
-          category: idea.category,
-          founder: idea.founder,
-          email: idea.email || "",
-          founderId: idea.founderId || "",
-          desc: idea.desc,
-          seeking: idea.seeking,
-          status: idea.status || "Pending Review",
-          created_at: serverTimestamp(),
-          createdDate: idea.createdDate || new Date().toISOString(),
+          title: idea.title, category: idea.category, founder: idea.founder, email: idea.email || "", founderId: idea.founderId || "",
+          desc: idea.desc, seeking: idea.seeking, status: idea.status || "Pending Review",
+          created_at: serverTimestamp(), createdDate: idea.createdDate || new Date().toISOString(),
         });
       } catch (err) { console.warn("Firestore idea save error", err); }
     }
-    // also ping Cloudflare Function (keeps wrangler binding working)
-    try {
-      await fetch("/api/ideas", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(idea) });
-    } catch {}
+    try { await fetch("/api/ideas", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(idea) }); } catch {}
     return true;
   },
   async getRegistrations() {
@@ -232,11 +157,7 @@ export const dbService = {
     const existing = JSON.parse(localStorage.getItem("startify_registrations") || "[]");
     localStorage.setItem("startify_registrations", JSON.stringify([reg, ...existing]));
     try { await fetch("/api/bookings", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(reg) }); } catch (e) { console.warn("Cloudflare API ping", e); }
-    if (isFirebaseConfigured && db) {
-      try {
-        await addDoc(collection(db, "registrations"), { ...reg, created_at: serverTimestamp() });
-      } catch (err) { console.warn("Firestore registration save error", err); }
-    }
+    if (isFirebaseConfigured && db) { try { await addDoc(collection(db, "registrations"), { ...reg, created_at: serverTimestamp() }); } catch (err) { console.warn("Firestore registration save error", err); } }
     return true;
   },
   async getPayments() {
@@ -257,9 +178,7 @@ export const dbService = {
   async savePayment(payment) {
     const existing = JSON.parse(localStorage.getItem("startify_payments") || "[]");
     localStorage.setItem("startify_payments", JSON.stringify([payment, ...existing]));
-    if (isFirebaseConfigured && db) {
-      try { await addDoc(collection(db, "payments"), { ...payment, created_at: serverTimestamp() }); } catch (err) { console.warn("Firestore payment save error", err); }
-    }
+    if (isFirebaseConfigured && db) { try { await addDoc(collection(db, "payments"), { ...payment, created_at: serverTimestamp() }); } catch (err) { console.warn("Firestore payment save error", err); } }
     return true;
   }
 };

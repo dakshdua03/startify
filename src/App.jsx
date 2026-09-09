@@ -278,14 +278,12 @@ export default function App() {
   const [activeChatRequest, setActiveChatRequest] = useState(null);
   const [targetEvent, setTargetEvent] = useState(null);
 
-  // Password auth (local — no Supabase OTP) + unified email verification
+  // Password + email link auth (Firebase)
   const [showPassword, setShowPassword] = useState(false);
   const [pendingBackers, setPendingBackers] = useState(() => {
     try { return JSON.parse(localStorage.getItem("startify_pending_backers") || "[]"); } catch { return []; }
   });
-  const [verificationInput, setVerificationInput] = useState("");
-  const [verificationSent, setVerificationSent] = useState(false);
-  const [verifiedEmail, setVerifiedEmail] = useState("");
+  const [authLoading, setAuthLoading] = useState(false);
   const [resetMode, setResetMode] = useState(false);
 
   // Toast
@@ -364,57 +362,32 @@ export default function App() {
     return map[email.toLowerCase()] === password;
   };
 
-  // --- Unified email verification (Firebase OTP — one button for first-time + reset) ---
+  // --- Email helpers (Firebase password + link) ---
   const isValidEmail = (email) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim());
-  const sendVerificationCode = async (email) => {
-    const target = email.trim().toLowerCase();
-    if (!isValidEmail(target)) { showToast("Enter a valid email first."); return; }
-    if (!isSupabaseConfigured) {
-      showToast("Email service not configured — set VITE_FIREBASE_API_KEY and VITE_FIREBASE_PROJECT_ID in Cloudflare Pages and redeploy.");
-      return;
-    }
-    setVerificationSent(true);
-    setVerificationInput("");
-    setVerifiedEmail("");
+  const handleResendLink = async () => {
+    const email = authForm.email.trim().toLowerCase();
+    const password = authForm.password.trim();
+    if (!isValidEmail(email)) { showToast("Enter a valid email first."); return; }
+    if (!isSupabaseConfigured) { showToast("Email service not configured — set VITE_FIREBASE_* in Cloudflare Pages."); return; }
+    if (!password || password.length < 6) { showToast("Enter your password (6+ chars) to resend link."); return; }
+    setAuthLoading(true);
     try {
-      await authService.sendOtp(target);
-      showToast(`✓ OTP sent to ${target} — check inbox and spam (valid 5 min). In dev, check console for code.`);
-      // store pending locally without code (real code is in Firestore)
-      try {
-        const store = JSON.parse(localStorage.getItem("startify_email_verification")||"{}");
-        store[target] = { code: "firebase", at: Date.now(), verified: false };
-        localStorage.setItem("startify_email_verification", JSON.stringify(store));
-      } catch {}
-    } catch (err) {
-      const msg = err?.message || "Failed to send OTP";
-      if (msg.toLowerCase().includes("rate limit")) showToast("Rate limited — try again later.");
-      else showToast(`Failed to send OTP: ${msg}`);
-      setVerificationSent(false);
-    }
+      await authService.resendVerification(email, password);
+      showToast(`✓ Verification link resent to ${email} — check inbox & spam.`);
+    } catch (err) { showToast(err?.message || "Failed to resend link."); }
+    finally { setAuthLoading(false); }
   };
-  const verifyEmailCode = async () => {
-    const target = authForm.email.trim().toLowerCase();
-    const token = verificationInput.trim();
-    if (!verificationSent) { showToast("Click 'Send verification code' first."); return false; }
-    if (!token || token.length !== 6) { showToast("Enter the 6-digit code from your email."); return false; }
-    if (!isSupabaseConfigured) {
-      showToast("Email service not configured.");
-      return false;
-    }
+  const handleForgotPassword = async () => {
+    const email = authForm.email.trim().toLowerCase();
+    if (!isValidEmail(email)) { showToast("Enter your email above first."); return; }
+    if (!isSupabaseConfigured) { showToast("Email service not configured."); return; }
+    setAuthLoading(true);
     try {
-      const ok = await authService.verifyOtp(target, token);
-      if (!ok) { showToast("Invalid or expired OTP — check email and try again."); return false; }
-      setVerifiedEmail(target);
-      try {
-        const store = JSON.parse(localStorage.getItem("startify_email_verification")||"{}");
-        if (store[target]) { store[target].verified = true; localStorage.setItem("startify_email_verification", JSON.stringify(store)); }
-      } catch {}
-      showToast(`✓ Email verified: ${target}`);
-      return true;
-    } catch (err) {
-      showToast(err?.message || "Invalid or expired OTP.");
-      return false;
-    }
+      await authService.sendPasswordReset(email);
+      showToast(`✓ Password reset link sent to ${email} — check inbox.`);
+      setResetMode(false);
+    } catch (err) { showToast(err?.message || "Failed to send reset link."); }
+    finally { setAuthLoading(false); }
   };
 
   const showToast = (msg) => {
@@ -494,7 +467,7 @@ export default function App() {
     }
     setAuthModalOpen(false);
     setAuthForm({ name: "", email: "", password: "", studentId: "", roleTitle: "", skills: "", focus: "", bio: "" });
-    setVerificationSent(false); setVerificationInput(""); setVerifiedEmail(""); setResetMode(false);
+    setResetMode(false);
   };
 
   const handleAuthSubmit = async (e) => {
@@ -510,129 +483,125 @@ export default function App() {
       showToast("Use your University of Hyderabad email ending in @uohyd.ac.in for Founder/Builder accounts. Backers can use any email.");
       return;
     }
-    // Unified email verification: required for first-time register + for reset
-    if (resetMode) {
-      if (verifiedEmail !== email.toLowerCase()) { showToast("Please verify your email first (click Send code → Verify)."); return; }
-      // reset password flow
-      saveCredential(email, password);
+    // Firebase password+link flow
+    if (isSupabaseConfigured) {
+      setAuthLoading(true);
       try {
-        const store = JSON.parse(localStorage.getItem("startify_email_verification")||"{}");
-        delete store[email.toLowerCase()];
-        localStorage.setItem("startify_email_verification", JSON.stringify(store));
-      } catch {}
-      setResetMode(false);
-      setVerificationSent(false);
-      setVerificationInput("");
-      setVerifiedEmail("");
-      showToast(`✓ Password reset for ${email}. Please sign in with new password.`);
-      setAuthMode("signin");
-      setAuthForm({ name: "", email: email, password: "", studentId: "", roleTitle: "", skills: "", focus: "", bio: "" });
-      return;
+        if (authMode === "register") {
+          if (!authForm.name.trim()) { showToast("Please enter your full name."); return; }
+          try {
+            const profiles = JSON.parse(localStorage.getItem("startify_user_profiles") || "[]");
+            if (profiles.some(p => p.email.toLowerCase()===email.toLowerCase() && p.role===targetRole)) {
+              showToast("An account with this email and role already exists. Please Sign In.");
+              return;
+            }
+          } catch {}
+          await authService.signUp(email, password);
+          const pendingUser = {
+            id: `user_${Date.now()}`,
+            name: authForm.name.trim(),
+            email,
+            role: targetRole,
+            studentId: authForm.studentId,
+            roleTitle: authForm.roleTitle,
+            skills: authForm.skills,
+            focus: authForm.focus,
+            bio: authForm.bio
+          };
+          if ((pendingUser.role === "founder" || pendingUser.role === "talent") && !isUoHEmail(pendingUser.email)) {
+            showToast("Founder/Builder requires @uohyd.ac.in. Switch to Backer for external email.");
+            return;
+          }
+          completeRegistration(pendingUser, targetRole);
+          showToast(`✓ Verification link sent to ${email} — click it to activate, then Sign In.`);
+          setAuthMode("signin");
+          return;
+        } else {
+          // signin — verify via Firebase emailVerified
+          await authService.signIn(email, password);
+          const demoUser = DEMO_USERS.find((u) => u.email.toLowerCase() === email.toLowerCase());
+          if (demoUser) {
+            saveCredential(email, password);
+            setCurrentUser(demoUser);
+            setActiveTab("dashboard");
+            showToast(`Welcome back, ${demoUser.name}!`);
+            setAuthModalOpen(false);
+            setAuthForm({ name: "", email: "", password: "", studentId: "", roleTitle: "", skills: "", focus: "", bio: "" });
+            setResetMode(false);
+            return;
+          }
+          let existingProfile = null;
+          try {
+            const profiles = JSON.parse(localStorage.getItem("startify_user_profiles") || "[]");
+            existingProfile = profiles.find(p => p.email.toLowerCase() === email.toLowerCase() && p.role === targetRole) || profiles.find(p => p.email.toLowerCase() === email.toLowerCase()) || null;
+            if (!existingProfile) {
+              const regsLocal = JSON.parse(localStorage.getItem("startify_registrations") || "[]");
+              const r = regsLocal.find(r => r.email.toLowerCase() === email.toLowerCase());
+              if (r) existingProfile = { id: r.email, name: r.name, email: r.email, role: r.role==="builder"?"talent":r.role==="funder"?"backer":r.role, bio: "" };
+            }
+          } catch {}
+          if (existingProfile) {
+            const reuseUser = { id: existingProfile.id, name: existingProfile.name || email.split("@")[0], email: existingProfile.email, role: existingProfile.role || targetRole, bio: existingProfile.bio || "", roleTitle: existingProfile.roleTitle, skills: existingProfile.skills, focus: existingProfile.focus };
+            setCurrentUser(reuseUser);
+            setActiveTab("dashboard");
+            showToast(`Welcome back, ${reuseUser.name}!`);
+            setAuthModalOpen(false);
+            setAuthForm({ name: "", email: "", password: "", studentId: "", roleTitle: "", skills: "", focus: "", bio: "" });
+            setResetMode(false);
+            return;
+          }
+          // Firebase verified but no local profile — create one from email
+          const fbUser = { id: email, name: authForm.name || email.split("@")[0], email, role: targetRole, bio: "" };
+          setCurrentUser(fbUser);
+          setActiveTab("dashboard");
+          showToast(`Welcome, ${email}!`);
+          setAuthModalOpen(false);
+          setAuthForm({ name: "", email: "", password: "", studentId: "", roleTitle: "", skills: "", focus: "", bio: "" });
+          return;
+        }
+      } catch (err) {
+        const msg = err?.message || "Auth failed";
+        if (msg.includes("email-already-in-use")) showToast("Email already registered — please Sign In or reset password.");
+        else if (msg.includes("wrong-password") || msg.includes("invalid-credential")) showToast("Incorrect password. Use Forgot password?");
+        else if (msg.includes("verify your email")) showToast(msg);
+        else showToast(msg);
+        return;
+      } finally { setAuthLoading(false); }
     }
-    if (authMode === "register" && verifiedEmail !== email.toLowerCase()) {
-      showToast("Please verify your email first (Send code → enter 6-digit code → Verify).");
-      return;
-    }
+    // Fallback local (no Firebase)
     const creds = getCredentials();
     const hasStoredPassword = !!creds[email.toLowerCase()];
-    // Demo accounts: allow sign-in with any 6+ char password if no stored credential yet
     const demoUser = DEMO_USERS.find((u) => u.email.toLowerCase() === email.toLowerCase());
     if (authMode === "signin") {
       if (demoUser) {
-        if (hasStoredPassword && !checkCredential(email, password)) {
-          showToast("Incorrect password for this account. Use Verify Email to reset.");
-          return;
-        }
+        if (hasStoredPassword && !checkCredential(email, password)) { showToast("Incorrect password."); return; }
         if (!hasStoredPassword) saveCredential(email, password);
-        setCurrentUser(demoUser);
-        setActiveTab("dashboard");
-        showToast(`Welcome back, ${demoUser.name}!`);
-        setAuthModalOpen(false);
-        setAuthForm({ name: "", email: "", password: "", studentId: "", roleTitle: "", skills: "", focus: "", bio: "" });
-        setVerificationSent(false); setVerificationInput(""); setVerifiedEmail(""); setResetMode(false);
-        return;
+        setCurrentUser(demoUser); setActiveTab("dashboard"); showToast(`Welcome back, ${demoUser.name}!`);
+        setAuthModalOpen(false); setAuthForm({ name: "", email: "", password: "", studentId: "", roleTitle: "", skills: "", focus: "", bio: "" }); setResetMode(false); return;
       }
-      // Existing profile sign-in
       let existingProfile = null;
       try {
         const profiles = JSON.parse(localStorage.getItem("startify_user_profiles") || "[]");
         existingProfile = profiles.find(p => p.email.toLowerCase() === email.toLowerCase() && p.role === targetRole) || profiles.find(p => p.email.toLowerCase() === email.toLowerCase()) || null;
-        if (!existingProfile) {
-          const buildersLocal = JSON.parse(localStorage.getItem("startify_admin_builders") || "[]");
-          const b = buildersLocal.find(b => (b.email||"").toLowerCase() === email.toLowerCase());
-          if (b) existingProfile = { id: b.id, name: b.name, email: b.email, role: targetRole, roleTitle: b.roleTitle || b.role, skills: b.skills, bio: b.bio || "" };
-        }
-        if (!existingProfile) {
-          const regsLocal = JSON.parse(localStorage.getItem("startify_registrations") || "[]");
-          const r = regsLocal.find(r => r.email.toLowerCase() === email.toLowerCase());
-          if (r) existingProfile = { id: r.email, name: r.name, email: r.email, role: r.role==="builder"?"talent":r.role==="funder"?"backer":r.role, bio: "" };
-        }
-        if (!existingProfile && email.toLowerCase().endsWith("@uohyd.ac.in") && email.toLowerCase().startsWith("user_")) {
-          const fakeId = email.split("@")[0];
-          const buildersLocal2 = JSON.parse(localStorage.getItem("startify_admin_builders") || "[]");
-          const b2 = buildersLocal2.find(b => b.id === fakeId);
-          if (b2) existingProfile = { id: b2.id, name: b2.name, email: b2.email || email, role: targetRole, roleTitle: b2.roleTitle || b2.role, skills: b2.skills, bio: b2.bio || "" };
-        }
       } catch {}
       if (existingProfile) {
-        if (hasStoredPassword && !checkCredential(email, password)) {
-          showToast("Incorrect password. Click 'Forgot password? Verify Email to reset' below.");
-          return;
-        }
+        if (hasStoredPassword && !checkCredential(email, password)) { showToast("Incorrect password. Click Forgot password?"); return; }
         if (!hasStoredPassword) saveCredential(email, password);
-        const reuseUser = {
-          id: existingProfile.id,
-          name: existingProfile.name || authForm.name || email.split("@")[0],
-          email: existingProfile.email,
-          role: existingProfile.role || targetRole,
-          studentId: existingProfile.studentId || authForm.studentId,
-          bio: existingProfile.bio || authForm.bio || "",
-          roleTitle: existingProfile.roleTitle || authForm.roleTitle,
-          skills: existingProfile.skills || authForm.skills,
-          focus: existingProfile.focus || authForm.focus,
-        };
-        setCurrentUser(reuseUser);
-        setActiveTab("dashboard");
-        showToast(`Welcome back, ${reuseUser.name}!`);
-        setAuthModalOpen(false);
-        setAuthForm({ name: "", email: "", password: "", studentId: "", roleTitle: "", skills: "", focus: "", bio: "" });
-        setVerificationSent(false); setVerificationInput(""); setVerifiedEmail(""); setResetMode(false);
-        return;
+        const reuseUser = { id: existingProfile.id, name: existingProfile.name || email.split("@")[0], email: existingProfile.email, role: existingProfile.role || targetRole, bio: existingProfile.bio || "" };
+        setCurrentUser(reuseUser); setActiveTab("dashboard"); showToast(`Welcome back, ${reuseUser.name}!`);
+        setAuthModalOpen(false); setAuthForm({ name: "", email: "", password: "", studentId: "", roleTitle: "", skills: "", focus: "", bio: "" }); setResetMode(false); return;
       }
-      // No existing account — prompt to create
-      showToast("No account found for this email. Switch to Create Account.");
-      return;
+      showToast("No account found for this email. Switch to Create Account."); return;
     }
-    // Register mode
     if (authMode === "register") {
       if (!authForm.name.trim()) { showToast("Please enter your full name."); return; }
-      // prevent duplicate same email+role
       try {
         const profiles = JSON.parse(localStorage.getItem("startify_user_profiles") || "[]");
-        if (profiles.some(p => p.email.toLowerCase()===email.toLowerCase() && p.role===targetRole)) {
-          showToast("An account with this email and role already exists. Please Sign In.");
-          return;
-        }
+        if (profiles.some(p => p.email.toLowerCase()===email.toLowerCase() && p.role===targetRole)) { showToast("An account with this email and role already exists. Please Sign In."); return; }
       } catch {}
-      if (hasStoredPassword && !checkCredential(email, password)) {
-        showToast("An account with this email already uses a different password. Use that password to Sign In, or use a different email.");
-        return;
-      }
-      const pendingUser = {
-        id: `user_${Date.now()}`,
-        name: authForm.name.trim(),
-        email,
-        role: targetRole,
-        studentId: authForm.studentId,
-        roleTitle: authForm.roleTitle,
-        skills: authForm.skills,
-        focus: authForm.focus,
-        bio: authForm.bio
-      };
-      if ((pendingUser.role === "founder" || pendingUser.role === "talent") && !isUoHEmail(pendingUser.email)) {
-        showToast("Founder/Builder requires @uohyd.ac.in. Switch to Backer for external email.");
-        return;
-      }
+      if (hasStoredPassword && !checkCredential(email, password)) { showToast("An account with this email already uses a different password."); return; }
+      const pendingUser = { id: `user_${Date.now()}`, name: authForm.name.trim(), email, role: targetRole, studentId: authForm.studentId, roleTitle: authForm.roleTitle, skills: authForm.skills, focus: authForm.focus, bio: authForm.bio };
+      if ((pendingUser.role === "founder" || pendingUser.role === "talent") && !isUoHEmail(pendingUser.email)) { showToast("Founder/Builder requires @uohyd.ac.in."); return; }
       completeRegistration(pendingUser, targetRole);
     }
   };
@@ -2263,24 +2232,20 @@ export default function App() {
                 </p>
               </div>
 
-              {/* Single unified Verify Email button — for first-time creation + password reset */}
+              {/* Password + link info — no OTP */}
               <div className="rounded-2xl border border-slate-200 bg-slate-50 p-3">
-                <div className="flex items-center justify-between gap-2">
-                  <div className="text-[11px] font-bold text-slate-700">Email verification *</div>
-                  {verifiedEmail === authForm.email.trim().toLowerCase() && verifiedEmail ? <span className="text-[11px] px-2 py-1 rounded-full bg-emerald-500 text-white font-bold">✓ Verified</span> : <span className="text-[11px] text-slate-500">{authMode==="register" ? "Required for new account" : "Use for password reset"}</span>}
-                </div>
-                <p className="text-[11px] text-slate-500 mt-1">One button for both: new accounts & forgot password. Real OTP via Firebase email — check inbox & spam (valid 5 min, also logged to console in dev).{!isSupabaseConfigured && " — configure VITE_FIREBASE_API_KEY / PROJECT_ID."}</p>
-                <div className="mt-2 flex gap-2">
-                  <button type="button" onClick={()=> sendVerificationCode(authForm.email)} className="h-9 px-4 rounded-full bg-white border border-slate-200 text-xs font-bold text-slate-700 hover:bg-slate-900 hover:text-white transition shrink-0">
-                    {verificationSent ? "Resend code" : "Send verification code"}
-                  </button>
-                  {verificationSent && verifiedEmail !== authForm.email.trim().toLowerCase() && (
-                    <div className="flex gap-2 flex-1">
-                      <input value={verificationInput} onChange={(e)=> setVerificationInput(e.target.value.replace(/\D/g,"").slice(0,6))} placeholder="6-digit code" inputMode="numeric" className="flex-1 h-9 rounded-full bg-white border border-slate-200 px-3 text-xs text-center tracking-widest font-bold outline-none focus:border-slate-900" />
-                      <button type="button" onClick={verifyEmailCode} className="h-9 px-4 rounded-full bg-slate-900 text-white text-xs font-bold hover:bg-black shrink-0">Verify</button>
-                    </div>
-                  )}
-                </div>
+                <div className="text-[11px] font-bold text-slate-700">Email verification via link</div>
+                <p className="text-[11px] text-slate-500 mt-1">Create account → we send a verification link to your email (check inbox & spam). Click the link to activate, then Sign In. No OTP needed.{!isSupabaseConfigured && " — configure VITE_FIREBASE_*."}</p>
+                {authMode === "signin" && (
+                  <div className="mt-2 flex flex-wrap gap-2">
+                    <button type="button" onClick={handleResendLink} disabled={authLoading} className="h-8 px-3 rounded-full bg-white border border-slate-200 text-[11px] font-bold text-slate-700 hover:bg-slate-900 hover:text-white transition disabled:opacity-50">
+                      {authLoading ? "..." : "Resend verification link"}
+                    </button>
+                    <button type="button" onClick={handleForgotPassword} disabled={authLoading} className="h-8 px-3 rounded-full bg-white border border-slate-200 text-[11px] font-bold text-slate-700 hover:bg-slate-50 disabled:opacity-50">
+                      Forgot password?
+                    </button>
+                  </div>
+                )}
               </div>
 
               <div>
@@ -2300,24 +2265,17 @@ export default function App() {
                     {showPassword ? "Hide" : "Show"}
                   </button>
                 </div>
-                {authMode==="signin" && !resetMode && (
-                  <button type="button" onClick={async ()=>{
-                    if(!isValidEmail(authForm.email)){ showToast("Enter your email above first."); return; }
-                    setResetMode(true);
-                    setAuthForm({...authForm, password:""});
-                    await sendVerificationCode(authForm.email);
-                  }} className="mt-1.5 text-[11px] text-indigo-600 hover:underline font-semibold">Forgot password? Verify Email to reset →</button>
-                )}
-                {resetMode && (
-                  <button type="button" onClick={()=> { setResetMode(false); setVerificationSent(false); setVerifiedEmail(""); setVerificationInput(""); }} className="mt-1.5 text-[11px] text-slate-500 hover:underline">Cancel reset — back to sign in</button>
+                {authMode==="signin" && (
+                  <button type="button" onClick={handleForgotPassword} className="mt-1.5 text-[11px] text-indigo-600 hover:underline font-semibold">Forgot password? Send reset link →</button>
                 )}
               </div>
 
               <button
                 type="submit"
-                className="w-full h-12 rounded-full bg-slate-900 text-white font-bold text-[14px] hover:bg-black transition shadow-md"
+                disabled={authLoading}
+                className="w-full h-12 rounded-full bg-slate-900 text-white font-bold text-[14px] hover:bg-black transition shadow-md disabled:opacity-50"
               >
-                {resetMode ? "Verify & Reset Password →" : authMode === "signin" ? "Sign In & Continue →" : `Create ${selectedRegisterRole.toUpperCase()} Account →`}
+                {authLoading ? "Please wait..." : authMode === "signin" ? "Sign In & Continue →" : `Create ${selectedRegisterRole.toUpperCase()} Account →`}
               </button>
               <div className="rounded-2xl border border-slate-200 bg-slate-50 p-3 flex items-start gap-2.5">
                 <span className="h-6 w-6 rounded-full bg-emerald-500 text-white grid place-items-center text-[11px] shrink-0">✓</span>

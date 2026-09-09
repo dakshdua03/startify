@@ -1,88 +1,79 @@
-# OTP Authentication — Production Integration Guide
+# Auth — Password + Email Link (Firebase)
 
-Current implementation (`src/lib/firebase.js:20-60` + `src/App.jsx:369`) uses **Firebase Firestore + Auth** with local fallback for `npm run dev`:
+Current implementation (`src/lib/firebase.js` + `src/App.jsx:369`) uses **Firebase Auth Email/Password + Email Verification Link**. No OTP.
 
 ```js
 import { authService } from "./lib/firebase"
-await authService.sendOtp(email) // generates 6-digit, stores in Firestore `email_otps` + tries Firebase email link
-await authService.verifyOtp(email, token) // checks Firestore, 5-min TTL
+await authService.signUp(email, password) // createUser + sendEmailVerification (link)
+await authService.signIn(email, password) // signIn, requires emailVerified
+await authService.resendVerification(email, password)
+await authService.sendPasswordReset(email)
 ```
 
-- Code is generated client+cloud, stored in Firestore `email_otps/{email}` with `expiresAt` (5 min), and mirrored to `localStorage` for dev.
-- In dev with no Firebase keys, code is logged to console and stored locally.
-- **Do not rely on localStorage alone in prod** — set Firebase env vars.
+- On register: account created in Firebase Auth + verification link sent from `startifyuoh@gmail.com` (if you enabled SMTP settings) or `noreply@startify-01.firebaseapp.com` by default. Must click link before Sign In works.
+- In dev with no Firebase keys, falls back to localStorage credential (no email).
 
 ---
 
-## Production Setup — Firebase (Option A, active)
+## Production Setup — Firebase (active)
 
-### 1. Create Firebase Project
-1. Go to https://console.firebase.google.com → Add project `startify-daksh`
-2. Enable **Firestore Database** (start in test mode, then add rules below)
-3. Enable **Authentication → Sign-in method → Email/Password + Email link** (optional for real email sending)
-4. Add Web App → copy config.
-
-### 2. Add Env Vars (local + Cloudflare Pages)
-
-Local `.env`:
-```
-VITE_FIREBASE_API_KEY=AIzaSy...
-VITE_FIREBASE_AUTH_DOMAIN=startify-daksh.firebaseapp.com
-VITE_FIREBASE_PROJECT_ID=startify-daksh
-VITE_FIREBASE_STORAGE_BUCKET=startify-daksh.appspot.com
-VITE_FIREBASE_MESSAGING_SENDER_ID=123...
-VITE_FIREBASE_APP_ID=1:123:web:abc...
-```
-
-Cloudflare Pages → Settings → Environment variables → add same `VITE_FIREBASE_*` + redeploy.
-
-### 3. Firestore Rules (for `email_otps`, `ideas`, `registrations`, `payments`)
+### 1. Firebase Console
+1. `Build → Authentication → Sign-in method → Email/Password → Enable`
+2. `Build → Authentication → Templates → Email address verification` → customize sender / subject.
+3. `Build → Authentication → Settings → Authorized domains` → add `localhost`, `startify2.pages.dev`, `startify-daksh-accelerator.pages.dev`
+4. `Build → Firestore Database → Rules` (for ideas/registrations/payments):
 ```js
 rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
-    match /email_otps/{email} { allow read, write: if true; } // lock down with request.auth in prod if needed
     match /ideas/{doc} { allow read: if true; allow write: if true; }
     match /registrations/{doc} { allow read, write: if true; }
     match /payments/{doc} { allow read, write: if true; }
   }
 }
 ```
-For tight security, add: `allow write: if request.time < resource.data.expiresAt` and auth checks.
 
-### 4. How OTP Works
-- `sendOtp(email)`: creates `email_otps/{lowerEmail}` with `{code, expiresAt: now+5min}`. Also calls `sendSignInLinkToEmail` if Auth configured (real email). Logs code to console for dev.
-- `verifyOtp(email, token)`: reads doc, checks `code === token && now < expiresAt`, marks `verified:true`.
-- `src/App.jsx` wraps this with `isFirebaseConfigured` gate and toast.
+### 2. Env Vars (local + Cloudflare Pages)
 
-Pros: No Supabase CORS, pay-as-you-go free tier (1GB, 50k reads/day), commercial allowed. Firestore auto-scales for 5000 UoH students.
-
----
-
-## Option B — Cloudflare Pages Function + Email (SendGrid / Resend) — custom 6-digit code
-
-1. Create API route `functions/api/otp.js`:
-```js
-export async function onRequestPost({ request, env }) {
-  const { email } = await request.json()
-  const code = Math.floor(100000 + Math.random()*900000).toString()
-  await env.OTP_KV.put(email.toLowerCase(), code, { expirationTtl: 300 })
-  await fetch("https://api.sendgrid.com/v3/mail/send", {
-    method: "POST",
-    headers: { Authorization: `Bearer ${env.SENDGRID_API_KEY}`, "Content-Type": "application/json" },
-    body: JSON.stringify({ personalizations: [{ to: [{ email }] }], from: { email: "noreply@startify.in" }, subject: `OTP ${code}`, content: [{ type: "text/plain", value: `Code ${code} valid 5 min` }] })
-  })
-  return new Response(JSON.stringify({ ok: true }), { headers: { "Content-Type": "application/json" } })
-}
+Local `.env`:
 ```
+VITE_FIREBASE_API_KEY=AIzaSy...
+VITE_FIREBASE_AUTH_DOMAIN=startify-01.firebaseapp.com
+VITE_FIREBASE_PROJECT_ID=startify-01
+VITE_FIREBASE_STORAGE_BUCKET=startify-01.firebasestorage.app
+VITE_FIREBASE_MESSAGING_SENDER_ID=451...
+VITE_FIREBASE_APP_ID=1:451...
+```
+
+Cloudflare Pages → Settings → Environment variables → add same `VITE_FIREBASE_*` + redeploy.
+
+### 3. Custom SMTP (optional — fixes Sender name not provided)
+
+`Authentication → Settings → SMTP settings → Enable`:
+```
+Sender: startifyuoh@gmail.com
+Host: smtp.gmail.com
+Port: 587
+Username: startifyuoh@gmail.com
+Password: Gmail App Password (myaccount.google.com → App passwords, 16 chars)
+Security: STARTTLS
+```
+→ Save → future verification / password reset emails come from your Gmail.
+
+### 4. How flow works
+- `signUp`: `createUserWithEmailAndPassword` → `sendEmailVerification` (link `https://startify-01.firebaseapp.com/__/auth/action?mode=verifyEmail&oobCode=...`)
+- User clicks link → Firebase marks `emailVerified=true` → can now `signIn`
+- `signIn`: checks `user.emailVerified`, else throws `Please verify your email first — click link`
+- `resendVerification` / `sendPasswordReset` use same SMTP.
+
+Pros: No OTP code to manage, no console leak, Firestore only for DB (no `email_otps` collection needed). Scales free for 5000 UoH students.
 
 ---
 
 ## Checklist to go live
-- [ ] Set `VITE_FIREBASE_*` in Cloudflare Pages and redeploy (no Supabase vars needed)
-- [ ] Create Firestore collections: `ideas`, `registrations`, `payments`, `email_otps` (auto-created on first write)
-- [ ] Test: blocked non-UoH Founder (`@uohyd.ac.in` gate in `handleAuthSubmit`), allowed Backer any email, OTP expiry, resend
-- [ ] Add rate limiting (Firestore `email_otps` doc has `createdAt`, reject if <60s since last)
-- [ ] Remove console.log OTP in `src/lib/firebase.js:47` for prod (or keep for support)
+- [ ] Set `VITE_FIREBASE_*` in Cloudflare Pages and redeploy
+- [ ] Add all `*.pages.dev` domains to Authorized domains
+- [ ] Test: @uohyd.ac.in gate for Founder/Builder, Backer any email, link expiry (3 days), resend link, forgot password
+- [ ] Configure SMTP so sender shows `Startify` / `startifyuoh@gmail.com`
 
-Legacy Supabase file kept as `src/lib/supabase.js` (unused) — safe to delete after verifying Firestore works. Active import is `src/lib/firebase.js` via `src/App.jsx:3`.
+Legacy Supabase file kept as `src/lib/supabase.js` (unused) — safe to delete. Active import is `src/lib/firebase.js` via `src/App.jsx:3`.
