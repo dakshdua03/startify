@@ -2221,7 +2221,7 @@ export default function App() {
                   required
                   type="email"
                   value={authForm.email}
-                  onChange={(e) => { setAuthForm({ ...authForm, email: e.target.value }); setVerificationSent(false); setVerifiedEmail(""); }}
+                  onChange={(e) => setAuthForm({ ...authForm, email: e.target.value })}
                   placeholder={selectedRegisterRole === "backer" ? "name@company.com (any domain)" : "name@uohyd.ac.in"}
                   className="w-full h-11 rounded-full bg-slate-50 border border-slate-200 px-4 text-[13px] text-slate-800 outline-none focus:border-indigo-300 focus:ring-2 focus:ring-indigo-100"
                 />
