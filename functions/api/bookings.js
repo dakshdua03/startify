@@ -18,8 +18,8 @@ export async function onRequestPost(context) {
     //   await context.env.BOOKINGS_KV.put(id, JSON.stringify({ ...body, at: new Date().toISOString() }));
     // }
 
-    // For now, just log and return success - frontend already saves to localStorage
-    // In future, insert to Supabase here
+    // For now, just log and return success - frontend saves to Firestore + localStorage
+    // In future, insert to Firestore via Firebase Admin SDK here
 
     return new Response(JSON.stringify({ 
       success: true, 
@@ -39,6 +39,6 @@ export async function onRequestGet(context) {
   // GET /api/bookings - list bookings (admin only - add auth check)
   return new Response(JSON.stringify({ 
     message: "Use POST to create booking. GET is admin only.",
-    hint: "Add Supabase integration for real persistence"
+    hint: "Firestore handles persistence via src/lib/firebase.js"
   }), { headers: { "Content-Type": "application/json" } });
 }

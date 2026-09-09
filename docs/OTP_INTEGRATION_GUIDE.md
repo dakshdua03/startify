@@ -1,122 +1,88 @@
 # OTP Authentication — Production Integration Guide
 
-Current implementation (`src/App.jsx:350-367`) is **mock** for local testing:
+Current implementation (`src/lib/firebase.js:20-60` + `src/App.jsx:369`) uses **Firebase Firestore + Auth** with local fallback for `npm run dev`:
 
 ```js
-const generateOtp = () => Math.floor(100000 + Math.random() * 900000).toString();
-const sendOtp = (email, role) => {
-  const code = generateOtp();
-  setOtpCode(code);
-  setOtpModalOpen(true);
-  showToast(`OTP for ${email}: ${code} (demo)`);
-  localStorage.setItem("startify_otp_map", ...);
-};
-const verifyOtp = (input, expected) => input.trim() === expected.trim();
+import { authService } from "./lib/firebase"
+await authService.sendOtp(email) // generates 6-digit, stores in Firestore `email_otps` + tries Firebase email link
+await authService.verifyOtp(email, token) // checks Firestore, 5-min TTL
 ```
 
-- Code is generated client-side, shown in toast, stored in `localStorage`.
-- **DO NOT use in production** — anyone can read `localStorage` or toast.
+- Code is generated client+cloud, stored in Firestore `email_otps/{email}` with `expiresAt` (5 min), and mirrored to `localStorage` for dev.
+- In dev with no Firebase keys, code is logged to console and stored locally.
+- **Do not rely on localStorage alone in prod** — set Firebase env vars.
 
 ---
 
-## Production Options (pick one)
+## Production Setup — Firebase (Option A, active)
 
-### Option A — Supabase Auth (recommended if you already use Supabase)
-Supabase handles OTP via email magic link or `signInWithOtp`.
+### 1. Create Firebase Project
+1. Go to https://console.firebase.google.com → Add project `startify-daksh`
+2. Enable **Firestore Database** (start in test mode, then add rules below)
+3. Enable **Authentication → Sign-in method → Email/Password + Email link** (optional for real email sending)
+4. Add Web App → copy config.
 
-1. Enable Email OTP: Dashboard → **Authentication → Providers → Email → Enable Confirm email / Enable Magic Link**
-2. In `src/lib/supabase.js`, replace mock with:
+### 2. Add Env Vars (local + Cloudflare Pages)
 
-```js
-import { createClient } from '@supabase/supabase-js'
-const supabase = createClient(import.meta.env.VITE_SUPABASE_URL, import.meta.env.VITE_SUPABASE_ANON_KEY)
-
-export const sendOtp = async (email) => {
-  const { error } = await supabase.auth.signInWithOtp({ email, options: { shouldCreateUser: false } })
-  if (error) throw error
-  showToast(`OTP sent to ${email} — check inbox`)
-}
-export const verifyOtp = async (email, token) => {
-  const { data, error } = await supabase.auth.verifyOtp({ email, token, type: 'email' })
-  return !error && !!data.session
-}
+Local `.env`:
+```
+VITE_FIREBASE_API_KEY=AIzaSy...
+VITE_FIREBASE_AUTH_DOMAIN=startify-daksh.firebaseapp.com
+VITE_FIREBASE_PROJECT_ID=startify-daksh
+VITE_FIREBASE_STORAGE_BUCKET=startify-daksh.appspot.com
+VITE_FIREBASE_MESSAGING_SENDER_ID=123...
+VITE_FIREBASE_APP_ID=1:123:web:abc...
 ```
 
-Pros: No SMS cost, built-in rate limiting, no server code. For SMS, use `signInWithOtp({ phone })`.
+Cloudflare Pages → Settings → Environment variables → add same `VITE_FIREBASE_*` + redeploy.
 
-### Option B — Cloudflare Pages Function + Email (SendGrid / Resend) — custom 6-digit code
+### 3. Firestore Rules (for `email_otps`, `ideas`, `registrations`, `payments`)
+```js
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    match /email_otps/{email} { allow read, write: if true; } // lock down with request.auth in prod if needed
+    match /ideas/{doc} { allow read: if true; allow write: if true; }
+    match /registrations/{doc} { allow read, write: if true; }
+    match /payments/{doc} { allow read, write: if true; }
+  }
+}
+```
+For tight security, add: `allow write: if request.time < resource.data.expiresAt` and auth checks.
+
+### 4. How OTP Works
+- `sendOtp(email)`: creates `email_otps/{lowerEmail}` with `{code, expiresAt: now+5min}`. Also calls `sendSignInLinkToEmail` if Auth configured (real email). Logs code to console for dev.
+- `verifyOtp(email, token)`: reads doc, checks `code === token && now < expiresAt`, marks `verified:true`.
+- `src/App.jsx` wraps this with `isFirebaseConfigured` gate and toast.
+
+Pros: No Supabase CORS, pay-as-you-go free tier (1GB, 50k reads/day), commercial allowed. Firestore auto-scales for 5000 UoH students.
+
+---
+
+## Option B — Cloudflare Pages Function + Email (SendGrid / Resend) — custom 6-digit code
 
 1. Create API route `functions/api/otp.js`:
-
 ```js
 export async function onRequestPost({ request, env }) {
-  const { email, role } = await request.json()
+  const { email } = await request.json()
   const code = Math.floor(100000 + Math.random()*900000).toString()
-  // Store in KV/DO with TTL 5 min: await env.OTP_KV.put(email.toLowerCase(), code, { expirationTtl: 300 })
-  // Fallback: use env variable store (not recommended) or D1
-  // Send via SendGrid:
+  await env.OTP_KV.put(email.toLowerCase(), code, { expirationTtl: 300 })
   await fetch("https://api.sendgrid.com/v3/mail/send", {
     method: "POST",
     headers: { Authorization: `Bearer ${env.SENDGRID_API_KEY}`, "Content-Type": "application/json" },
-    body: JSON.stringify({
-      personalizations: [{ to: [{ email }] }],
-      from: { email: "noreply@startify.in" },
-      subject: `Your Startify OTP is ${code}`,
-      content: [{ type: "text/plain", value: `Your OTP is ${code}. Valid 5 min.` }]
-    })
+    body: JSON.stringify({ personalizations: [{ to: [{ email }] }], from: { email: "noreply@startify.in" }, subject: `OTP ${code}`, content: [{ type: "text/plain", value: `Code ${code} valid 5 min` }] })
   })
   return new Response(JSON.stringify({ ok: true }), { headers: { "Content-Type": "application/json" } })
 }
 ```
 
-2. Frontend `sendOtp` becomes:
-
-```js
-const sendOtp = async (email, role) => {
-  const res = await fetch("/api/otp", { method: "POST", body: JSON.stringify({ email, role }) })
-  if (!res.ok) throw new Error("send failed")
-  setOtpModalOpen(true)
-}
-const verifyOtp = async (email, token) => {
-  const res = await fetch("/api/otp-verify", { method: "POST", body: JSON.stringify({ email, token }) })
-  const { valid } = await res.json()
-  return valid
-}
-```
-
-Add `functions/api/otp-verify.js` that checks KV/D1 and deletes on success.
-
-### Option C — SMS (India) — MSG91 / Twilio for @uohyd.ac.in + phone
-
-If you collect phone, use MSG91 (cheap India OTP) or Twilio.
-
-**MSG91:**
-
-```js
-await fetch(`https://control.msg91.com/api/v5/otp?mobile=${phone}&otp=${code}&template_id=${env.MSG91_TEMPLATE_ID}`, {
-  headers: { authkey: env.MSG91_AUTHKEY }
-})
-```
-
-**Twilio Verify:**
-
-```js
-import twilio from 'twilio'
-const client = twilio(env.TWILIO_SID, env.TWILIO_AUTH)
-await client.verify.v2.services(env.TWILIO_SERVICE_SID).verifications.create({ to: `+91${phone}`, channel: 'sms' })
-// verify: client.verify.v2.services(...).verificationChecks.create({ to, code })
-```
-
 ---
 
 ## Checklist to go live
+- [ ] Set `VITE_FIREBASE_*` in Cloudflare Pages and redeploy (no Supabase vars needed)
+- [ ] Create Firestore collections: `ideas`, `registrations`, `payments`, `email_otps` (auto-created on first write)
+- [ ] Test: blocked non-UoH Founder (`@uohyd.ac.in` gate in `handleAuthSubmit`), allowed Backer any email, OTP expiry, resend
+- [ ] Add rate limiting (Firestore `email_otps` doc has `createdAt`, reject if <60s since last)
+- [ ] Remove console.log OTP in `src/lib/firebase.js:47` for prod (or keep for support)
 
-- [ ] Remove `showToast(code)` and `localStorage.setItem("startify_otp_map")` from `sendOtp`
-- [ ] Add rate limiting (e.g., 3 OTPs / 10 min per email, Cloudflare KV counter)
-- [ ] Store code server-side with 5-min TTL, hash it, delete after verify
-- [ ] Add env vars in Cloudflare Pages → Settings → Variables: `SENDGRID_API_KEY` / `SUPABASE_URL` / `MSG91_AUTHKEY`
-- [ ] Keep `@uohyd.ac.in` gate for Founder/Builder (`isUoHEmail` in `handleAuthSubmit`)
-- [ ] Test: blocked non-UoH Founder, allowed Backer any email, OTP expiry, resend
-
-Current mock is kept for `npm run dev` without keys. Set `VITE_USE_MOCK_OTP=false` to force real flow.
-
+Legacy Supabase file kept as `src/lib/supabase.js` (unused) — safe to delete after verifying Firestore works. Active import is `src/lib/firebase.js` via `src/App.jsx:3`.

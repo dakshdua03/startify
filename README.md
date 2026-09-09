@@ -107,8 +107,12 @@ Enjoy!
 4. Env vars (Add in Cloudflare Pages → Settings → Environment variables):
    ```
    VITE_RAZORPAY_KEY_ID=rzp_test_xxxx
-   VITE_SUPABASE_URL=https://xxxx.supabase.co
-   VITE_SUPABASE_ANON_KEY=xxxx
+   VITE_FIREBASE_API_KEY=AIzaSy...
+   VITE_FIREBASE_AUTH_DOMAIN=your-project.firebaseapp.com
+   VITE_FIREBASE_PROJECT_ID=your-project
+   VITE_FIREBASE_STORAGE_BUCKET=your-project.appspot.com
+   VITE_FIREBASE_MESSAGING_SENDER_ID=123...
+   VITE_FIREBASE_APP_ID=1:123:web:abc...
    ```
 
 5. Click Save and Deploy → Live at `startify-daksh-accelerator.pages.dev`

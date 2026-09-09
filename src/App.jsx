@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import logoImg from "./assets/startify-wordmark-full.png";
-import { dbService, isSupabaseConfigured, authService } from "./lib/supabase";
+import { dbService, isFirebaseConfigured as isSupabaseConfigured, authService } from "./lib/firebase";
 
 /* ==========================================================================
    PRE-CREATED TEST ACCOUNTS & DEMO DATA FOR EASY TESTING
@@ -364,13 +364,13 @@ export default function App() {
     return map[email.toLowerCase()] === password;
   };
 
-  // --- Unified email verification (real Supabase OTP — one button for first-time + reset) ---
+  // --- Unified email verification (Firebase OTP — one button for first-time + reset) ---
   const isValidEmail = (email) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim());
   const sendVerificationCode = async (email) => {
     const target = email.trim().toLowerCase();
     if (!isValidEmail(target)) { showToast("Enter a valid email first."); return; }
     if (!isSupabaseConfigured) {
-      showToast("Email service not configured — set VITE_SUPABASE_URL and VITE_SUPABASE_ANON_KEY in Cloudflare Pages and redeploy.");
+      showToast("Email service not configured — set VITE_FIREBASE_API_KEY and VITE_FIREBASE_PROJECT_ID in Cloudflare Pages and redeploy.");
       return;
     }
     setVerificationSent(true);
@@ -378,16 +378,16 @@ export default function App() {
     setVerifiedEmail("");
     try {
       await authService.sendOtp(target);
-      showToast(`✓ OTP sent to ${target} — check inbox and spam (valid 5 min).`);
-      // store pending locally without code (real code is in email only)
+      showToast(`✓ OTP sent to ${target} — check inbox and spam (valid 5 min). In dev, check console for code.`);
+      // store pending locally without code (real code is in Firestore)
       try {
         const store = JSON.parse(localStorage.getItem("startify_email_verification")||"{}");
-        store[target] = { code: "supabase", at: Date.now(), verified: false };
+        store[target] = { code: "firebase", at: Date.now(), verified: false };
         localStorage.setItem("startify_email_verification", JSON.stringify(store));
       } catch {}
     } catch (err) {
       const msg = err?.message || "Failed to send OTP";
-      if (msg.toLowerCase().includes("rate limit")) showToast("Rate limited — Supabase allows 3-4 OTPs/hr. Try again later.");
+      if (msg.toLowerCase().includes("rate limit")) showToast("Rate limited — try again later.");
       else showToast(`Failed to send OTP: ${msg}`);
       setVerificationSent(false);
     }
@@ -2269,7 +2269,7 @@ export default function App() {
                   <div className="text-[11px] font-bold text-slate-700">Email verification *</div>
                   {verifiedEmail === authForm.email.trim().toLowerCase() && verifiedEmail ? <span className="text-[11px] px-2 py-1 rounded-full bg-emerald-500 text-white font-bold">✓ Verified</span> : <span className="text-[11px] text-slate-500">{authMode==="register" ? "Required for new account" : "Use for password reset"}</span>}
                 </div>
-                <p className="text-[11px] text-slate-500 mt-1">One button for both: new accounts & forgot password. Real OTP via Supabase email — check inbox & spam (valid 5 min).{!isSupabaseConfigured && " — configure VITE_SUPABASE_URL/ANON_KEY."}</p>
+                <p className="text-[11px] text-slate-500 mt-1">One button for both: new accounts & forgot password. Real OTP via Firebase email — check inbox & spam (valid 5 min, also logged to console in dev).{!isSupabaseConfigured && " — configure VITE_FIREBASE_API_KEY / PROJECT_ID."}</p>
                 <div className="mt-2 flex gap-2">
                   <button type="button" onClick={()=> sendVerificationCode(authForm.email)} className="h-9 px-4 rounded-full bg-white border border-slate-200 text-xs font-bold text-slate-700 hover:bg-slate-900 hover:text-white transition shrink-0">
                     {verificationSent ? "Resend code" : "Send verification code"}
