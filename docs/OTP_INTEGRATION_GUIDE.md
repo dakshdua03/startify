@@ -19,7 +19,20 @@ await authService.sendPasswordReset(email)
 
 ### 1. Firebase Console
 1. `Build → Authentication → Sign-in method → Email/Password → Enable`
-2. `Build → Authentication → Templates → Email address verification` → customize sender / subject.
+2. `Build → Authentication → Templates → Email address verification` → Edit (pencil) → set Subject `Verify your email for Startify — you’re almost in` and Body:
+   ```
+   Hello %DISPLAY_NAME%,
+
+   Thanks for joining Startify — UoH’s startup hub. Please verify your email:
+   %LINK%
+
+   Expires in 3 days. If you didn’t create an account, ignore this email.
+
+   Thanks,
+   Startify Team
+   https://startify2.pages.dev
+   ```
+   Keep `%LINK%` (required). Set `Authentication → Settings → General → Public-facing name: Startify` so `%APP_NAME%` → Startify.
 3. `Build → Authentication → Settings → Authorized domains` → add `localhost`, `startify2.pages.dev`, `startify-daksh-accelerator.pages.dev`
 4. `Build → Firestore Database → Rules` (for ideas/registrations/payments):
 ```js
