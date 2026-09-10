@@ -141,7 +141,12 @@ function deleteFunderById(id){
 }
 
 function getAllData(){
-  const ideas = [...load(LS_KEYS.ideas, []), ...SEED_IDEAS];
+  // Deduplicate ideas by id — stored overrides seed (prevents replication on approve)
+  const storedIdeas = load(LS_KEYS.ideas, []);
+  const ideaMap = new Map();
+  SEED_IDEAS.forEach(i=> ideaMap.set(i.id, i));
+  storedIdeas.forEach(i=> ideaMap.set(i.id, i));
+  const ideas = Array.from(ideaMap.values());
   const regs = load(LS_KEYS.regs, null) || [
     {name:"Rahul Sharma", email:"rahul@uohyd.ac.in", role:"founder", registeredAt:"2026-08-23"},
     {name:"Aditi Rao", email:"aditi@uohyd.ac.in", role:"builder", registeredAt:"2026-08-22"},
@@ -155,10 +160,12 @@ function getAllData(){
   const pendingBackers = load(LS_KEYS.pendingBackers, []);
   const credentials = load(LS_KEYS.credentials, {});
   const profiles = load(LS_KEYS.profiles, []);
-  const allUsers = [...DEMO_USERS.map(u=>({...u, source:"demo"})), ...regs.map(r=>({id:r.email, name:r.name, email:r.email, role: r.role==="builder"?"talent":r.role==="funder"?"backer":r.role, createdAt:r.registeredAt, source:"registration"})), ...builders.map(b=>({id:b.id, name:b.name, email:b.email||b.id+"@uohyd.ac.in", role:"talent", source:"builder"})), ...funders.map(f=>({id:f.id, name:f.name, email:f.email||f.id+"@startify.net", role:"backer", source:"funder"})), ...pendingBackers.map(p=>({id:p.id, name:p.name, email:p.email, role:"backer", createdAt:p.createdAt, pending:true, source:"pending"}))];
-  // de-dupe by email
+  // Include profiles (normal site registrations via password+link) so admin sees all accounts
+  const allUsers = [...DEMO_USERS.map(u=>({...u, source:"demo"})), ...regs.map(r=>({id:r.email, name:r.name, email:r.email, role: r.role==="builder"?"talent":r.role==="funder"?"backer":r.role, createdAt:r.registeredAt, source:"registration"})), ...profiles.map(p=>({id:p.id, name:p.name, email:p.email, role:p.role, createdAt:p.createdAt, source:"profile"})), ...builders.map(b=>({id:b.id, name:b.name, email:b.email||b.id+"@uohyd.ac.in", role:"talent", source:"builder"})), ...funders.map(f=>({id:f.id, name:f.name, email:f.email||f.id+"@startify.net", role:"backer", source:"funder"})), ...pendingBackers.map(p=>({id:p.id, name:p.name, email:p.email, role:"backer", createdAt:p.createdAt, pending:true, source:"pending"}))];
+  // de-dupe by email+role so same email with different roles shows separately, else dedupe by email for overview
   const seen=new Set(); const uniqUsers=[];
-  for(const u of allUsers){ if(!seen.has(u.email.toLowerCase())){ seen.add(u.email.toLowerCase()); uniqUsers.push(u); } }
+  for(const u of allUsers){ const key=u.email.toLowerCase()+"|"+u.role; if(!seen.has(key)){ seen.add(key); uniqUsers.push(u); } }
+  // For overview counts, also compute deduped by email only for total
   return {ideas, regs, builders, funders, requests, messages, events, pendingBackers, credentials, profiles, uniqUsers};
 }
 
@@ -389,12 +396,14 @@ function render(){
     content.querySelectorAll(".approveBtn").forEach(b=> b.addEventListener("click", ()=>{
       const id=b.dataset.approve;
       const stored=load(LS_KEYS.ideas, []);
-      // if idea is seed, we need to add override
       const all=getAllData().ideas;
       const target=all.find(i=>i.id===id);
-      if(target){ target.status="Approved & Live"; target.createdDate="Just now"; }
-      // persist seed change as new entry
-      save(LS_KEYS.ideas, [ {...target, status:"Approved & Live", createdDate:"Just now" }, ...stored ]);
+      if(!target) return;
+      const updated={...target, status:"Approved & Live", createdDate:"Just now"};
+      // upsert by id (no duplication)
+      const next=stored.filter(i=>i.id!==id);
+      save(LS_KEYS.ideas, [updated, ...next]);
+      // also seed dedupe via getAllData handles it
       alert("Approved: "+target.title);
       render();
     }));
@@ -403,8 +412,10 @@ function render(){
       const stored=load(LS_KEYS.ideas, []);
       const all=getAllData().ideas;
       const target=all.find(i=>i.id===id);
-      if(target){ target.status="Rejected"; }
-      save(LS_KEYS.ideas, [ {...target, status:"Rejected"}, ...stored ]);
+      if(!target) return;
+      const updated={...target, status:"Rejected"};
+      const next=stored.filter(i=>i.id!==id);
+      save(LS_KEYS.ideas, [updated, ...next]);
       alert("Rejected");
       render();
     }));

@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import logoImg from "./assets/startify-wordmark-full.png";
 import { dbService, isFirebaseConfigured as isSupabaseConfigured, authService } from "./lib/firebase";
 
@@ -269,6 +269,7 @@ export default function App() {
   const [showAllBuilders, setShowAllBuilders] = useState(false);
   const [showAllFunders, setShowAllFunders] = useState(false);
   const [showAllIdeas, setShowAllIdeas] = useState(false);
+  const ideasScrollRef = useRef(null);
   const getProfileImageKey = (email) => `startify_profile_img_${email.toLowerCase()}`;
   const getProfileAboutKey = (email) => `startify_profile_about_${email.toLowerCase()}`;
   const getProfileImage = (email) => { try { return localStorage.getItem(getProfileImageKey(email)) || ""; } catch { return ""; } };
@@ -446,8 +447,7 @@ export default function App() {
       setActiveTab("dashboard");
     } else {
       if (targetRole === "talent") {
-        setBuilders([
-          {
+        const newBuilder = {
             id: newUser.id,
             name: newUser.name,
             email: newUser.email.toLowerCase(),
@@ -456,9 +456,12 @@ export default function App() {
             year: "Campus Builder",
             verifiedStudent: true,
             status: "Available for Collaboration"
-          },
-          ...builders
-        ]);
+          };
+        setBuilders(prev=> [newBuilder, ...prev]);
+        try {
+          const existingB = JSON.parse(localStorage.getItem("startify_admin_builders")||"[]");
+          localStorage.setItem("startify_admin_builders", JSON.stringify([newBuilder, ...existingB]));
+        } catch {}
       }
       dbService.saveRegistration({ name: newUser.name, email: newUser.email, role: targetRole==="talent"?"builder":"founder", ideaOrSkills: targetRole==="talent"? (authForm.skills||"Talent") : "Founder", contact:"", registeredAt: new Date().toISOString().slice(0,10), status:"verified" });
       setCurrentUser(newUser);
@@ -1053,19 +1056,30 @@ export default function App() {
               </div>
             </div>
           </div>
-          {/* Ideas on home — why Startify started */}
-          <section className="mt-10">
-            <div className="mb-4 flex items-end justify-between">
+          {/* Ideas on home — why Startify started — swipeable, placed high */}
+          <section className="mt-8">
+            <div className="mb-4 flex items-end justify-between gap-4">
               <div>
-                <div className="text-[11px] font-bold uppercase tracking-widest text-slate-500">STARTIFY CORE</div>
+                <div className="text-[11px] font-bold uppercase tracking-widest text-slate-500">STARTIFY CORE • WHY WE STARTED</div>
                 <h2 className="font-heading mt-1 text-[25px] font-extrabold text-slate-900">Ideas gaining momentum</h2>
-                <p className="text-[13px] text-slate-600 mt-1">Real UoH student ideas looking for co-founders — sign in to connect.</p>
+                <p className="text-[13px] text-slate-600 mt-1">Real UoH student ideas looking for co-founders — swipe to explore, sign in to connect.</p>
               </div>
-              <button onClick={() => { setAuthMode("register"); setAuthModalOpen(true); }} className="hidden sm:inline-flex h-9 px-4 rounded-full bg-slate-900 text-white text-xs font-bold hover:bg-black">Join to connect →</button>
+              <div className="hidden sm:flex items-center gap-2 shrink-0">
+                <button onClick={()=> ideasScrollRef.current?.scrollBy({left:-320, behavior:'smooth'})} className="h-9 w-9 rounded-full bg-white border border-slate-200 grid place-items-center text-slate-700 hover:bg-slate-900 hover:text-white transition" aria-label="Previous">‹</button>
+                <button onClick={()=> ideasScrollRef.current?.scrollBy({left:320, behavior:'smooth'})} className="h-9 w-9 rounded-full bg-slate-900 text-white grid place-items-center hover:bg-black transition" aria-label="Next">›</button>
+                <button onClick={() => { setAuthMode("register"); setAuthModalOpen(true); }} className="h-9 px-4 rounded-full bg-slate-900 text-white text-xs font-bold hover:bg-black hidden lg:inline-flex items-center">Join to connect →</button>
+              </div>
             </div>
-            <div className="grid gap-5 md:grid-cols-3">
-              {ideas.filter(i=> i.status !== "Rejected").slice(0,6).map((idea) => (
-                <article key={idea.id} className="rounded-[24px] border border-slate-200 bg-white p-6 shadow-sm flex flex-col">
+            <div className="flex items-center justify-between sm:hidden mb-3 gap-2">
+              <div className="flex gap-2">
+                <button onClick={()=> ideasScrollRef.current?.scrollBy({left:-320, behavior:'smooth'})} className="h-8 w-8 rounded-full bg-white border border-slate-200 grid place-items-center text-slate-700">‹</button>
+                <button onClick={()=> ideasScrollRef.current?.scrollBy({left:320, behavior:'smooth'})} className="h-8 w-8 rounded-full bg-slate-900 text-white grid place-items-center">›</button>
+              </div>
+              <span className="text-[11px] text-slate-500">Swipe →</span>
+            </div>
+            <div ref={ideasScrollRef} className="flex gap-5 overflow-x-auto snap-x snap-mandatory pb-2 scrollbar-hide scroll-smooth" style={{scrollbarWidth:'none'}}>
+              {ideas.filter(i=> i.status !== "Rejected").slice(0,12).map((idea) => (
+                <article key={idea.id} className="snap-start shrink-0 w-[300px] md:w-[360px] rounded-[24px] border border-slate-200 bg-white p-6 shadow-sm flex flex-col">
                   <div className="flex items-center justify-between gap-3">
                     <span className="rounded-full bg-slate-100 px-3 py-1 text-[10px] font-bold text-slate-600">{idea.category}</span>
                     <span className="text-[10px] font-semibold text-slate-500">{idea.createdDate}</span>
@@ -2154,7 +2168,7 @@ export default function App() {
           </div>
 
           <div className="text-zinc-500 text-center md:text-left text-[11.5px]">
-            An initiative for <strong className="text-slate-600">University of Hyderabad</strong> students • Founder/Builder @uohyd.ac.in • <a href="/admin.html" className="underline decoration-slate-300 underline-offset-2 hover:text-slate-700">Admin</a>
+            An initiative for <strong className="text-slate-600">University of Hyderabad</strong> students • <a href="/admin.html" className="underline decoration-slate-300 underline-offset-2 hover:text-slate-700">Admin</a>
           </div>
 
           <div className="flex items-center gap-6">
