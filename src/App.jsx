@@ -1070,9 +1070,8 @@ export default function App() {
             </div>
             <div className="flex flex-col gap-4 w-full max-w-full overflow-hidden">
               <div className="role-choice-panel rounded-[28px] border border-slate-200 bg-white p-5 sm:p-7 shadow-sm flex flex-col w-full max-w-full overflow-hidden">
-                <div className="mb-4 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
+                <div className="mb-4">
                   <div className="text-xs font-bold uppercase tracking-[.16em] text-slate-500">Choose how you participate</div>
-                  <span className="text-xs px-3 py-1 rounded-full bg-slate-50 border border-slate-200 text-slate-600 shrink-0 self-start sm:self-auto">3 roles • One ecosystem</span>
                 </div>
                 <div className="space-y-4">
                   {[
@@ -1185,31 +1184,23 @@ export default function App() {
         </main>
       )}
 
-      {/* HERO BANNER — kept minimal for signed-in users; workflow lives only on signed-out home */}
-      {activeTab !== "dashboard" && activeTab !== "home" && activeTab !== "chats" && (
+      {/* HERO BANNER — only for Ideas board, not for Talent/Backers (those details live in Profile) */}
+      {activeTab === "ideas" && (
         <section className="mx-auto max-w-[1200px] px-5 md:px-8 pt-8 pb-6">
-          <div className="max-w-[760px]">
-            <div className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-white border border-slate-200 text-xs text-slate-600 font-semibold shadow-sm">
+          <div className="max-w-[760px] rounded-[24px] bg-white border border-slate-200 p-6 shadow-sm">
+            <div className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-slate-50 border border-slate-200 text-xs text-slate-700 font-semibold shadow-sm">
               <span className="h-2 w-2 rounded-full bg-emerald-500 animate-pulse" />
               University of Hyderabad • Students Only Community
             </div>
             <h1 className="font-heading text-[30px] sm:text-[38px] md:text-[44px] font-extrabold leading-[1.08] tracking-tight mt-4 text-slate-900">
-              {currentUser?.role === "founder" && "Share your idea. Find your builders and backers."}
-              {currentUser?.role === "talent" && "Discover UoH ideas to build with."}
-              {currentUser?.role === "backer" && "Discover UoH ideas to support."}
-              {currentUser?.role === "admin" && "Admin overview — ideas, talent & backers."}
-              {!currentUser && <>Connect on <span className="bg-gradient-to-r from-violet-600 to-indigo-600 bg-clip-text text-transparent">Startup Ideas</span>. Chat directly after acceptance.</>}
+              Campus Ideas Board
             </h1>
             <p className="text-[14.5px] md:text-[15px] leading-[1.65] text-slate-600 mt-3 max-w-[620px]">
-              {currentUser?.role === "founder" && "An initiative for University of Hyderabad students — post ideas, meet verified campus talent, and pitch campus backers."}
-              {currentUser?.role === "talent" && "An initiative for University of Hyderabad students — browse founder ideas and send a request to collaborate."}
-              {currentUser?.role === "backer" && "An initiative for University of Hyderabad students — browse founder ideas and skilled talent, then connect with promising teams."}
-              {currentUser?.role === "admin" && "University of Hyderabad — Startify internal review. You have all data; no public admin signup."}
-              {!currentUser && "For University of Hyderabad students. Sign in as Founder, Builder, or Backer to connect and chat after acceptance."}
+              Browse UoH student ideas — founder, builder and backer details live in your Profile. Connect directly after acceptance.
             </p>
             <div className="mt-5 flex flex-wrap gap-3">
               {currentUser?.role === "founder" && <button onClick={() => setIdeaModalOpen(true)} className="h-10 px-5 rounded-full bg-slate-900 text-white font-bold text-[13px] hover:bg-slate-800 shadow transition">Post Your Idea</button>}
-              {currentUser && <button onClick={() => setActiveTab("dashboard")} className="h-10 px-5 rounded-full bg-slate-900 text-white font-bold text-[13px] hover:bg-slate-800 shadow transition">Open My Dashboard</button>}
+              {currentUser && <button onClick={() => setActiveTab("dashboard")} className="h-10 px-5 rounded-full bg-white border border-slate-200 text-slate-700 font-bold text-[13px] hover:bg-slate-50 shadow-sm transition">Open My Dashboard</button>}
               {!currentUser && <button onClick={() => { setAuthMode("register"); setAuthModalOpen(true); }} className="h-10 px-5 rounded-full bg-slate-900 text-white font-bold text-[13px] hover:bg-slate-800 shadow transition">Get Started</button>}
             </div>
           </div>
@@ -2286,11 +2277,11 @@ export default function App() {
                         className={`p-2.5 sm:p-4 rounded-2xl border text-center transition flex flex-col items-center justify-center gap-1 min-h-[68px] sm:min-h-[74px] w-full max-w-full overflow-hidden ${
                           selectedRegisterRole === role
                             ? "bg-slate-900 text-white border-slate-900 shadow-lg scale-[1.02]"
-                            : "bg-white text-slate-700 border-slate-200 hover:border-slate-300 hover:bg-slate-50"
+                            : "bg-slate-50 text-slate-800 border-slate-300 hover:border-slate-400 hover:bg-white shadow-sm"
                         }`}
                       >
-                        <span className={`text-[11px] sm:text-[13px] font-bold leading-none break-words ${selectedRegisterRole === role ? "text-white" : "text-slate-800"}`}>{label}</span>
-                        <span className={`text-[9px] sm:text-[11px] leading-none break-words ${selectedRegisterRole === role ? "text-white/70" : "text-slate-500"}`}>{sub}</span>
+                        <span className={`text-[11px] sm:text-[13px] font-bold leading-none break-words ${selectedRegisterRole === role ? "text-white" : "text-slate-900"}`}>{label}</span>
+                        <span className={`text-[9px] sm:text-[11px] leading-none break-words font-medium ${selectedRegisterRole === role ? "text-white/80" : "text-slate-600"}`}>{sub}</span>
                       </button>
                     ))}
                   </div>
