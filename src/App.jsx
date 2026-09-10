@@ -270,6 +270,9 @@ export default function App() {
   const [showAllFunders, setShowAllFunders] = useState(false);
   const [showAllIdeas, setShowAllIdeas] = useState(false);
   const ideasScrollRef = useRef(null);
+  const ideasScrollRefSignedIn = useRef(null);
+  const [profileNameEditOpen, setProfileNameEditOpen] = useState(false);
+  const [profileNameDraft, setProfileNameDraft] = useState("");
   const getProfileImageKey = (email) => `startify_profile_img_${email.toLowerCase()}`;
   const getProfileAboutKey = (email) => `startify_profile_about_${email.toLowerCase()}`;
   const getProfileImage = (email) => { try { return localStorage.getItem(getProfileImageKey(email)) || ""; } catch { return ""; } };
@@ -1118,7 +1121,36 @@ export default function App() {
             <div className="mt-8 grid gap-4 sm:grid-cols-2 lg:grid-cols-4"><div className="rounded-2xl border border-slate-200 bg-white/80 p-5"><div className="text-[11px] font-bold uppercase tracking-wide text-slate-500">Live ideas</div><div className="font-heading mt-2 text-3xl font-extrabold text-slate-800">{ideas.length}</div><p className="mt-1 text-[11px] text-slate-500">Projects looking for momentum</p></div><div className="rounded-2xl border border-slate-200 bg-white/80 p-5"><div className="text-[11px] font-bold uppercase tracking-wide text-slate-500">Active people</div><div className="font-heading mt-2 text-3xl font-extrabold text-slate-800">{builders.length + funders.length + ideas.length}</div><p className="mt-1 text-[11px] text-slate-500">Founders, talent, and funders</p></div><div className="rounded-2xl border border-slate-200 bg-white/80 p-5"><div className="text-[11px] font-bold uppercase tracking-wide text-slate-500">Connections made</div><div className="font-heading mt-2 text-3xl font-extrabold text-slate-800">{requests.filter((request) => request.status === "accepted").length}</div><p className="mt-1 text-[11px] text-slate-500">Conversations unlocked</p></div><div className="rounded-2xl border border-slate-200 bg-white/80 p-5"><div className="text-[11px] font-bold uppercase tracking-wide text-slate-500">Upcoming events</div><div className="font-heading mt-2 text-3xl font-extrabold text-slate-800">{events.length}</div><p className="mt-1 text-[11px] text-slate-500">Ways to meet the community</p></div></div>
           </div>
           <section className="mt-8"><div className="mb-4 flex items-end justify-between"><div><div className="text-[11px] font-bold uppercase tracking-widest text-slate-500">MARK YOUR CALENDAR</div><h2 className="font-heading mt-1 text-[25px] font-extrabold text-slate-800" style={{color: '#0f172a'}}>Upcoming community events</h2></div><button onClick={() => setActiveTab("dashboard")} className="text-xs font-bold text-slate-700 hover:underline">Go to my dashboard →</button></div><div className="grid gap-5 md:grid-cols-2">{events.map((event) => <article key={event.id} className="rounded-[24px] border border-slate-200 bg-white p-6 shadow-sm" style={{background: 'rgba(255,255,255,0.92)'}}><div className="flex items-center justify-between gap-3"><span className="rounded-full bg-slate-100 px-3 py-1 text-[10px] font-bold uppercase tracking-wide text-slate-600">{event.category}</span><span className="text-xs font-semibold text-slate-500">{event.date}</span></div><h3 className="font-heading mt-4 text-[19px] font-extrabold" style={{color: '#0f172a'}}>{event.title}</h3><p className="mt-2 text-[13px]" style={{color: '#475569'}}>{event.time} · {event.venue}</p><p className="mt-3 text-[13px] leading-5" style={{color: '#334155'}}>{event.desc}</p></article>)}</div></section>
-          <section className="mt-10"><div className="mb-4 flex items-end justify-between"><div><div className="text-[11px] font-bold uppercase tracking-widest text-slate-500">IDEAS GAINING MOMENTUM</div><h2 className="font-heading mt-1 text-[25px] font-extrabold text-slate-800">What the community is building</h2></div><button onClick={() => setActiveTab("dashboard")} className="text-xs font-bold text-slate-700 hover:underline">Find your matches in Dashboard →</button></div><div className="grid gap-5 md:grid-cols-3">{ideas.slice(0, 3).map((idea) => <article key={idea.id} className="rounded-[24px] border border-slate-200 bg-white/85 p-6 shadow-sm"><div className="flex items-center justify-between gap-3"><span className="rounded-full bg-slate-100 px-3 py-1 text-[10px] font-bold text-slate-600">{idea.category}</span><span className="text-[10px] font-semibold text-slate-500">{idea.createdDate}</span></div><h3 className="font-heading mt-4 text-[20px] font-extrabold text-slate-800">{idea.title}</h3><p className="mt-1 text-[12px] font-medium text-slate-500">By {idea.founder}</p><p className="mt-3 text-[13px] leading-5 text-slate-600">{idea.desc}</p><div className="mt-4 border-t border-slate-200 pt-3 text-[11px] font-semibold text-slate-600">Seeking: {idea.seeking}</div></article>)}</div></section>
+          <section className="mt-10">
+            <div className="mb-4 flex items-end justify-between gap-4">
+              <div>
+                <div className="text-[11px] font-bold uppercase tracking-widest text-slate-500">IDEAS GAINING MOMENTUM</div>
+                <h2 className="font-heading mt-1 text-[25px] font-extrabold text-slate-800">What the community is building</h2>
+                <p className="text-[13px] text-slate-600 mt-1">Swipe to explore — founder or not, ideas need eyes.</p>
+              </div>
+              <div className="hidden sm:flex items-center gap-2 shrink-0">
+                <button onClick={()=> ideasScrollRefSignedIn.current?.scrollBy({left:-320, behavior:'smooth'})} className="h-9 w-9 rounded-full bg-white border border-slate-200 grid place-items-center text-slate-700 hover:bg-slate-900 hover:text-white" aria-label="Prev">‹</button>
+                <button onClick={()=> ideasScrollRefSignedIn.current?.scrollBy({left:320, behavior:'smooth'})} className="h-9 w-9 rounded-full bg-slate-900 text-white grid place-items-center hover:bg-black" aria-label="Next">›</button>
+                <button onClick={() => setActiveTab("dashboard")} className="h-9 px-4 rounded-full bg-white border border-slate-200 text-xs font-bold hover:bg-slate-50">Dashboard →</button>
+              </div>
+            </div>
+            <div className="flex sm:hidden items-center gap-2 mb-3">
+              <button onClick={()=> ideasScrollRefSignedIn.current?.scrollBy({left:-320, behavior:'smooth'})} className="h-8 w-8 rounded-full bg-white border border-slate-200 grid place-items-center">‹</button>
+              <button onClick={()=> ideasScrollRefSignedIn.current?.scrollBy({left:320, behavior:'smooth'})} className="h-8 w-8 rounded-full bg-slate-900 text-white grid place-items-center">›</button>
+              <span className="text-[11px] text-slate-500">Swipe →</span>
+            </div>
+            <div ref={ideasScrollRefSignedIn} className="flex gap-5 overflow-x-auto snap-x snap-mandatory pb-2 scroll-smooth" style={{scrollbarWidth:'none'}}>
+              {ideas.filter(i=> i.status !== "Rejected").slice(0,12).map((idea) => (
+                <article key={idea.id} className="snap-start shrink-0 w-[300px] md:w-[360px] rounded-[24px] border border-slate-200 bg-white/85 p-6 shadow-sm flex flex-col">
+                  <div className="flex items-center justify-between gap-3"><span className="rounded-full bg-slate-100 px-3 py-1 text-[10px] font-bold text-slate-600">{idea.category}</span><span className="text-[10px] font-semibold text-slate-500">{idea.createdDate}</span></div>
+                  <h3 className="font-heading mt-4 text-[20px] font-extrabold text-slate-800">{idea.title}</h3>
+                  <p className="mt-1 text-[12px] font-medium text-slate-500">By {idea.founder}</p>
+                  <p className="mt-3 text-[13px] leading-5 text-slate-600 line-clamp-3">{idea.desc}</p>
+                  <div className="mt-4 border-t border-slate-200 pt-3 text-[11px] font-semibold text-slate-600">Seeking: {idea.seeking}</div>
+                </article>
+              ))}
+            </div>
+          </section>
         </main>
       )}
 
@@ -1679,6 +1711,7 @@ export default function App() {
                   <div className="min-w-0 flex-1">
                     <div className="flex flex-wrap items-center gap-1.5 sm:gap-2">
                       <h1 className="font-heading text-[18px] sm:text-[24px] md:text-[28px] font-extrabold leading-none text-slate-900">Welcome, {currentUser.name}</h1>
+                      <button onClick={()=>{ setProfileNameDraft(currentUser.name); setProfileNameEditOpen(true); }} className="h-7 px-2 rounded-full bg-white border border-slate-200 text-[11px] font-bold text-slate-600 hover:bg-slate-50">Edit name</button>
                       <span className={`px-2 py-0.5 sm:px-2.5 sm:py-1 rounded-full text-[10px] sm:text-[11px] font-bold border ${currentUser.role==="founder"?"bg-indigo-50 border-indigo-200 text-indigo-700":currentUser.role==="talent"?"bg-sky-50 border-sky-200 text-sky-700":currentUser.role==="backer"?"bg-violet-50 border-violet-200 text-violet-700":"bg-amber-50 border-amber-200 text-amber-700"}`}>{ROLE_META[currentUser.role]?.label || currentUser.role.toUpperCase()}</span>
                       {isVerified ? <span className="inline-flex items-center px-2 py-0.5 sm:px-2 sm:py-1 rounded-full bg-emerald-50 border border-emerald-200 text-emerald-700 text-[10px] sm:text-[11px] font-bold whitespace-nowrap">✓ Verified</span> : <span className="px-2 py-0.5 sm:py-1 rounded-full bg-slate-100 border border-slate-200 text-slate-600 text-[10px] sm:text-[11px] font-bold">Unverified</span>}
                       {currentUser._backerPending && <span className="px-2 py-0.5 sm:py-1 rounded-full bg-amber-500 text-white text-[10px] sm:text-[11px] font-bold">Pending admin</span>}
@@ -1754,6 +1787,35 @@ export default function App() {
                           </div>
                         );
                       })}
+                    </div>
+                  </div>
+                )}
+                {profileNameEditOpen && (
+                  <div className="mt-4 rounded-2xl border border-slate-200 bg-white p-4">
+                    <div className="text-sm font-bold text-slate-800">Edit name</div>
+                    <p className="text-xs text-slate-500 mt-1">Update your display name — visible to everyone.</p>
+                    <input value={profileNameDraft} onChange={e=> setProfileNameDraft(e.target.value)} placeholder="Your full name" className="mt-3 w-full h-10 rounded-xl border border-slate-200 bg-slate-50 px-3 text-sm outline-none focus:border-slate-300" />
+                    <div className="mt-3 flex justify-end gap-2">
+                      <button onClick={()=> setProfileNameEditOpen(false)} className="h-9 px-4 rounded-full border border-slate-200 text-sm font-semibold">Cancel</button>
+                      <button onClick={()=>{
+                        const trimmed=profileNameDraft.trim();
+                        if(!trimmed){ showToast("Name cannot be empty"); return; }
+                        try{
+                          const key2="startify_user_profiles";
+                          const arr=JSON.parse(localStorage.getItem(key2)||"[]");
+                          const idx=arr.findIndex(p=> p.email.toLowerCase()===currentUser.email.toLowerCase() && p.role===currentUser.role);
+                          if(idx>=0){ arr[idx].name=trimmed; localStorage.setItem(key2, JSON.stringify(arr)); }
+                          // also update registrations
+                          try{
+                            const regs=JSON.parse(localStorage.getItem("startify_registrations")||"[]");
+                            const rIdx=regs.findIndex(r=> r.email.toLowerCase()===currentUser.email.toLowerCase());
+                            if(rIdx>=0){ regs[rIdx].name=trimmed; localStorage.setItem("startify_registrations", JSON.stringify(regs)); }
+                          }catch{}
+                          setCurrentUser({...currentUser, name: trimmed});
+                          setProfileNameEditOpen(false);
+                          showToast("✓ Name updated");
+                        }catch{ showToast("Failed to save"); }
+                      }} className="h-9 px-5 rounded-full bg-slate-900 text-white text-sm font-bold">Save</button>
                     </div>
                   </div>
                 )}

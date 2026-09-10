@@ -1,6 +1,6 @@
 // Startify Database Service (Firebase + Local Fallback) — Password + Email Link
 import { initializeApp, getApps } from 'firebase/app';
-import { getFirestore, collection, addDoc, getDocs, query, orderBy, limit, serverTimestamp } from 'firebase/firestore';
+import { getFirestore, collection, addDoc, getDocs, query, orderBy, limit, serverTimestamp, doc, setDoc } from 'firebase/firestore';
 import { getAuth, createUserWithEmailAndPassword, signInWithEmailAndPassword, sendEmailVerification, sendPasswordResetEmail, signOut, onAuthStateChanged } from 'firebase/auth';
 
 const firebaseConfig = {
@@ -147,11 +147,13 @@ export const dbService = {
     localStorage.setItem("startify_submitted_ideas", JSON.stringify([idea, ...existing]));
     if (isFirebaseConfigured && db) {
       try {
-        await addDoc(collection(db, "ideas"), {
+        // Use same id locally and in Firestore to prevent duplicate entries when merging
+        await setDoc(doc(db, "ideas", idea.id), {
+          id: idea.id,
           title: idea.title, category: idea.category, founder: idea.founder, email: idea.email || "", founderId: idea.founderId || "",
           desc: idea.desc, seeking: idea.seeking, status: idea.status || "Pending Review",
           created_at: serverTimestamp(), createdDate: idea.createdDate || new Date().toISOString(),
-        });
+        }, { merge: true });
       } catch (err) { console.warn("Firestore idea save error", err); }
     }
     try { await fetch("/api/ideas", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(idea) }); } catch {}
