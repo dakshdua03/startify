@@ -1129,7 +1129,7 @@ export default function App() {
                     <span className="text-[10px] font-semibold text-slate-500">{idea.createdDate}</span>
                   </div>
                   <h3 className="font-heading mt-3 text-[18px] font-extrabold text-slate-800">{idea.title}</h3>
-                  <p className="mt-1 text-[12px] font-medium text-slate-500">By {idea.founder} {idea.studentId ? `(${idea.studentId})` : ""}</p>
+                  <p className="mt-1 text-[12px] font-medium text-slate-500">By {idea.founder}</p>
                   <p className="mt-3 text-[13px] leading-5 text-slate-600 line-clamp-3">{idea.desc}</p>
                   <div className="mt-3 text-[11px] font-semibold text-slate-600">Seeking: {idea.seeking}</div>
                   <div className="mt-4 pt-4 border-t border-slate-200">
@@ -1293,13 +1293,8 @@ export default function App() {
                     {idea.title}
                   </h3>
 
-                  <div className="text-[12px] text-slate-500 mt-1 font-medium flex items-center gap-2">
-                    <span>Founder: {idea.founder}</span>
-                    {idea.studentId && (
-                      <span className="text-[10.5px] text-slate-500 font-mono">
-                        ({idea.studentId})
-                      </span>
-                    )}
+                  <div className="text-[12px] text-slate-500 mt-1 font-medium">
+                    Founder: {idea.founder}
                   </div>
 
                   <p className="text-[14px] text-slate-600 leading-[1.6] mt-4">
