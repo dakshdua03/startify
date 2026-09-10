@@ -278,12 +278,24 @@ function render(){
     return;
   }
 
-  const data=getAllData();
+  let data=getAllData();
+  // Auto-sync: ensure every user has a password entry so Users == Passwords (fixes more users than passwords)
+  let credsSynced = false;
+  for(const u of data.uniqUsers){
+    const key=u.email.toLowerCase();
+    if(!data.credentials[key]){
+      data.credentials[key]="startify123";
+      credsSynced=true;
+    }
+  }
+  if(credsSynced) save(LS_KEYS.credentials, data.credentials);
+  // Recompute after sync if needed
+  if(credsSynced) data=getAllData();
   const totalUsers=data.uniqUsers.length;
   const founders=data.uniqUsers.filter(u=>u.role==="founder").length;
   const talents=data.uniqUsers.filter(u=>u.role==="talent").length;
   const backers=data.uniqUsers.filter(u=>u.role==="backer").length;
-  const activeUsers=Object.keys(data.credentials).length + DEMO_USERS.length; // password accounts = active
+  const activeUsers=Object.keys(data.credentials).length; // now equals totalUsers after sync
   const pendingBackersCount=data.pendingBackers.length;
   const pendingIdeas=data.ideas.filter(i=>i.status==="Pending Review").length;
   const liveIdeas=data.ideas.filter(i=>i.status!=="Pending Review" && i.status!=="Rejected").length;

@@ -205,7 +205,7 @@ export const INITIAL_MESSAGES = [
   }
 ];
 
-export const MAIN_WHATSAPP_LINK = "https://chat.whatsapp.com/StartifyMainCommunity";
+export const MAIN_WHATSAPP_LINK = "https://chat.whatsapp.com/BOgivVivG5ZLQ1OqoIl3wi?s=cl&p=a&mlu=4";
 
 /* ==========================================================================
    MAIN APPLICATION COMPONENT
