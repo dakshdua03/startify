@@ -479,7 +479,7 @@ export default function App() {
       showToast("Password must be at least 6 characters.");
       return;
     }
-    if ((targetRole === "founder" || targetRole === "talent") && !isUoHEmail(email)) {
+    if (authMode === "register" && (targetRole === "founder" || targetRole === "talent") && !isUoHEmail(email)) {
       showToast("Use your University of Hyderabad email ending in @uohyd.ac.in for Founder/Builder accounts. Backers can use any email.");
       return;
     }
