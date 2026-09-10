@@ -215,13 +215,14 @@ export default function App() {
   // Visitors begin at the role-selection page. The workspace only opens after sign-in.
   const [currentUser, setCurrentUser] = useState(null);
 
-  // Data Collections
-  const [ideas, setIdeas] = useState(INITIAL_IDEAS);
-  const [funders, setFunders] = useState(INITIAL_FUNDERS);
-  const [builders, setBuilders] = useState(INITIAL_BUILDERS);
-  const [events, setEvents] = useState(INITIAL_EVENTS);
-  const [requests, setRequests] = useState(INITIAL_REQUESTS);
-  const [messages, setMessages] = useState(INITIAL_MESSAGES);
+  // Data Collections — hide demo if flag set (for manual testing)
+  const hideDemoFlag = typeof window !== "undefined" && localStorage.getItem("startify_hide_demo") === "true";
+  const [ideas, setIdeas] = useState(hideDemoFlag ? [] : INITIAL_IDEAS);
+  const [funders, setFunders] = useState(hideDemoFlag ? [] : INITIAL_FUNDERS);
+  const [builders, setBuilders] = useState(hideDemoFlag ? [] : INITIAL_BUILDERS);
+  const [events, setEvents] = useState(hideDemoFlag ? [] : INITIAL_EVENTS);
+  const [requests, setRequests] = useState(hideDemoFlag ? [] : INITIAL_REQUESTS);
+  const [messages, setMessages] = useState(hideDemoFlag ? [] : INITIAL_MESSAGES);
 
   // Active Tab & Filters
   const [activeTab, setActiveTab] = useState("home"); // "home" | "ideas" | "talent" | "backers" | "events" | "dashboard" | "chats"
@@ -517,19 +518,23 @@ export default function App() {
           setAuthMode("signin");
           return;
         } else {
-          // signin — verify via Firebase emailVerified
-          await authService.signIn(email, password);
-          const demoUser = DEMO_USERS.find((u) => u.email.toLowerCase() === email.toLowerCase());
-          if (demoUser) {
-            saveCredential(email, password);
-            setCurrentUser(demoUser);
+          // signin — demo accounts bypass Firebase verification for manual testing
+          const demoUserEarly = DEMO_USERS.find((u) => u.email.toLowerCase() === email.toLowerCase());
+          if (demoUserEarly) {
+            const creds = getCredentials();
+            const hasStored = !!creds[email.toLowerCase()];
+            if (hasStored && !checkCredential(email, password)) { showToast("Incorrect password for demo account."); return; }
+            if (!hasStored) saveCredential(email, password);
+            setCurrentUser(demoUserEarly);
             setActiveTab("dashboard");
-            showToast(`Welcome back, ${demoUser.name}!`);
+            showToast(`Welcome back, ${demoUserEarly.name}! (Demo)`);
             setAuthModalOpen(false);
             setAuthForm({ name: "", email: "", password: "", studentId: "", roleTitle: "", skills: "", focus: "", bio: "" });
             setResetMode(false);
             return;
           }
+          // real Firebase signin — verify via emailVerified
+          await authService.signIn(email, password);
           let existingProfile = null;
           try {
             const profiles = JSON.parse(localStorage.getItem("startify_user_profiles") || "[]");
@@ -1517,6 +1522,28 @@ export default function App() {
          ========================================================================== */}
       {activeTab === "dashboard" && currentUser && (
         <section className="dashboard-surface mx-auto max-w-[1200px] px-5 md:px-8 py-10">
+          {/* Manual test helpers — hide/show demo data */}
+          {currentUser.role === "admin" && (
+            <div className="mb-4 flex flex-wrap gap-2">
+              <button onClick={()=>{
+                localStorage.setItem("startify_hide_demo","true");
+                // remove demo ids from current state
+                const demoIdeaIds = new Set(INITIAL_IDEAS.map(i=>i.id));
+                const demoBuilderIds = new Set(INITIAL_BUILDERS.map(b=>b.id));
+                const demoFunderIds = new Set(INITIAL_FUNDERS.map(f=>f.id));
+                setIdeas(prev=>prev.filter(i=>!demoIdeaIds.has(i.id)));
+                setBuilders(prev=>prev.filter(b=>!demoBuilderIds.has(b.id)));
+                setFunders(prev=>prev.filter(f=>!demoFunderIds.has(f.id)));
+                showToast("Demo data hidden — new accounts you create at /admin.html will remain. Reload to persist.");
+              }} className="h-8 px-3 rounded-full bg-white border border-slate-200 text-xs font-bold text-slate-700 hover:bg-slate-50">Hide demo data</button>
+              <button onClick={()=>{
+                localStorage.removeItem("startify_hide_demo");
+                showToast("Demo hide cleared — reload page to restore demos");
+                setTimeout(()=>window.location.reload(),800);
+              }} className="h-8 px-3 rounded-full bg-white border border-slate-200 text-xs font-bold text-slate-700 hover:bg-slate-50">Show demos again</button>
+              <a href="/admin.html" target="_blank" className="h-8 px-3 rounded-full bg-slate-900 text-white text-xs font-bold grid place-items-center hover:bg-black">Open /admin.html → create test accounts</a>
+            </div>
+          )}
           {/* Profile Card — shows who you are + same-email role switcher */}
           {(() => {
             const initials = currentUser.name.split(" ").map(s=>s[0]).join("").slice(0,2).toUpperCase();
