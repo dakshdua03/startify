@@ -911,7 +911,7 @@ export default function App() {
             <div className="hidden sm:flex items-center gap-2 text-[11px] font-semibold text-slate-500 whitespace-nowrap leading-none">
               <span className="font-bold tracking-widest uppercase">University of Hyderabad</span>
               <span className="h-1 w-1 rounded-full bg-slate-300"></span>
-              <span>A student initiative • Connect • Build</span>
+              <span>Connect • Build</span>
             </div>
           </div>
 
@@ -1660,9 +1660,14 @@ export default function App() {
             </div>
           )}
                     {/* Profile moved to Profile tab — dashboard now focuses on activity */}
-          <div class="mb-6">
-            <h2 className="font-heading text-xl font-extrabold text-slate-800">Dashboard</h2>
-            <p className="text-sm text-slate-500">Track your ideas, incoming requests and chats. Edit your profile in the <button onClick={()=>setActiveTab("profile")} className="underline font-semibold text-slate-700 hover:text-slate-900">Profile</button> tab.</p>
+          <div className="mb-6 flex flex-col sm:flex-row sm:items-start sm:justify-between gap-3">
+            <div>
+              <h2 className="font-heading text-xl font-extrabold text-slate-800">Dashboard</h2>
+              <p className="text-sm text-slate-500">Track your ideas, incoming requests and chats. Edit your profile in the <button onClick={()=>setActiveTab("profile")} className="underline font-semibold text-slate-700 hover:text-slate-900">Profile</button> tab.</p>
+            </div>
+            {currentUser?.role === "founder" && (
+              <button onClick={()=> setIdeaModalOpen(true)} className="h-10 px-5 rounded-full bg-slate-900 text-white font-bold text-sm hover:bg-black shadow shrink-0">+ Post Idea</button>
+            )}
           </div>
 
           {currentUser?._backerPending && (
