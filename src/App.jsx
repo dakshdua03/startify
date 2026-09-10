@@ -851,10 +851,10 @@ export default function App() {
         </div>
       )}
 
-      {/* UoH launch banner — hidden after sign-in, profile badge moves to dashboard */}
+      {/* UoH launch banner — clean, no gate details */}
       {!currentUser && (
         <div className="bg-indigo-600 text-white text-center text-[11px] font-semibold py-2 px-4">
-          An initiative for <strong>University of Hyderabad</strong> students • Founder / Builder (@uohyd.ac.in) + Backer (open)
+          Built for <strong>University of Hyderabad</strong> students • Connect • Build • Launch
         </div>
       )}
 
@@ -1053,6 +1053,35 @@ export default function App() {
               </div>
             </div>
           </div>
+          {/* Ideas on home — why Startify started */}
+          <section className="mt-10">
+            <div className="mb-4 flex items-end justify-between">
+              <div>
+                <div className="text-[11px] font-bold uppercase tracking-widest text-slate-500">STARTIFY CORE</div>
+                <h2 className="font-heading mt-1 text-[25px] font-extrabold text-slate-900">Ideas gaining momentum</h2>
+                <p className="text-[13px] text-slate-600 mt-1">Real UoH student ideas looking for co-founders — sign in to connect.</p>
+              </div>
+              <button onClick={() => { setAuthMode("register"); setAuthModalOpen(true); }} className="hidden sm:inline-flex h-9 px-4 rounded-full bg-slate-900 text-white text-xs font-bold hover:bg-black">Join to connect →</button>
+            </div>
+            <div className="grid gap-5 md:grid-cols-3">
+              {ideas.filter(i=> i.status !== "Rejected").slice(0,6).map((idea) => (
+                <article key={idea.id} className="rounded-[24px] border border-slate-200 bg-white p-6 shadow-sm flex flex-col">
+                  <div className="flex items-center justify-between gap-3">
+                    <span className="rounded-full bg-slate-100 px-3 py-1 text-[10px] font-bold text-slate-600">{idea.category}</span>
+                    <span className="text-[10px] font-semibold text-slate-500">{idea.createdDate}</span>
+                  </div>
+                  <h3 className="font-heading mt-3 text-[18px] font-extrabold text-slate-800">{idea.title}</h3>
+                  <p className="mt-1 text-[12px] font-medium text-slate-500">By {idea.founder} {idea.studentId ? `(${idea.studentId})` : ""}</p>
+                  <p className="mt-3 text-[13px] leading-5 text-slate-600 line-clamp-3">{idea.desc}</p>
+                  <div className="mt-3 text-[11px] font-semibold text-slate-600">Seeking: {idea.seeking}</div>
+                  <div className="mt-4 pt-4 border-t border-slate-200">
+                    <button onClick={() => { setAuthMode("register"); setAuthModalOpen(true); }} className="w-full h-9 rounded-full bg-white border border-slate-200 text-xs font-bold text-slate-700 hover:bg-slate-900 hover:text-white transition">Sign in to connect →</button>
+                  </div>
+                </article>
+              ))}
+            </div>
+            {ideas.length === 0 && <div className="mt-4 rounded-2xl border border-dashed border-slate-200 bg-white py-8 text-center text-sm text-slate-500">No ideas yet — be the first to post!</div>}
+          </section>
         </main>
       )}
 
