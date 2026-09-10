@@ -23,23 +23,37 @@ if (isFirebaseConfigured) {
   try { db = getFirestore(app); } catch (e) { console.warn("Firestore init failed", e); }
   try { auth = getAuth(app); } catch (e) { console.warn("Auth init failed", e); }
 }
+// Debug: log config status on load (visible in balance F12)
+if (typeof window !== "undefined") {
+  console.log(`[Startify Firebase] configured=${isFirebaseConfigured} project=${firebaseConfig.projectId || "none"} authDomain=${firebaseConfig.authDomain || "none"}`);
+  if (!isFirebaseConfigured) console.warn("Firebase NOT configured — set VITE_FIREBASE_* in .env and Cloudflare Pages > Settings > Variables and redeploy");
+}
 
 export { app, db, auth };
 export const isSupabaseConfigured = isFirebaseConfigured; // alias for App.jsx
 
 export const authService = {
   async signUp(email, password) {
+    console.log("[Startify] signUp start", email, "configured", isFirebaseConfigured);
     if (!isFirebaseConfigured || !auth) throw new Error("Firebase not configured — set VITE_FIREBASE_*");
     const cred = await createUserWithEmailAndPassword(auth, email.trim().toLowerCase(), password);
+    console.log("[Startify] user created", cred.user.uid, "verified", cred.user.emailVerified);
     try {
       await sendEmailVerification(cred.user, { url: window.location.origin, handleCodeInApp: false });
-    } catch (e) { console.warn("sendEmailVerification failed", e?.message); }
+      console.log("[Startify] verification email queued for", email, "continueUrl", window.location.origin);
+    } catch (e) {
+      console.error("[Startify] sendEmailVerification FAILED", e?.code, e?.message);
+      throw new Error(`Failed to send verification email: ${e?.message || e}`);
+    }
+    // Sign out immediately so user must verify before next sign-in (keeps session clean)
+    try { await signOut(auth); } catch {}
     return cred.user;
   },
   async signIn(email, password) {
+    console.log("[Startify] signIn attempt", email);
     if (!isFirebaseConfigured || !auth) throw new Error("Firebase not configured");
     const cred = await signInWithEmailAndPassword(auth, email.trim().toLowerCase(), password);
-    // Require verified email — except allow if user just signed up and hasn't clicked yet? We enforce here.
+    console.log("[Startify] signIn ok, emailVerified=", cred.user.emailVerified);
     if (!cred.user.emailVerified) {
       await signOut(auth);
       throw new Error("Please verify your email first — click the link sent to your inbox (check spam). Click Resend link if needed.");
