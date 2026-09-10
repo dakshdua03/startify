@@ -549,6 +549,18 @@ export default function App() {
             setResetMode(false);
             return;
           }
+          // pre-check: if email not in any local store, treat as wrong email (not wrong password)
+          try {
+            const profilesCheck = JSON.parse(localStorage.getItem("startify_user_profiles")||"[]");
+            const regsCheck = JSON.parse(localStorage.getItem("startify_registrations")||"[]");
+            const credsCheck = getCredentials();
+            const existsLocally = DEMO_USERS.some(u=>u.email.toLowerCase()===email.toLowerCase()) || profilesCheck.some(p=>p.email.toLowerCase()===email.toLowerCase()) || regsCheck.some(r=>r.email.toLowerCase()===email.toLowerCase()) || !!credsCheck[email.toLowerCase()];
+            if (!existsLocally) {
+              // Still try Firebase, but if it fails with invalid-credential we will show wrong email below
+              // To avoid Firebase quota, we can early return with correct message
+              // Check if Firebase would know this email? We can't know without calling, so we let it try but map error correctly below
+            }
+          } catch {}
           // real Firebase signin — verify via emailVerified
           await authService.signIn(email, password);
           let existingProfile = null;
@@ -583,8 +595,19 @@ export default function App() {
       } catch (err) {
         const msg = err?.message || "Auth failed";
         if (msg.includes("email-already-in-use")) showToast("Email already registered — please Sign In or reset password.");
-        else if (msg.includes("wrong-password") || msg.includes("invalid-credential")) showToast("Incorrect password. Use Forgot password?");
+        else if (msg.includes("wrong-password") || msg.includes("invalid-credential") || msg.includes("INVALID_LOGIN_CREDENTIALS")) {
+          let existsLocally = false;
+          try {
+            const pcs = JSON.parse(localStorage.getItem("startify_user_profiles")||"[]");
+            const rcs = JSON.parse(localStorage.getItem("startify_registrations")||"[]");
+            const ccs = getCredentials();
+            existsLocally = DEMO_USERS.some(u=>u.email.toLowerCase()===email.toLowerCase()) || pcs.some(p=>p.email.toLowerCase()===email.toLowerCase()) || rcs.some(r=>r.email.toLowerCase()===email.toLowerCase()) || !!ccs[email.toLowerCase()];
+          } catch {}
+          if (!existsLocally) showToast("No account with this email — check spelling or Create Account.");
+          else showToast("Incorrect password for this email. Use Forgot password?");
+        }
         else if (msg.includes("verify your email")) showToast(msg);
+        else if (msg.toLowerCase().includes("user-not-found") || msg.toLowerCase().includes("email not found")) showToast("No account with this email — check spelling or Create Account.");
         else showToast(msg);
         return;
       } finally { setAuthLoading(false); }

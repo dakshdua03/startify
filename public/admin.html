@@ -232,9 +232,10 @@ function getAllData(){
     return {id: p?.id || r?.id || email, name: p?.name || r?.name || email.split("@")[0], email, role: p?.role || r?.role || "founder", createdAt: p?.createdAt || r?.registeredAt || "—", source:"credential"};
   });
   const allUsers = [...DEMO_USERS.map(u=>({...u, source:"demo"})), ...regs.map(r=>({id:r.email, name:r.name, email:r.email, role: r.role==="builder"?"talent":r.role==="funder"?"backer":r.role, createdAt:r.registeredAt, source:"registration"})), ...profiles.map(p=>({id:p.id, name:p.name, email:p.email, role:p.role, createdAt:p.createdAt, source:"profile"})), ...credUsers.map(c=>({...c, source:"credential"})), ...builders.map(b=>({id:b.id, name:b.name, email:b.email||b.id+"@uohyd.ac.in", role:"talent", source:"builder"})), ...funders.map(f=>({id:f.id, name:f.name, email:f.email||f.id+"@startify.net", role:"backer", source:"funder"})), ...pendingBackers.map(p=>({id:p.id, name:p.name, email:p.email, role:"backer", createdAt:p.createdAt, pending:true, source:"pending"}))];
-  // de-dupe by email+role so same email with different roles shows separately, else dedupe by email for overview
+  // de-dupe by email+role so same email with different roles shows separately, then group same email together
   const seen=new Set(); const uniqUsers=[];
   for(const u of allUsers){ const key=u.email.toLowerCase()+"|"+u.role; if(!seen.has(key)){ seen.add(key); uniqUsers.push(u); } }
+  uniqUsers.sort((a,b)=> a.email.toLowerCase().localeCompare(b.email.toLowerCase()) || a.role.localeCompare(b.role));
   // For overview counts, also compute deduped by email only for total
   return {ideas, regs, builders, funders, requests, messages, events, pendingBackers, credentials, profiles, uniqUsers};
 }
