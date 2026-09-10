@@ -2367,9 +2367,9 @@ export default function App() {
               >
                 {authLoading ? "Please wait..." : authMode === "signin" ? "Sign In & Continue →" : `Create ${selectedRegisterRole.toUpperCase()} Account →`}
               </button>
-              <div className="rounded-2xl border border-slate-200 bg-slate-50 p-3 flex items-start gap-2.5">
+              <div className="rounded-2xl border border-slate-900 bg-white p-3 flex items-start gap-2.5 shadow-sm">
                 <span className="h-6 w-6 rounded-full bg-emerald-500 text-white grid place-items-center text-[11px] shrink-0">✓</span>
-                <div className="text-[11px] leading-4 text-slate-600"><strong className="text-slate-800">Verified community</strong> — connect and collaborate with confidence.</div>
+                <div className="text-[11px] leading-4 text-slate-900"><strong className="text-black">Verified community</strong> — connect and collaborate with confidence.</div>
               </div>
               <p className="text-center text-[11px] text-slate-400">Be respectful — misuse leads to removal. Ecosystem workflow guides every collaboration.</p>
             </form>
