@@ -139,13 +139,76 @@ function deleteFunderById(id){
   alert("Deleted backer: "+(target?target.name:id));
   render();
 }
+function editBuilderById(id){
+  let builders=load(LS_KEYS.builders, []);
+  const target=builders.find(b=> b.id===id) || SEED_BUILDERS.find(s=> s.id===id);
+  if(!target){ alert("Builder not found"); return; }
+  const newName=prompt("Edit name:", target.name||"");
+  if(newName===null) return;
+  const newSkills=prompt("Edit skills:", target.skills||"");
+  if(newSkills===null) return;
+  const updated={...target, name:newName.trim()||target.name, skills:newSkills.trim()||target.skills};
+  const next=builders.filter(b=> b.id!==id);
+  save(LS_KEYS.builders, [updated, ...next]);
+  alert("Updated builder: "+updated.name);
+  render();
+}
+function editFunderById(id){
+  let funders=load(LS_KEYS.funders, []);
+  const target=funders.find(f=> f.id===id) || SEED_FUNDERS.find(s=> s.id===id);
+  if(!target){ alert("Backer not found"); return; }
+  const newName=prompt("Edit name:", target.name||"");
+  if(newName===null) return;
+  const newFocus=prompt("Edit focus:", target.focus||"");
+  if(newFocus===null) return;
+  const updated={...target, name:newName.trim()||target.name, focus:newFocus.trim()||target.focus};
+  const next=funders.filter(f=> f.id!==id);
+  save(LS_KEYS.funders, [updated, ...next]);
+  alert("Updated backer: "+updated.name);
+  render();
+}
+function deleteIdeaById(id){
+  if(!confirm(`Delete idea ${id} ?`)) return;
+  let stored=load(LS_KEYS.ideas, []);
+  // also need to handle seed: if it's seed, we add tombstone by saving without it? Instead we store deleted marker
+  // For seed ideas, we save a filtered list with that id marked as deleted via localStorage hide flag is complex; instead we save stored with that id removed and also save a hidden set
+  const all=getAllData().ideas;
+  const target=all.find(i=>i.id===id);
+  const next=stored.filter(i=>i.id!==id);
+  // If it's a seed with no stored entry, we need to create a deletion marker: save a dummy with status Rejected to hide? Simpler: add to stored a tombstone with status Deleted
+  const isSeed = SEED_IDEAS.some(s=> s.id===id) && !stored.some(s=> s.id===id);
+  if(isSeed){
+    save(LS_KEYS.ideas, [{id, status:"Deleted_By_Admin", deleted:true}, ...next]);
+  } else {
+    save(LS_KEYS.ideas, next);
+  }
+  // also remove from Firestore? No — local only
+  alert("Deleted idea: "+(target?target.title:id));
+  render();
+}
+function editIdeaById(id){
+  const all=getAllData().ideas;
+  const target=all.find(i=>i.id===id);
+  if(!target){ alert("Idea not found"); return; }
+  const newTitle=prompt("Edit title:", target.title||"");
+  if(newTitle===null) return;
+  const newDesc=prompt("Edit description:", target.desc||"");
+  if(newDesc===null) return;
+  const updated={...target, title:newTitle.trim()||target.title, desc:newDesc.trim()||target.desc};
+  let stored=load(LS_KEYS.ideas, []);
+  const next=stored.filter(i=>i.id!==id);
+  save(LS_KEYS.ideas, [updated, ...next]);
+  alert("Updated idea: "+updated.title);
+  render();
+}
 
 function getAllData(){
-  // Deduplicate ideas by id — stored overrides seed (prevents replication on approve)
+  // Deduplicate ideas by id — stored overrides seed (prevents replication on approve), deleted tombstones hide seed
   const storedIdeas = load(LS_KEYS.ideas, []);
+  const deletedIds = new Set(storedIdeas.filter(i=> i.deleted).map(i=>i.id));
   const ideaMap = new Map();
-  SEED_IDEAS.forEach(i=> ideaMap.set(i.id, i));
-  storedIdeas.forEach(i=> ideaMap.set(i.id, i));
+  SEED_IDEAS.forEach(i=> { if(!deletedIds.has(i.id)) ideaMap.set(i.id, i); });
+  storedIdeas.forEach(i=> { if(i.deleted) ideaMap.delete(i.id); else ideaMap.set(i.id, i); });
   const ideas = Array.from(ideaMap.values());
   const regs = load(LS_KEYS.regs, null) || [
     {name:"Rahul Sharma", email:"rahul@uohyd.ac.in", role:"founder", registeredAt:"2026-08-23"},
@@ -361,11 +424,11 @@ function render(){
             <thead><tr class="text-xs text-slate-500 text-left border-b"><th class="pb-2">Name</th><th class="pb-2">Email</th><th class="pb-2">Role</th><th class="pb-2">Source</th><th class="pb-2">Action</th></tr></thead>
             <tbody class="divide-y">
               ${data.uniqUsers.map(u=>{
-                const isDemo = DEMO_USERS.some(d=> d.email.toLowerCase()===u.email.toLowerCase());
                 const escEmail = u.email.replace(/'/g, "\\'");
                 const escId = (u.id||"").toString().replace(/'/g, "\\'");
-                const delBtn = isDemo ? '<span class="text-[11px] text-slate-400">protected</span>' : `<button onclick="deleteUserByEmail('${escEmail}','${escId}')" class="h-7 px-3 rounded-full bg-white border border-red-200 text-red-600 text-xs font-bold hover:bg-red-50">Delete</button>`;
-                return `<tr><td class="py-3 font-semibold">${u.name||'<span class="text-slate-400 italic">no name</span>'}</td><td class="py-3 text-slate-600">${u.email}</td><td class="py-3"><span class="px-2 py-1 rounded-full text-xs font-bold border ${u.role==="founder"?"bg-indigo-50 border-indigo-200 text-indigo-700": u.role==="talent"?"bg-sky-50 border-sky-200 text-sky-700": u.role==="backer"?"bg-violet-50 border-violet-200 text-violet-700":"bg-slate-100 border-slate-200"}">${u.role}</span></td><td class="py-3 text-xs text-slate-500">${u.source||u.registeredAt||u.createdAt||"demo"}</td><td class="py-3">${delBtn}</td></tr>`;
+                const demoNote = DEMO_USERS.some(d=> d.email.toLowerCase()===u.email.toLowerCase()) ? ' • demo' : '';
+                const delBtn = `<button onclick="deleteUserByEmail('${escEmail}','${escId}')" class="h-7 px-3 rounded-full bg-white border border-red-200 text-red-600 text-xs font-bold hover:bg-red-50">Delete</button>`;
+                return `<tr><td class="py-3 font-semibold">${u.name||'<span class="text-slate-400 italic">no name</span>'}</td><td class="py-3 text-slate-600">${u.email}</td><td class="py-3"><span class="px-2 py-1 rounded-full text-xs font-bold border ${u.role==="founder"?"bg-indigo-50 border-indigo-200 text-indigo-700": u.role==="talent"?"bg-sky-50 border-sky-200 text-sky-700": u.role==="backer"?"bg-violet-50 border-violet-200 text-violet-700":"bg-slate-100 border-slate-200"}">${u.role}</span></td><td class="py-3 text-xs text-slate-500">${(u.source||u.registeredAt||u.createdAt||"demo")+demoNote}</td><td class="py-3">${delBtn}</td></tr>`;
               }).join("")}
             </tbody>
           </table>
@@ -385,8 +448,10 @@ function render(){
                 <div class="text-xs text-slate-500 mt-1">By ${idea.founder} • ${idea.status} • ${idea.createdDate||""}</div>
                 <div class="text-sm text-slate-600 mt-1">${idea.desc||""}</div>
               </div>
-              <div class="flex gap-2 shrink-0">
+              <div class="flex gap-2 shrink-0 flex-wrap">
                 ${idea.status==="Pending Review" ? `<button data-approve="${idea.id}" class="approveBtn h-8 px-3 rounded-full bg-slate-900 text-white text-xs font-bold">Approve</button><button data-reject="${idea.id}" class="rejectBtn h-8 px-3 rounded-full bg-white border border-slate-200 text-xs font-bold">Reject</button>` : `<span class="text-xs px-3 py-1 rounded-full bg-white border border-slate-200">${idea.status}</span>`}
+                <button data-edit-idea="${idea.id}" class="editIdeaBtn h-8 px-3 rounded-full bg-white border border-slate-200 text-xs font-bold">Edit</button>
+                <button data-delete-idea="${idea.id}" class="deleteIdeaBtn h-8 px-3 rounded-full bg-white border border-red-200 text-red-600 text-xs font-bold">Delete</button>
               </div>
             </div>
           `).join("")}
@@ -419,6 +484,8 @@ function render(){
       alert("Rejected");
       render();
     }));
+    content.querySelectorAll(".deleteIdeaBtn").forEach(b=> b.addEventListener("click", ()=> deleteIdeaById(b.dataset.deleteIdea)));
+    content.querySelectorAll(".editIdeaBtn").forEach(b=> b.addEventListener("click", ()=> editIdeaById(b.dataset.editIdea)));
 
   } else if(currentTab==="talent"){
     content.innerHTML = `
@@ -427,12 +494,12 @@ function render(){
         <p class="text-sm text-slate-500 mt-1">UoH students with skills — Builder accounts require @uohyd.ac.in</p>
         <div class="mt-4 grid sm:grid-cols-2 lg:grid-cols-3 gap-4">
           ${data.builders.map(b=>{
-            const isSeed = SEED_BUILDERS.some(s=> s.id===b.id);
             const displayName = b.name && b.name.trim() ? b.name : '<span class="text-amber-600 italic">missing name — check creation</span>';
             const displayEmail = b.email ? `<div class="text-[11px] text-slate-400 break-all">${b.email}</div>` : '';
             const escId = (b.id||"").toString().replace(/'/g, "\\'");
-            const delBtn = isSeed ? '<span class="text-[11px] text-slate-400">seed</span>' : `<button onclick="deleteBuilderById('${escId}')" class="h-7 px-3 rounded-full bg-white border border-red-200 text-red-600 text-xs font-bold hover:bg-red-50">Delete</button>`;
-            return `<div class="p-4 rounded-2xl border ${isSeed?"border-amber-200 bg-amber-50":"border-slate-200 bg-slate-50"} flex flex-col justify-between"><div><div class="font-bold flex items-center justify-between gap-2"><span>${displayName}</span>${delBtn}</div><div class="text-xs text-slate-500">${b.role||"Builder"}</div>${displayEmail}<div class="text-xs mt-2 bg-white border border-slate-200 rounded-xl p-2 break-words">${b.skills||"no skills"}</div></div><div class="mt-2 text-[11px] text-slate-400">ID: ${b.id}</div></div>`;
+            const delBtn = `<button onclick="deleteBuilderById('${escId}')" class="h-7 px-3 rounded-full bg-white border border-red-200 text-red-600 text-xs font-bold hover:bg-red-50">Delete</button>`;
+            const editBtn = `<button onclick="editBuilderById('${escId}')" class="h-7 px-3 rounded-full bg-white border border-slate-200 text-slate-600 text-xs font-bold hover:bg-slate-50">Edit</button>`;
+            return `<div class="p-4 rounded-2xl border border-slate-200 bg-slate-50 flex flex-col justify-between"><div><div class="font-bold flex items-center justify-between gap-2"><span>${displayName}</span><div class="flex gap-1">${editBtn}${delBtn}</div></div><div class="text-xs text-slate-500">${b.role||"Builder"}</div>${displayEmail}<div class="text-xs mt-2 bg-white border border-slate-200 rounded-xl p-2 break-words">${b.skills||"no skills"}</div></div><div class="mt-2 text-[11px] text-slate-400">ID: ${b.id}</div></div>`;
           }).join("")}
         </div>
         ${data.builders.length===0 ? '<div class="mt-4 text-center text-sm text-slate-500">No builders yet — create via Create Account tab.</div>' : ''}
@@ -445,12 +512,12 @@ function render(){
         <p class="text-sm text-slate-500 mt-1">Open to outside — any verified email allowed</p>
         <div class="mt-4 grid md:grid-cols-2 gap-4">
           ${data.funders.map(f=>{
-            const isSeed = SEED_FUNDERS.some(s=> s.id===f.id);
             const displayName = f.name && f.name.trim() ? f.name : '<span class="text-amber-600 italic">missing name</span>';
             const displayEmail = f.email ? `<div class="text-[11px] text-slate-400 break-all">${f.email}</div>` : '';
             const escId = (f.id||"").toString().replace(/'/g, "\\'");
-            const delBtn = isSeed ? '<span class="text-[11px] text-slate-400">seed</span>' : `<button onclick="deleteFunderById('${escId}')" class="h-7 px-3 rounded-full bg-white border border-red-200 text-red-600 text-xs font-bold hover:bg-red-50">Delete</button>`;
-            return `<div class="p-4 rounded-2xl border ${isSeed?"border-amber-200 bg-amber-50":"border-slate-200 bg-slate-50"} flex flex-col justify-between"><div><div class="font-bold flex items-center justify-between gap-2"><span>${displayName}</span>${delBtn}</div><div class="text-xs text-slate-500">${f.role||"Backer"} • ${f.ticketSize||""}</div>${displayEmail}<div class="text-xs mt-2">${f.focus||""}</div><div class="text-sm mt-2 text-slate-600 break-words">${f.bio||""}</div></div><div class="mt-2 text-[11px] text-slate-400">ID: ${f.id}</div></div>`;
+            const delBtn = `<button onclick="deleteFunderById('${escId}')" class="h-7 px-3 rounded-full bg-white border border-red-200 text-red-600 text-xs font-bold hover:bg-red-50">Delete</button>`;
+            const editBtn = `<button onclick="editFunderById('${escId}')" class="h-7 px-3 rounded-full bg-white border border-slate-200 text-slate-600 text-xs font-bold hover:bg-slate-50">Edit</button>`;
+            return `<div class="p-4 rounded-2xl border border-slate-200 bg-slate-50 flex flex-col justify-between"><div><div class="font-bold flex items-center justify-between gap-2"><span>${displayName}</span><div class="flex gap-1">${editBtn}${delBtn}</div></div><div class="text-xs text-slate-500">${f.role||"Backer"} • ${f.ticketSize||""}</div>${displayEmail}<div class="text-xs mt-2">${f.focus||""}</div><div class="text-sm mt-2 text-slate-600 break-words">${f.bio||""}</div></div><div class="mt-2 text-[11px] text-slate-400">ID: ${f.id}</div></div>`;
           }).join("")}
         </div>
         ${data.funders.length===0 ? '<div class="mt-4 text-center text-sm text-slate-500">No backers yet.</div>' : ''}

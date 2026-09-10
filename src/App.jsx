@@ -322,7 +322,8 @@ export default function App() {
   });
 
   useEffect(() => {
-    dbService.getIdeas(INITIAL_IDEAS).then((data) => {
+    const hide = localStorage.getItem("startify_hide_demo")==="true";
+    dbService.getIdeas(hide ? [] : INITIAL_IDEAS).then((data) => {
       if (data && data.length > 0) setIdeas(data);
     });
     // Load admin-persisted talent/backers/events for launch

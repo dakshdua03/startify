@@ -118,17 +118,29 @@ export const dbService = {
   },
   async saveServices(services) { localStorage.setItem("startify_offered_services", JSON.stringify(services)); return true; },
   async getIdeas(defaultIdeas = []) {
+    let cloudIdeas = [];
     if (isFirebaseConfigured && db) {
       try {
         const q = query(collection(db, "ideas"), orderBy("created_at", "desc"), limit(50));
         const snap = await getDocs(q);
-        const cloudIdeas = snap.docs.map(d => ({ id: d.id, ...d.data() }));
-        if (cloudIdeas && cloudIdeas.length > 0) return cloudIdeas;
+        cloudIdeas = snap.docs.map(d => ({ id: d.id, ...d.data() }));
       } catch (err) { console.warn("Firestore fetch ideas failed, using local", err); }
     }
-    const local = localStorage.getItem("startify_submitted_ideas");
-    if (local) { try { return [...JSON.parse(local), ...defaultIdeas]; } catch (e) { console.error(e); } }
-    return defaultIdeas;
+    const local = (()=>{ try{ return JSON.parse(localStorage.getItem("startify_submitted_ideas")||"[]"); }catch{return [];} })();
+    // Handle soft-deleted demos (admin tombstones)
+    const deletedIds = new Set(local.filter(i=> i.deleted).map(i=>i.id));
+    const filteredDefault = defaultIdeas.filter(i=> !deletedIds.has(i.id));
+    const filteredLocal = local.filter(i=> !i.deleted);
+    const filteredCloud = cloudIdeas.filter(i=> !i.deleted && !deletedIds.has(i.id));
+    // Merge cloud + local + default (demos treated as real), dedupe by id, cloud newest first
+    const map = new Map();
+    [...filteredDefault, ...filteredLocal].forEach(i=> { if(i && i.id) map.set(i.id, i); });
+    filteredCloud.forEach(i=> { if(i && i.id) map.set(i.id, i); });
+    const merged = Array.from(map.values());
+    if (merged.length > 0) return merged;
+    if (filteredCloud.length > 0) return filteredCloud;
+    if (filteredLocal.length > 0) return [...filteredLocal, ...filteredDefault];
+    return filteredDefault;
   },
   async saveIdea(idea) {
     const existing = JSON.parse(localStorage.getItem("startify_submitted_ideas") || "[]");
