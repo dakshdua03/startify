@@ -5,11 +5,11 @@
 export async function onRequestPost(context) {
   try {
     const body = await context.request.json();
-    const { name, idea, help, budget, service } = body;
+    const { name, idea, help, budget, service, email } = body;
 
-    // Basic validation
-    if (!name || !idea) {
-      return new Response(JSON.stringify({ error: "name and idea required" }), { status: 400 });
+    // Basic validation — accept both idea posts and auth registrations
+    if (!name || (!idea && !email)) {
+      return new Response(JSON.stringify({ error: "name and email/idea required" }), { status: 400 });
     }
 
     // If KV bound, save there (uncomment after creating KV)

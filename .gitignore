@@ -5,3 +5,7 @@ dist/
 ADMIN_CREDENTIALS.local.md
 *.local.md
 .DS_Store
+.firebase/
+.firebaserc
+firebase-debug.log
+opencode.json

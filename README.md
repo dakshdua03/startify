@@ -1,172 +1,79 @@
-
 # Startify - Daksh Dua | Accelerator @ UoH
+
+**Live:** https://startify1.pages.dev / https://startify2.pages.dev
 
 **I help founders at UoH build & grow profitable businesses.**
 
-This is the full local codebase for Startify platform - positioned as YOUR accelerator brand, not just a community board.
+Share this link — anyone at UoH can join as Founder (@uohyd.ac.in), Builder (@uohyd.ac.in), or Backer (any email). Password + email verification link, Firestore DB.
 
-## Founder Brand Positioning
-- You are the product, Startify is the method
-- Services are monetizable (Idea Validation ₹999, MVP ₹4999, Growth ₹2999/mo, Fundraising ₹1999, Team Free, Community Free→₹499/yr)
-- Batch 1 free till Dec 2025, paid Jan 2026 - urgency to lock free
-- 8-week Startify Accelerate program Batch 1 free → next ₹9999
+## Join in 30s
+1. Open live link → `Sign in` → `Create Account` → pick role → `Founder` / `Builder` needs `@uohyd.ac.in`, `Backer` any email
+2. Enter password (6+ chars) → Create → check inbox for `Verify your email for Startify` → click link
+3. Back to site → `Sign In` → dashboard: Ideas Board / Skilled Talent / Backers Hub / Events / Chats
 
-## Features Included
-1. **Hero with Daksh as accelerator** - profile card, stats 11 businesses, 187 members, 2x growth
-2. **Services grid** - 6 monetizable services with outcome badges, booking modals
-3. **8-Week Accelerator** - dark section, week breakdown, Apply CTA
-4. **5 Community Tools** - Ideas, Business & Resources, Skills & Talent, Core Team, Community - with your custom logos (in src/assets/)
-5. **Case Studies** - Businesses you've helped grow (UoH Merch 2.6x, CampusKart 0→47 users, Chai & Code idea→revenue)
-6. **Pricing Table** - Free / Builder ₹999/mo / Accelerator ₹9999 - monthly/yearly toggle, future monetization note
-7. **Booking System** - Modal with form (name, idea, help, budget) saves to localStorage key startify_bookings, ready for Razorpay integration
-8. **Group Modals** - WhatsApp join flow via Daksh request
-9. **Admin Panel** - Separate artifact (container:///mnt/data/startify_admin_panel_agentic_artifact_3_37fce3d03942.html) - password startifyUoH2025 - manages Ideas, Talent, Businesses, Mentors, Community, Members, Events, Settings, Export JSON
+> Verification email from `noreply@startify-01.firebaseapp.com` (or `startifyuoh@gmail.com` if SMTP enabled). Check Spam. Link expires 3 days. `Resend link` or `Forgot password` available on Sign In.
+
+## Features
+- **Ideas Board** — post CampusKart-style ideas, seek co-founders
+- **Skilled Talent** — find React/Node/Figma builders
+- **Backers Hub** — angel mentors, pre-seed micro-capital
+- **Events** — Demo Day, speed networking
+- **Chats & Requests** — connect → accept → message
+- **Dashboard** — your ideas, incoming/outgoing requests
+- **Admin** — `/admin.html` → Ideas/Talent/Registrations/Payments (password `startifyUoH2025`, change in `public/admin.html:28`)
+
+## Tech Stack
+- **Frontend:** React 18 + Vite + Tailwind, deployed on **Cloudflare Pages** (free, commercial allowed, unlimited bandwidth)
+- **Auth:** Firebase Auth Email/Password + verification link (SMTP via `startifyuoh@gmail.com` optional)
+- **DB:** Firebase Firestore (`ideas`, `registrations`, `payments`) + localStorage fallback — 50k reads/day free
+- **Payments:** Razorpay (test `rzp_test_StartifyDemoKey`, set `VITE_RAZORPAY_KEY_ID`)
+- **Functions:** `functions/api/bookings.js` + `ideas.js` on Cloudflare edge (100k req/day free)
 
 ## Run Locally
 ```bash
 npm install
-npm run dev
-```
-Open http://localhost:3000
-
-## Build for Production
-```bash
-npm run build
-npm run preview
+cp .env.example .env   # fill VITE_FIREBASE_*
+npm run dev            # http://localhost:3000
+npm run build && npm run preview
 ```
 
-## Future Monetization - How You Charge (as requested)
-1. **Add Razorpay**: 
-   - Create .env with VITE_RAZORPAY_KEY_ID
-   - In src/App.jsx handleSubmit, after form save, call Razorpay checkout
-   - Example in code comments near handleSubmit
+## Env Vars
+Local `.env` and Cloudflare Pages → `Settings → Environment variables` (Production):
+```
+VITE_FIREBASE_API_KEY=AIzaSy...
+VITE_FIREBASE_AUTH_DOMAIN=startify-01.firebaseapp.com
+VITE_FIREBASE_PROJECT_ID=startify-01
+VITE_FIREBASE_STORAGE_BUCKET=startify-01.firebasestorage.app
+VITE_FIREBASE_MESSAGING_SENDER_ID=451...
+VITE_FIREBASE_APP_ID=1:451...web:abc...
+VITE_RAZORPAY_KEY_ID=rzp_test_xxxx
+```
+See `.env.example`.
 
-2. **Database**: Replace localStorage with Supabase/Firebase
-   - Create table bookings, ideas, talent
-   - Update handleSubmit to insert to Supabase
+## Firebase Setup (once)
+1. https://console.firebase.google.com → project `startify-01` → `Firestore Database → Create → Test mode → asia-south1` → Rules:
+```js
+rules_version='2'; service cloud.firestore { match /databases/{database}/documents {
+  match /ideas/{d} { allow read, write: if true; }
+  match /registrations/{d} { allow read, write: if true; }
+  match /payments/{d} { allow read, write: if true; }
+}}
+```
+2. `Authentication → Sign-in method → Email/Password → Enable`
+3. `Authentication → Templates → Email address verification` → Subject `Verify your email for Startify` → Body with `%LINK%` → Save, set `Public-facing name: Startify`
+4. `Authentication → Settings → Authorized domains → Add` `startify1.pages.dev`, `startify2.pages.dev`, `localhost`
+5. Optional SMTP: `Authentication → Settings → SMTP → smtp.gmail.com:587` with App Password to send from `startifyuoh@gmail.com`
 
-3. **UoH Verification**: Add email check @uohyd.ac.in for free tier
+## Deploy
+Push to `main` → Cloudflare Pages auto-deploys via GitHub webhook (`dakshdua03/startify`).
 
-4. **Deploy**: Vercel - import this folder, env vars, deploy
+- Build: `npm run build` → `dist` (ignored in repo, built on Cloudflare)
+- Custom domain: `Pages → Custom domains → startify.yourdomain.com` (free)
 
-## Your Logos Included
-- src/assets/startify_ideas_logo_1.webp
-- src/assets/startify_business_resources_logo_1.webp
-- src/assets/startify_skills_talent_badge.webp
-- src/assets/core_team_shield_logo.webp
-- src/assets/community_network_logo.webp
-All have beautiful Startify wordmark small + group icon big - as you requested (group purpose broad, Startify logo small but present)
-
-## Admin Panel
-Full admin is at artifact link. To integrate locally:
-- Copy admin artifact source into src/Admin.jsx
-- Add route in main.jsx: <Route path="/admin" element={<Admin />} />
-
-Password: startifyUoH2025
+## Sharing
+Send `https://startify1.pages.dev` — no install, works on phone/desktop. New users click `Create Account` and go through verification above.
 
 ## Contact
-Daksh Dua - dakshdua03 Instagram
-Built to help people grow businesses with Startify platform
+Daksh Dua — dakshdua03 (Instagram)
 
-## Next Steps You Asked
-- Charge people: pricing table already shows future prices, Razorpay placeholder ready
-- Market YOU not just idea: hero is Daksh, services are your offers, case studies are your wins, Startify is your system
-
-Enjoy!
-
-
----
-
-## ☁️ Cloudflare Pages Deployment (RECOMMENDED FOR YOU - Commercial Use Allowed on Free)
-
-### Why Cloudflare Pages for Startify?
-- **YES commercial use on FREE tier** - Unlike Vercel Hobby ($0 but personal only), Cloudflare explicitly allows monetization on free. You will charge ₹999/₹2999/₹9999 from Jan 2026, so you NEED this.
-- **Unlimited bandwidth** - UoH has 5000+ students, if your Idea Board goes viral, Netlify 100GB cap would cut you. Cloudflare = unlimited, no overage bills.
-- **500 builds/mo, custom domains free, Workers 100k req/day free**
-
-### Deploy in 2 minutes (Dashboard method - easiest):
-
-1. Push this folder to GitHub:
-   ```bash
-   git init
-   git add .
-   git commit -m "Startify accelerator v2 - Cloudflare ready"
-   git branch -M main
-   git remote add origin https://github.com/dakshdua03/startify.git
-   git push -u origin main
-   ```
-
-2. Go to https://dash.cloudflare.com → Pages → Create a project → Connect to Git → Select `startify` repo
-
-3. Build settings:
-   - Framework preset: Vite
-   - Build command: `npm run build`
-   - Build output directory: `dist`
-   - Root directory: `/` (leave empty)
-
-4. Env vars (Add in Cloudflare Pages → Settings → Environment variables):
-   ```
-   VITE_RAZORPAY_KEY_ID=rzp_test_xxxx
-   VITE_FIREBASE_API_KEY=AIzaSy...
-   VITE_FIREBASE_AUTH_DOMAIN=your-project.firebaseapp.com
-   VITE_FIREBASE_PROJECT_ID=your-project
-   VITE_FIREBASE_STORAGE_BUCKET=your-project.appspot.com
-   VITE_FIREBASE_MESSAGING_SENDER_ID=123...
-   VITE_FIREBASE_APP_ID=1:123:web:abc...
-   ```
-
-5. Click Save and Deploy → Live at `startify-daksh-accelerator.pages.dev`
-
-6. Add custom domain (free): Pages → Custom domains → `startify.yourdomain.com` or `dakshdua03.com`
-
-### Deploy via Wrangler CLI (alternative):
-
-```bash
-npm install -g wrangler
-wrangler login
-npm run build
-wrangler pages publish dist --project-name=startify-daksh-accelerator
-```
-
-### GitHub Actions Auto-Deploy (already included):
-
-File `.github/workflows/cloudflare-pages.yml` auto-deploys on every push to main.
-
-Setup secrets in GitHub repo → Settings → Secrets:
-- `CLOUDFLARE_API_TOKEN` - from Cloudflare → My Profile → API Tokens → Create Token → Edit Cloudflare Workers template
-- `CLOUDFLARE_ACCOUNT_ID` - from Cloudflare Dashboard → right sidebar
-
-### Cloudflare Pages Functions (Backend - optional):
-
-You have `functions/api/bookings.js` and `functions/api/ideas.js` already.
-
-- They run on Cloudflare's edge, 100k req/day free, commercial allowed
-- Currently they just return success and rely on frontend localStorage
-- To make real DB: connect Supabase in the function, or KV namespace
-
-Example: To save bookings to KV:
-1. Cloudflare Dashboard → Workers & Pages → KV → Create namespace `BOOKINGS`
-2. Pages → your project → Settings → Functions → KV namespace bindings → Add `BOOKINGS_KV`
-3. Uncomment KV code in `functions/api/bookings.js`
-
-### What about backend / DB?
-
-- **Frontend**: Cloudflare Pages (this project)
-- **Database**: Supabase free tier (also allows commercial) - 500MB, 50k monthly active users free
-- **Payments**: Razorpay (client-side checkout works on Cloudflare Pages)
-- **No need for Render** - Render free sleeps after 15 min, bad for store/API
-
-### Migration from Vercel/Netlify?
-
-If you already deployed to Vercel Hobby, migrate now before you start charging, because Vercel ToS will force Pro $20/mo once you monetize. Cloudflare free stays free for commercial.
-
-### Your Monetization Path on Cloudflare Free:
-
-- Till Dec 2025: Free for UoH - build proof, get 7 founders for Batch 1
-- Jan 2026: Add Razorpay checkout in `src/App.jsx` handleSubmit → call `functions/api/bookings.js` which creates Razorpay order
-- Still on Cloudflare Pages free tier - no need to pay Cloudflare
-
-<!-- deploy-trigger: 2026-09-09 rebuild with debug logs for verification email flow -->
-
----
-
+<!-- deploy-trigger: 2026-09-10 finalize for sharing — cleaned dist/.env, fixed bookings API, polished README -->
