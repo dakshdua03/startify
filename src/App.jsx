@@ -295,7 +295,6 @@ export default function App() {
     name: "",
     email: "",
     password: "",
-    studentId: "",
     roleTitle: "",
     skills: "",
     focus: "",
@@ -305,7 +304,6 @@ export default function App() {
   const [newIdeaForm, setNewIdeaForm] = useState({
     title: "",
     category: "Tech / AI",
-    studentId: "",
     desc: "",
     seeking: "Tech Co-Founder"
   });
@@ -420,7 +418,8 @@ export default function App() {
     try {
       const key="startify_user_profiles";
       const existing=JSON.parse(localStorage.getItem(key)||"[]");
-      const normalized={ id:newUser.id, name:newUser.name, email:newUser.email.toLowerCase(), role:newUser.role, studentId:newUser.studentId||"", roleTitle:newUser.roleTitle||"", skills:newUser.skills||"", focus:newUser.focus||"", bio:newUser.bio||"", createdAt:new Date().toISOString() };
+      const derivedSid = newUser.email.split("@")[0].toUpperCase();
+      const normalized={ id:newUser.id, name:newUser.name, email:newUser.email.toLowerCase(), role:newUser.role, studentId: derivedSid, roleTitle:newUser.roleTitle||"", skills:newUser.skills||"", focus:newUser.focus||"", bio:newUser.bio||"", createdAt:new Date().toISOString() };
       const filtered=existing.filter(p=> !(p.email.toLowerCase()===normalized.email.toLowerCase() && p.role===normalized.role));
       localStorage.setItem(key, JSON.stringify([normalized, ...filtered]));
     } catch {}
@@ -467,7 +466,7 @@ export default function App() {
       showToast(`Registered as ${targetRole.toUpperCase()}! Welcome, ${newUser.name}.`);
     }
     setAuthModalOpen(false);
-    setAuthForm({ name: "", email: "", password: "", studentId: "", roleTitle: "", skills: "", focus: "", bio: "" });
+    setAuthForm({ name: "", email: "", password: "", roleTitle: "", skills: "", focus: "", bio: "" });
     setResetMode(false);
   };
 
@@ -529,7 +528,7 @@ export default function App() {
             setActiveTab("dashboard");
             showToast(`Welcome back, ${demoUserEarly.name}! (Demo)`);
             setAuthModalOpen(false);
-            setAuthForm({ name: "", email: "", password: "", studentId: "", roleTitle: "", skills: "", focus: "", bio: "" });
+            setAuthForm({ name: "", email: "", password: "", roleTitle: "", skills: "", focus: "", bio: "" });
             setResetMode(false);
             return;
           }
@@ -551,7 +550,7 @@ export default function App() {
             setActiveTab("dashboard");
             showToast(`Welcome back, ${reuseUser.name}!`);
             setAuthModalOpen(false);
-            setAuthForm({ name: "", email: "", password: "", studentId: "", roleTitle: "", skills: "", focus: "", bio: "" });
+            setAuthForm({ name: "", email: "", password: "", roleTitle: "", skills: "", focus: "", bio: "" });
             setResetMode(false);
             return;
           }
@@ -561,7 +560,7 @@ export default function App() {
           setActiveTab("dashboard");
           showToast(`Welcome, ${email}!`);
           setAuthModalOpen(false);
-          setAuthForm({ name: "", email: "", password: "", studentId: "", roleTitle: "", skills: "", focus: "", bio: "" });
+          setAuthForm({ name: "", email: "", password: "", roleTitle: "", skills: "", focus: "", bio: "" });
           return;
         }
       } catch (err) {
@@ -582,7 +581,7 @@ export default function App() {
         if (hasStoredPassword && !checkCredential(email, password)) { showToast("Incorrect password."); return; }
         if (!hasStoredPassword) saveCredential(email, password);
         setCurrentUser(demoUser); setActiveTab("dashboard"); showToast(`Welcome back, ${demoUser.name}!`);
-        setAuthModalOpen(false); setAuthForm({ name: "", email: "", password: "", studentId: "", roleTitle: "", skills: "", focus: "", bio: "" }); setResetMode(false); return;
+        setAuthModalOpen(false); setAuthForm({ name: "", email: "", password: "", roleTitle: "", skills: "", focus: "", bio: "" }); setResetMode(false); return;
       }
       let existingProfile = null;
       try {
@@ -594,7 +593,7 @@ export default function App() {
         if (!hasStoredPassword) saveCredential(email, password);
         const reuseUser = { id: existingProfile.id, name: existingProfile.name || email.split("@")[0], email: existingProfile.email, role: existingProfile.role || targetRole, bio: existingProfile.bio || "" };
         setCurrentUser(reuseUser); setActiveTab("dashboard"); showToast(`Welcome back, ${reuseUser.name}!`);
-        setAuthModalOpen(false); setAuthForm({ name: "", email: "", password: "", studentId: "", roleTitle: "", skills: "", focus: "", bio: "" }); setResetMode(false); return;
+        setAuthModalOpen(false); setAuthForm({ name: "", email: "", password: "", roleTitle: "", skills: "", focus: "", bio: "" }); setResetMode(false); return;
       }
       showToast("No account found for this email. Switch to Create Account."); return;
     }
@@ -605,7 +604,8 @@ export default function App() {
         if (profiles.some(p => p.email.toLowerCase()===email.toLowerCase() && p.role===targetRole)) { showToast("An account with this email and role already exists. Please Sign In."); return; }
       } catch {}
       if (hasStoredPassword && !checkCredential(email, password)) { showToast("An account with this email already uses a different password."); return; }
-      const pendingUser = { id: `user_${Date.now()}`, name: authForm.name.trim(), email, role: targetRole, studentId: authForm.studentId, roleTitle: authForm.roleTitle, skills: authForm.skills, focus: authForm.focus, bio: authForm.bio };
+      const derivedStudentId = email.split("@")[0].toUpperCase();
+      const pendingUser = { id: `user_${Date.now()}`, name: authForm.name.trim(), email, role: targetRole, studentId: derivedStudentId, roleTitle: authForm.roleTitle, skills: authForm.skills, focus: authForm.focus, bio: authForm.bio };
       if ((pendingUser.role === "founder" || pendingUser.role === "talent") && !isUoHEmail(pendingUser.email)) { showToast("Founder/Builder requires @uohyd.ac.in."); return; }
       completeRegistration(pendingUser, targetRole);
     }
@@ -629,7 +629,7 @@ export default function App() {
       founder: currentUser.name,
       email: currentUser.email.toLowerCase(),
       verifiedStudent: true,
-      studentId: currentUser.studentId || "UOH",
+      studentId: currentUser.email.split("@")[0].toUpperCase(),
       desc: newIdeaForm.desc,
       seeking: newIdeaForm.seeking,
       status: "Pending Review",
@@ -640,7 +640,7 @@ export default function App() {
     setIdeas([newIdea, ...ideas]);
     setIdeaModalOpen(false);
     showToast(`✓ Idea "${newIdeaForm.title}" sent for admin review.`);
-    setNewIdeaForm({ title: "", category: "Tech / AI", studentId: "", desc: "", seeking: "Tech Co-Founder" });
+    setNewIdeaForm({ title: "", category: "Tech / AI", desc: "", seeking: "Tech Co-Founder" });
   };
 
   const handleApproveIdea = (ideaId) => {
@@ -1679,7 +1679,7 @@ export default function App() {
                                   const mapped={ id: target.id, name: currentUser.name, email: target.email, role: target.role, studentId: target.studentId|| currentUser.studentId, bio: getProfileAbout(target.email) || target.bio|| currentUser.bio||"", roleTitle: target.roleTitle||"", skills: target.skills||"", focus: target.focus||"" }; setCurrentUser(mapped); setProfileSwitcherOpen(false); showToast(`Switched to ${o.label} — same name & photo kept`);
                                 }
                               }} className="h-8 px-3 rounded-full bg-slate-900 text-white text-xs font-bold hover:bg-slate-800 w-full">Switch →</button> : <button onClick={()=>{
-                                setAuthForm({...authForm, name: currentUser.name, email: currentUser.email, studentId: currentUser.studentId||"", roleTitle:"", skills:"", focus:"", bio:""});
+                                setAuthForm({...authForm, name: currentUser.name, email: currentUser.email, roleTitle:"", skills:"", focus:"", bio:""});
                                 setSelectedRegisterRole(o.role);
                                 setAuthMode("register");
                                 setAuthModalOpen(true);
