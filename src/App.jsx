@@ -318,7 +318,13 @@ export default function App() {
     time: "",
     venue: "",
     category: "Pitch Night",
-    desc: ""
+    desc: "",
+    thumbnail: "",
+    organizer: "",
+    capacity: "",
+    eventType: "Offline",
+    tags: "",
+    link: ""
   });
 
   useEffect(() => {
@@ -333,7 +339,11 @@ export default function App() {
       const f = JSON.parse(localStorage.getItem("startify_admin_funders") || "null");
       if (f && Array.isArray(f) && f.length) setFunders((prev) => [...f, ...prev]);
       const ev = JSON.parse(localStorage.getItem("startify_events") || "null");
-      if (ev && Array.isArray(ev) && ev.length) setEvents((prev) => [...ev, ...prev]);
+      if (ev && Array.isArray(ev) && ev.length) {
+        const deletedIds = new Set(ev.filter(x=>x.deleted).map(x=>x.id));
+        const filtered = ev.filter(x=>!x.deleted);
+        setEvents((prev) => [...filtered, ...prev.filter(p=>!deletedIds.has(p.id))]);
+      }
       const req = JSON.parse(localStorage.getItem("startify_requests") || "null");
       if (req && Array.isArray(req) && req.length) setRequests((prev) => [...req, ...prev]);
       const msgs = JSON.parse(localStorage.getItem("startify_messages") || "null");
@@ -1497,45 +1507,57 @@ export default function App() {
             {events.map((ev) => (
               <div
                 key={ev.id}
-                className="rounded-[24px] border border-slate-200 bg-white p-6 flex flex-col justify-between hover:border-slate-300 transition shadow-sm"
+                className="rounded-[24px] border border-slate-200 bg-white overflow-hidden flex flex-col justify-between hover:border-slate-300 transition shadow-sm"
                 style={{color: '#0f172a'}}
               >
-                <div>
-                  <div className="flex items-center justify-between">
-                    <span className="text-[10.5px] font-bold px-3 py-1 rounded-full bg-slate-100 border border-slate-200 text-slate-700 uppercase">
-                      {ev.category}
-                    </span>
-                    <span className="text-[11px] text-slate-500 font-medium">
-                      {ev.date}
-                    </span>
+                {ev.thumbnail && <img src={ev.thumbnail} alt={ev.title} className="h-40 w-full object-cover" />}
+                <div className="p-6 flex-1 flex flex-col">
+                  <div>
+                    <div className="flex items-center justify-between">
+                      <span className="text-[10.5px] font-bold px-3 py-1 rounded-full bg-slate-100 border border-slate-200 text-slate-700 uppercase">{ev.category}</span>
+                      <span className="text-[11px] text-slate-500 font-medium">{ev.date}</span>
+                    </div>
+                    <h3 className="font-heading font-extrabold text-[20px] mt-4" style={{color: '#0f172a'}}>{ev.title}</h3>
+                    <div className="mt-3 space-y-1.5 text-[12.5px] text-slate-600">
+                      <div>🕒 <strong>Time:</strong> {ev.time}</div>
+                      <div>📍 <strong>Venue:</strong> {ev.venue}</div>
+                      {ev.organizer && <div>👤 <strong>Organizer:</strong> {ev.organizer}</div>}
+                      {ev.eventType && <div>🏷️ <strong>Type:</strong> {ev.eventType} {ev.capacity ? `• ${ev.capacity}` : ""}</div>}
+                      {ev.tags && <div>🔖 <strong>Tags:</strong> {ev.tags}</div>}
+                    </div>
+                    <p className="text-[13.5px] leading-[1.55] mt-4" style={{color: '#334155'}}>{ev.desc}</p>
                   </div>
-
-                  <h3 className="font-heading font-extrabold text-[20px] mt-4" style={{color: '#0f172a'}}>
-                    {ev.title}
-                  </h3>
-
-                  <div className="mt-3 space-y-1.5 text-[12.5px] text-slate-600">
-                    <div>🕒 <strong>Time:</strong> {ev.time}</div>
-                    <div>📍 <strong>Venue:</strong> {ev.venue}</div>
+                  <div className="mt-6 pt-4 border-t border-slate-200 space-y-2">
+                    <button onClick={() => { requireAuth(() => { setTargetEvent(ev); setEventModalOpen(true); }); }} className="w-full h-10 rounded-full bg-slate-900 text-white text-[12.5px] font-bold hover:bg-slate-800 transition">RSVP for Event →</button>
+                    {currentUser?.role==="admin" && (
+                      <div className="flex gap-2">
+                        <button onClick={()=>{
+                          setEventForm({ title: ev.title, date: ev.date, time: ev.time, venue: ev.venue, category: ev.category, desc: ev.desc, thumbnail: ev.thumbnail||"", organizer: ev.organizer||"", capacity: ev.capacity||"", eventType: ev.eventType||"Offline", tags: ev.tags||"", link: ev.link||"" });
+                          // remove old then will add on save
+                          const next=events.filter(x=>x.id!==ev.id);
+                          setEvents(next);
+                          try{ localStorage.setItem("startify_events", JSON.stringify(next)); }catch{}
+                          setEventAddModalOpen(true);
+                        }} className="flex-1 h-8 rounded-full bg-white border border-slate-200 text-xs font-bold hover:bg-slate-50">Edit</button>
+                        <button onClick={()=>{
+                          if(!confirm(`Delete event ${ev.title}?`)) return;
+                          const isSeed = INITIAL_EVENTS.some(s=>s.id===ev.id);
+                          const next=events.filter(x=>x.id!==ev.id);
+                          setEvents(next);
+                          try{
+                            const stored = JSON.parse(localStorage.getItem("startify_events")||"[]");
+                            const filteredStored = stored.filter(x=>x.id!==ev.id);
+                            if(isSeed) {
+                              localStorage.setItem("startify_events", JSON.stringify([{id:ev.id, deleted:true}, ...filteredStored]));
+                            } else {
+                              localStorage.setItem("startify_events", JSON.stringify(next.filter(x=>INITIAL_EVENTS.every(s=>s.id!==x.id))));
+                            }
+                          }catch{}
+                          showToast("Event deleted");
+                        }} className="flex-1 h-8 rounded-full bg-white border border-red-200 text-red-600 text-xs font-bold hover:bg-red-50">Delete</button>
+                      </div>
+                    )}
                   </div>
-
-                  <p className="text-[13.5px] leading-[1.55] mt-4" style={{color: '#334155'}}>
-                    {ev.desc}
-                  </p>
-                </div>
-
-                <div className="mt-6 pt-4 border-t border-slate-200">
-                  <button
-                    onClick={() => {
-                      requireAuth(() => {
-                        setTargetEvent(ev);
-                        setEventModalOpen(true);
-                      });
-                    }}
-                    className="w-full h-10 rounded-full bg-slate-900 text-white text-[12.5px] font-bold hover:bg-slate-800 transition"
-                  >
-                    RSVP for Event →
-                  </button>
                 </div>
               </div>
             ))}
@@ -2622,14 +2644,22 @@ export default function App() {
                   time: eventForm.time,
                   venue: eventForm.venue,
                   category: eventForm.category,
-                  desc: eventForm.desc
+                  desc: eventForm.desc,
+                  thumbnail: eventForm.thumbnail,
+                  organizer: eventForm.organizer,
+                  capacity: eventForm.capacity,
+                  eventType: eventForm.eventType,
+                  tags: eventForm.tags,
+                  link: eventForm.link
                 };
-                setEvents([newEvent, ...events]);
+                const updated = [newEvent, ...events];
+                setEvents(updated);
+                try { localStorage.setItem("startify_events", JSON.stringify(updated)); } catch {}
                 setEventAddModalOpen(false);
-                setEventForm({ title: "", date: "", time: "", venue: "", category: "Pitch Night", desc: "" });
+                setEventForm({ title: "", date: "", time: "", venue: "", category: "Pitch Night", desc: "", thumbnail: "", organizer: "", capacity: "", eventType: "Offline", tags: "", link: "" });
                 showToast("Event created and published.");
               }}
-              className="mt-5 space-y-4"
+              className="mt-5 space-y-4 max-h-[65vh] overflow-y-auto pr-1"
             >
               <div>
                 <label className="block text-[12px] font-semibold text-slate-600 mb-1">Event Title *</label>
@@ -2660,7 +2690,42 @@ export default function App() {
               </div>
               <div>
                 <label className="block text-[12px] font-semibold text-slate-600 mb-1">Description *</label>
-                <textarea required value={eventForm.desc} onChange={(e) => setEventForm({ ...eventForm, desc: e.target.value })} placeholder="Give a short description of the event." className="w-full min-h-[90px] rounded-[20px] bg-zinc-900 border border-white/15 p-4 text-[13px] text-white outline-none focus:border-white" />
+                <textarea required value={eventForm.desc} onChange={(e) => setEventForm({ ...eventForm, desc: e.target.value })} placeholder="Give a short description of the event." className="w-full min-h-[90px] rounded-[20px] bg-slate-50 border border-slate-200 p-4 text-[13px] text-slate-800 outline-none focus:border-slate-400" />
+              </div>
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-[12px] font-semibold text-slate-600 mb-1">Organizer</label>
+                  <input value={eventForm.organizer} onChange={(e) => setEventForm({ ...eventForm, organizer: e.target.value })} placeholder="Daksh Dua / Startify Team" className="w-full h-11 rounded-full bg-slate-50 border border-slate-200 px-4 text-[13px] text-slate-800 outline-none" />
+                </div>
+                <div>
+                  <label className="block text-[12px] font-semibold text-slate-600 mb-1">Capacity</label>
+                  <input value={eventForm.capacity} onChange={(e) => setEventForm({ ...eventForm, capacity: e.target.value })} placeholder="e.g. 80 seats" className="w-full h-11 rounded-full bg-slate-50 border border-slate-200 px-4 text-[13px] text-slate-800 outline-none" />
+                </div>
+              </div>
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-[12px] font-semibold text-slate-600 mb-1">Event Type</label>
+                  <select value={eventForm.eventType} onChange={(e) => setEventForm({ ...eventForm, eventType: e.target.value })} className="w-full h-11 rounded-full bg-slate-50 border border-slate-200 px-4 text-[13px] text-slate-800 outline-none">
+                    <option>Offline</option><option>Online</option><option>Hybrid</option>
+                  </select>
+                </div>
+                <div>
+                  <label className="block text-[12px] font-semibold text-slate-600 mb-1">Registration Link</label>
+                  <input value={eventForm.link} onChange={(e) => setEventForm({ ...eventForm, link: e.target.value })} placeholder="https://..." className="w-full h-11 rounded-full bg-slate-50 border border-slate-200 px-4 text-[13px] text-slate-800 outline-none" />
+                </div>
+              </div>
+              <div>
+                <label className="block text-[12px] font-semibold text-slate-600 mb-1">Tags (comma separated)</label>
+                <input value={eventForm.tags} onChange={(e) => setEventForm({ ...eventForm, tags: e.target.value })} placeholder="AI, Pitch, Networking" className="w-full h-11 rounded-full bg-slate-50 border border-slate-200 px-4 text-[13px] text-slate-800 outline-none" />
+              </div>
+              <div>
+                <label className="block text-[12px] font-semibold text-slate-600 mb-1">Thumbnail Image</label>
+                <input type="file" accept="image/*" onChange={(e)=>{
+                  const file=e.target.files[0]; if(!file) return;
+                  if(file.size>2*1024*1024){ showToast("Image max 2MB"); return; }
+                  const r=new FileReader(); r.onload=()=>setEventForm({...eventForm, thumbnail:r.result}); r.readAsDataURL(file);
+                }} className="w-full h-11 rounded-full bg-slate-50 border border-slate-200 px-4 text-[13px] text-slate-800 outline-none file:mr-2 file:rounded-full file:border-0 file:bg-slate-900 file:text-white file:px-3 file:py-1 file:text-xs" />
+                {eventForm.thumbnail && <img src={eventForm.thumbnail} alt="preview" className="mt-2 h-24 w-full object-cover rounded-xl border border-slate-200" />}
               </div>
               <button type="submit" className="w-full h-12 rounded-full bg-slate-900 text-white font-bold text-[14px] hover:bg-slate-800 transition">Publish Event →</button>
             </form>
