@@ -506,6 +506,10 @@ export default function App() {
       try {
         if (authMode === "register") {
           if (!authForm.name.trim()) { showToast("Please enter your full name."); return; }
+          if ((targetRole === "founder" || targetRole === "talent") && !isUoHEmail(email)) {
+            showToast("Founder/Builder requires @uohyd.ac.in. Use Backer for Gmail.");
+            return;
+          }
           try {
             const profiles = JSON.parse(localStorage.getItem("startify_user_profiles") || "[]");
             if (profiles.some(p => p.email.toLowerCase()===email.toLowerCase() && p.role===targetRole)) {
@@ -519,16 +523,12 @@ export default function App() {
             name: authForm.name.trim(),
             email,
             role: targetRole,
-            studentId: authForm.studentId,
+            studentId: email.split("@")[0].toUpperCase(),
             roleTitle: authForm.roleTitle,
             skills: authForm.skills,
             focus: authForm.focus,
             bio: authForm.bio
           };
-          if ((pendingUser.role === "founder" || pendingUser.role === "talent") && !isUoHEmail(pendingUser.email)) {
-            showToast("Founder/Builder requires @uohyd.ac.in. Switch to Backer for external email.");
-            return;
-          }
           completeRegistration(pendingUser, targetRole);
           showToast(`✓ Verification link sent to ${email} — click it to activate, then Sign In.`);
           setAuthMode("signin");

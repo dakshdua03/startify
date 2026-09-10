@@ -226,7 +226,12 @@ function getAllData(){
   const credentials = load(LS_KEYS.credentials, {});
   const profiles = load(LS_KEYS.profiles, []);
   // Include profiles (normal site registrations via password+link) so admin sees all accounts
-  const allUsers = [...DEMO_USERS.map(u=>({...u, source:"demo"})), ...regs.map(r=>({id:r.email, name:r.name, email:r.email, role: r.role==="builder"?"talent":r.role==="funder"?"backer":r.role, createdAt:r.registeredAt, source:"registration"})), ...profiles.map(p=>({id:p.id, name:p.name, email:p.email, role:p.role, createdAt:p.createdAt, source:"profile"})), ...builders.map(b=>({id:b.id, name:b.name, email:b.email||b.id+"@uohyd.ac.in", role:"talent", source:"builder"})), ...funders.map(f=>({id:f.id, name:f.name, email:f.email||f.id+"@startify.net", role:"backer", source:"funder"})), ...pendingBackers.map(p=>({id:p.id, name:p.name, email:p.email, role:"backer", createdAt:p.createdAt, pending:true, source:"pending"}))];
+  const credUsers = Object.keys(credentials).map(email=> {
+    const p = profiles.find(x=> x.email.toLowerCase()===email.toLowerCase());
+    const r = regs.find(x=> x.email.toLowerCase()===email.toLowerCase());
+    return {id: p?.id || r?.id || email, name: p?.name || r?.name || email.split("@")[0], email, role: p?.role || r?.role || "founder", createdAt: p?.createdAt || r?.registeredAt || "—", source:"credential"};
+  });
+  const allUsers = [...DEMO_USERS.map(u=>({...u, source:"demo"})), ...regs.map(r=>({id:r.email, name:r.name, email:r.email, role: r.role==="builder"?"talent":r.role==="funder"?"backer":r.role, createdAt:r.registeredAt, source:"registration"})), ...profiles.map(p=>({id:p.id, name:p.name, email:p.email, role:p.role, createdAt:p.createdAt, source:"profile"})), ...credUsers.map(c=>({...c, source:"credential"})), ...builders.map(b=>({id:b.id, name:b.name, email:b.email||b.id+"@uohyd.ac.in", role:"talent", source:"builder"})), ...funders.map(f=>({id:f.id, name:f.name, email:f.email||f.id+"@startify.net", role:"backer", source:"funder"})), ...pendingBackers.map(p=>({id:p.id, name:p.name, email:p.email, role:"backer", createdAt:p.createdAt, pending:true, source:"pending"}))];
   // de-dupe by email+role so same email with different roles shows separately, else dedupe by email for overview
   const seen=new Set(); const uniqUsers=[];
   for(const u of allUsers){ const key=u.email.toLowerCase()+"|"+u.role; if(!seen.has(key)){ seen.add(key); uniqUsers.push(u); } }
