@@ -638,6 +638,7 @@ export default function App() {
       return;
     }
 
+    const nowStr = new Date().toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' });
     const newIdea = {
       id: `idea_${Date.now()}`,
       title: newIdeaForm.title,
@@ -650,7 +651,7 @@ export default function App() {
       desc: newIdeaForm.desc,
       seeking: newIdeaForm.seeking,
       status: "Pending Review",
-      createdDate: "Pending admin review"
+      createdDate: nowStr
     };
 
     dbService.saveIdea(newIdea);
@@ -875,8 +876,8 @@ export default function App() {
         </div>
       )}
 
-      {/* NAVIGATION HEADER — light glass, not sticky on dashboard/chats, no overlap */}
-      <nav className={`${activeTab==="dashboard" || activeTab==="chats" ? "relative" : "sticky top-0"} z-40 backdrop-blur-xl bg-white/75 border-b border-slate-200`}>
+      {/* NAVIGATION HEADER — light glass, not sticky on dashboard/chats/profile, no overlap */}
+      <nav className={`${activeTab==="dashboard" || activeTab==="chats" || activeTab==="profile" ? "relative" : "sticky top-0"} z-40 backdrop-blur-xl bg-white/75 border-b border-slate-200`}>
         <div className="mx-auto max-w-[1200px] px-5 md:px-8 min-h-[72px] py-3 flex flex-wrap items-center justify-between gap-3">
           <div className="flex items-center gap-3.5 cursor-pointer" onClick={() => setActiveTab(currentUser ? "dashboard" : "home")}>
             <img
@@ -948,6 +949,12 @@ export default function App() {
                 Chats
                 {myAcceptedConnections.length > 0 && <span className="ml-1.5 inline-grid h-5 min-w-[20px] place-items-center rounded-full bg-white text-[10px] font-bold text-slate-900 px-1 border border-slate-200">{myAcceptedConnections.length}</span>}
               </button>
+              <button
+                onClick={() => setActiveTab("profile")}
+                className={`px-3 py-1.5 rounded-full transition whitespace-nowrap shrink-0 ${activeTab === "profile" ? "bg-slate-900 text-white font-bold shadow" : "text-slate-600 hover:text-slate-900"}`}
+              >
+                Profile
+              </button>
             </div>
           )}
 
@@ -1002,6 +1009,7 @@ export default function App() {
               {showEventsTab && <button onClick={() => { setActiveTab("events"); setMobileMenuOpen(false); }} className={`block w-full text-left py-2 px-3 rounded-xl ${activeTab === "events" ? "bg-slate-900 text-white" : "text-slate-700"}`}>Events & Meetups</button>}
               <button onClick={() => { setActiveTab("dashboard"); setMobileMenuOpen(false); }} className={`block w-full text-left py-2 px-3 rounded-xl font-bold ${activeTab === "dashboard" ? "bg-slate-900 text-white" : "text-slate-700"}`}>{currentUser.role === "admin" ? "Admin workspace" : "My Dashboard"} ({currentUser.role.toUpperCase()})</button>
               <button onClick={() => { setActiveTab("chats"); setMobileMenuOpen(false); }} className={`block w-full text-left py-2 px-3 rounded-xl ${activeTab === "chats" ? "bg-slate-900 text-white" : "text-slate-700"}`}>Chats</button>
+              <button onClick={() => { setActiveTab("profile"); setMobileMenuOpen(false); }} className={`block w-full text-left py-2 px-3 rounded-xl ${activeTab === "profile" ? "bg-slate-900 text-white" : "text-slate-700"}`}>Profile</button>
             </>}
             {!currentUser && <button onClick={() => { setAuthMode("register"); setAuthModalOpen(true); setMobileMenuOpen(false); }} className="block w-full text-left py-2 px-3 rounded-xl bg-slate-900 text-white font-bold">Join Startify →</button>}
           </div>
@@ -1642,276 +1650,11 @@ export default function App() {
               <a href="/admin.html" target="_blank" className="h-8 px-3 rounded-full bg-slate-900 text-white text-xs font-bold grid place-items-center hover:bg-black">Open /admin.html → create test accounts</a>
             </div>
           )}
-          {/* Profile Card — shows who you are + same-email role switcher */}
-          {(() => {
-            const initials = currentUser.name.split(" ").map(s=>s[0]).join("").slice(0,2).toUpperCase();
-            const creds = (()=>{ try{ return JSON.parse(localStorage.getItem("startify_credentials")||"{}"); }catch{return {};}})();
-            const isVerified = !!creds[currentUser.email.toLowerCase()] || DEMO_USERS.some(u=>u.email.toLowerCase()===currentUser.email.toLowerCase());
-            const profilesKey = "startify_user_profiles";
-            const allProfiles = (()=>{ try{
-              const a=JSON.parse(localStorage.getItem(profilesKey)||"[]");
-              const regs=JSON.parse(localStorage.getItem("startify_registrations")||"[]");
-              const fromRegs=regs.map(r=>({id:r.email, name:r.name, email:r.email, role: r.role==="builder"?"talent": r.role==="funder"?"backer": r.role}));
-              const pb=JSON.parse(localStorage.getItem("startify_pending_backers")||"[]");
-              const fromPb=pb.map(p=>({id:p.id, name:p.name, email:p.email, role:"backer"}));
-              const ab=JSON.parse(localStorage.getItem("startify_admin_builders")||"[]");
-              const fromAb=ab.map(b=>({id:b.id, name:b.name, email:(b.email||b.id+"@uohyd.ac.in"), role:"talent"}));
-              const af=JSON.parse(localStorage.getItem("startify_admin_funders")||"[]");
-              const fromAf=af.map(f=>({id:f.id, name:f.name, email:(f.email||f.id+"@startify.net"), role:"backer"}));
-              return [...a, ...fromRegs, ...fromPb, ...fromAb, ...fromAf, ...DEMO_USERS];
-            }catch{ return [...DEMO_USERS]; }})();
-            const sameEmailProfiles = allProfiles.filter(p=> p.email && p.email.toLowerCase()===currentUser.email.toLowerCase());
-            const roleOptions = [
-              {role:"founder", label:"Founder", desc:"Post ideas", needUoH:true},
-              {role:"talent", label:"Builder", desc:"Join teams", needUoH:true},
-              {role:"backer", label:"Backer", desc:"Fund ideas", needUoH:false},
-            ];
-            const hasRole = (r) => sameEmailProfiles.some(p=>p.role===r) || currentUser.role===r;
-            const isSameEmailRolePending = (r) => r==="backer" && pendingBackers.some(p=>p.email.toLowerCase()===currentUser.email.toLowerCase());
-            return (
-              <div className="rounded-[28px] border border-slate-200 bg-white p-4 sm:p-6 md:p-7">
-                <div className="flex gap-3 sm:gap-4 items-start">
-                  {(() => {
-                    const img = getProfileImage(currentUser.email);
-                    return (
-                      <div className="relative shrink-0">
-                        {img ? (
-                          <img src={img} alt={currentUser.name} className="h-12 w-12 sm:h-16 sm:w-16 rounded-2xl object-cover border border-slate-200 shadow-sm" />
-                        ) : (
-                          <div className="h-12 w-12 sm:h-16 sm:w-16 rounded-2xl bg-slate-100 border border-slate-200 grid place-items-center text-2xl sm:text-3xl">👤</div>
-                        )}
-                        <label className="absolute -bottom-1 -right-1 h-6 w-6 sm:h-7 sm:w-7 rounded-full bg-white border border-slate-200 shadow-sm grid place-items-center text-[9px] sm:text-[10px] font-bold text-slate-600 cursor-pointer hover:bg-slate-50" title="Upload profile image">
-                          Edit
-                          <input type="file" accept="image/*" className="hidden" onChange={(e)=>{
-                            const file=e.target.files[0];
-                            if(!file) return;
-                            if(file.size > 2*1024*1024){ showToast("Image too large — max 2MB"); return; }
-                            const reader=new FileReader();
-                            reader.onload=()=>{
-                              try{
-                                localStorage.setItem(getProfileImageKey(currentUser.email), reader.result);
-                                // also update unified profile store
-                                try{
-                                  const key2="startify_user_profiles";
-                                  const arr=JSON.parse(localStorage.getItem(key2)||"[]");
-                                  const idx=arr.findIndex(p=> p.email.toLowerCase()===currentUser.email.toLowerCase() && p.role===currentUser.role);
-                                  if(idx>=0){ arr[idx].profileImage=reader.result; localStorage.setItem(key2, JSON.stringify(arr)); }
-                                }catch{}
-                                showToast("✓ Profile image updated");
-                                // force re-render
-                                setProfileSwitcherOpen(v=>v);
-                              }catch{ showToast("Failed to save image"); }
-                            };
-                            reader.readAsDataURL(file);
-                          }}/>
-                        </label>
-                      </div>
-                    );
-                  })()}
-                  <div className="min-w-0 flex-1">
-                    <div className="flex flex-wrap items-center gap-1.5 sm:gap-2">
-                      <h1 className="font-heading text-[18px] sm:text-[24px] md:text-[28px] font-extrabold leading-none text-slate-900">Welcome, {currentUser.name}</h1>
-                      <button onClick={()=>{ setProfileNameDraft(currentUser.name); setProfileNameEditOpen(true); }} className="h-7 px-2 rounded-full bg-white border border-slate-200 text-[11px] font-bold text-slate-600 hover:bg-slate-50">Edit name</button>
-                      <span className={`px-2 py-0.5 sm:px-2.5 sm:py-1 rounded-full text-[10px] sm:text-[11px] font-bold border ${currentUser.role==="founder"?"bg-indigo-50 border-indigo-200 text-indigo-700":currentUser.role==="talent"?"bg-sky-50 border-sky-200 text-sky-700":currentUser.role==="backer"?"bg-violet-50 border-violet-200 text-violet-700":"bg-amber-50 border-amber-200 text-amber-700"}`}>{ROLE_META[currentUser.role]?.label || currentUser.role.toUpperCase()}</span>
-                      {isVerified ? <span className="inline-flex items-center px-2 py-0.5 sm:px-2 sm:py-1 rounded-full bg-emerald-50 border border-emerald-200 text-emerald-700 text-[10px] sm:text-[11px] font-bold whitespace-nowrap">✓ Verified</span> : <span className="px-2 py-0.5 sm:py-1 rounded-full bg-slate-100 border border-slate-200 text-slate-600 text-[10px] sm:text-[11px] font-bold">Unverified</span>}
-                      {currentUser._backerPending && <span className="px-2 py-0.5 sm:py-1 rounded-full bg-amber-500 text-white text-[10px] sm:text-[11px] font-bold">Pending admin</span>}
-                    </div>
-                    <div className="mt-1.5 sm:mt-2 text-xs sm:text-sm text-slate-600 truncate">{currentUser.email}</div>
-                    {(() => {
-                      const about = getProfileAbout(currentUser.email) || currentUser.bio || "";
-                      return (
-                        <div className="mt-2 sm:mt-3">
-                          {about ? <p className="text-xs sm:text-sm text-slate-700 leading-4 sm:leading-5 bg-slate-50 border border-slate-200 rounded-xl p-2.5 sm:p-3 line-clamp-3">{about}</p> : <p className="text-xs sm:text-sm text-slate-400 italic">No about yet — tell others what you build or fund.</p>}
-                          <button onClick={()=>{ setProfileAboutDraft(about); setProfileEditOpen(true); }} className="mt-2 h-7 sm:h-8 px-2.5 sm:px-3 rounded-full bg-white border border-slate-200 text-[11px] sm:text-xs font-bold text-slate-700 hover:bg-slate-50">{about ? "Edit about" : "Add about"}</button>
-                        </div>
-                      );
-                    })()}
-                    {currentUser.role === "talent" && (
-                      <div className="mt-3 p-3 rounded-xl bg-slate-50 border border-slate-200">
-                        <div className="text-[11px] font-bold uppercase tracking-widest text-slate-500">Your skills</div>
-                        <div className="mt-1 text-sm text-slate-800 font-semibold">{currentUser.roleTitle || "Builder"}</div>
-                        <div className="text-xs text-slate-600 mt-1 break-words">{currentUser.skills || "No skills added yet — add your stack to attract founders."}</div>
-                        <button onClick={()=>{ setProfileRoleTitleDraft(currentUser.roleTitle||""); setProfileSkillsDraft(currentUser.skills||""); setProfileSkillsEditOpen(true); }} className="mt-2 h-7 px-3 rounded-full bg-white border border-slate-200 text-[11px] font-bold text-slate-700 hover:bg-slate-50">Edit skills</button>
-                      </div>
-                    )}
-                    {currentUser.role === "backer" && (
-                      <div className="mt-3 p-3 rounded-xl bg-slate-50 border border-slate-200">
-                        <div className="text-[11px] font-bold uppercase tracking-widest text-slate-500">Your focus</div>
-                        <div className="text-xs text-slate-600 mt-1 break-words">{currentUser.focus || "No focus set — add what you fund."}</div>
-                        <button onClick={()=>{ setProfileFocusDraft(currentUser.focus||""); setProfileSkillsEditOpen(true); }} className="mt-2 h-7 px-3 rounded-full bg-white border border-slate-200 text-[11px] font-bold text-slate-700 hover:bg-slate-50">Edit focus</button>
-                      </div>
-                    )}
-                    <p className="hidden sm:block text-[13px] text-slate-600 mt-3 leading-5">
-                      {currentUser.role === "founder" && "Manage your posted startup ideas, view incoming talent & backer requests, and chat directly."}
-                      {currentUser.role === "talent" && "View your builder profile, track incoming team invites, and talk to founders."}
-                      {currentUser.role === "backer" && "View founder pitches, manage dealflow inquiries, and chat directly with student startups."}
-                      {currentUser.role === "admin" && "Sole admin — you have all data. Manage ideas, backers, and accounts at /admin.html."}
-                    </p>
-                    {currentUser.role==="founder" && <div className="mt-2 sm:mt-3"><button onClick={()=> setIdeaModalOpen(true)} className="h-8 sm:h-9 px-3 sm:px-4 rounded-full bg-slate-900 text-white text-[11px] sm:text-xs font-bold hover:bg-slate-800">+ Post New Idea</button></div>}
-                  </div>
-                  <button onClick={()=> setProfileSwitcherOpen(!profileSwitcherOpen)} className="shrink-0 h-8 w-8 sm:h-10 sm:w-10 rounded-full border border-slate-200 bg-slate-50 grid place-items-center text-slate-700 hover:bg-white hover:border-slate-300 shadow-sm" title="Switch profile (same email)">
-                    <span className={`transition-transform text-base sm:text-lg ${profileSwitcherOpen?"rotate-180":""}`}>⌄</span>
-                  </button>
-                </div>
-                {profileSwitcherOpen && (
-                  <div className="mt-3 rounded-2xl border border-slate-200 bg-slate-50 p-4">
-                    <div className="grid md:grid-cols-3 gap-3">
-                      {roleOptions.map(o=>{
-                        const active = currentUser.role===o.role;
-                        const exists = hasRole(o.role);
-                        const pending = isSameEmailRolePending(o.role);
-                        const needUoHFail = o.needUoH && !currentUser.email.toLowerCase().endsWith("@uohyd.ac.in");
-                        return (
-                          <div key={o.role} className={`flex flex-col p-3 rounded-xl border ${active?"bg-slate-900 border-slate-900 text-white":"bg-white border-slate-200"}`}>
-                            <div className="flex items-center gap-2">
-                              <div className={`text-sm font-bold ${active?"text-white":"text-slate-800"}`}>{o.label}</div>
-                              {pending ? <span className="ml-auto text-[10px] px-1.5 py-0.5 rounded-full bg-amber-500 text-white">pending</span>: exists && !active ? <span className="ml-auto text-[10px] px-1.5 py-0.5 rounded-full bg-emerald-50 border border-emerald-200 text-emerald-700">ready</span>: null}
-                            </div>
-                            <div className={`text-[11px] mt-2 ${active?"text-white/70":"text-slate-500"}`}>{o.desc} {o.needUoH? "• @uohyd.ac.in":"• any email"}</div>
-                            <div className="mt-3">
-                              {active ? <span className="inline-flex h-8 px-3 rounded-full bg-white/15 border border-white/20 text-xs font-bold text-white items-center">Active</span> : needUoHFail ? <span className="text-[11px] text-amber-600 font-semibold">Needs @uohyd.ac.in</span> : exists ? <button onClick={()=>{
-                                const target = sameEmailProfiles.find(p=> p.role===o.role);
-                                if(target){
-                                  // Keep same name and profile image for same email across roles
-                                  const img = getProfileImage(currentUser.email);
-                                  if(img) try{ localStorage.setItem(getProfileImageKey(target.email), img); }catch{}
-                                  const mapped={ id: target.id, name: currentUser.name, email: target.email, role: target.role, studentId: target.studentId|| currentUser.studentId, bio: getProfileAbout(target.email) || target.bio|| currentUser.bio||"", roleTitle: target.roleTitle||"", skills: target.skills||"", focus: target.focus||"" }; setCurrentUser(mapped); setProfileSwitcherOpen(false); showToast(`Switched to ${o.label} — same name & photo kept`);
-                                }
-                              }} className="h-8 px-3 rounded-full bg-slate-900 text-white text-xs font-bold hover:bg-slate-800 w-full">Switch →</button> : <button onClick={()=>{
-                                setAuthForm({...authForm, name: currentUser.name, email: currentUser.email, roleTitle:"", skills:"", focus:"", bio:""});
-                                setSelectedRegisterRole(o.role);
-                                setAuthMode("register");
-                                setAuthModalOpen(true);
-                              }} className="h-8 px-3 rounded-full bg-white border border-slate-200 text-xs font-bold text-slate-700 hover:bg-slate-50 w-full">Create →</button>}
-                            </div>
-                          </div>
-                        );
-                      })}
-                    </div>
-                  </div>
-                )}
-                {profileNameEditOpen && (
-                  <div className="mt-4 rounded-2xl border border-slate-200 bg-white p-4">
-                    <div className="text-sm font-bold text-slate-800">Edit name</div>
-                    <p className="text-xs text-slate-500 mt-1">Update your display name — visible to everyone.</p>
-                    <input value={profileNameDraft} onChange={e=> setProfileNameDraft(e.target.value)} placeholder="Your full name" className="mt-3 w-full h-10 rounded-xl border border-slate-200 bg-slate-50 px-3 text-sm outline-none focus:border-slate-300" />
-                    <div className="mt-3 flex justify-end gap-2">
-                      <button onClick={()=> setProfileNameEditOpen(false)} className="h-9 px-4 rounded-full border border-slate-200 text-sm font-semibold">Cancel</button>
-                      <button onClick={()=>{
-                        const trimmed=profileNameDraft.trim();
-                        if(!trimmed){ showToast("Name cannot be empty"); return; }
-                        try{
-                          const key2="startify_user_profiles";
-                          const arr=JSON.parse(localStorage.getItem(key2)||"[]");
-                          const idx=arr.findIndex(p=> p.email.toLowerCase()===currentUser.email.toLowerCase() && p.role===currentUser.role);
-                          if(idx>=0){ arr[idx].name=trimmed; localStorage.setItem(key2, JSON.stringify(arr)); }
-                          // also update registrations
-                          try{
-                            const regs=JSON.parse(localStorage.getItem("startify_registrations")||"[]");
-                            const rIdx=regs.findIndex(r=> r.email.toLowerCase()===currentUser.email.toLowerCase());
-                            if(rIdx>=0){ regs[rIdx].name=trimmed; localStorage.setItem("startify_registrations", JSON.stringify(regs)); }
-                          }catch{}
-                          setCurrentUser({...currentUser, name: trimmed});
-                          setProfileNameEditOpen(false);
-                          showToast("✓ Name updated");
-                        }catch{ showToast("Failed to save"); }
-                      }} className="h-9 px-5 rounded-full bg-slate-900 text-white text-sm font-bold">Save</button>
-                    </div>
-                  </div>
-                )}
-                {profileEditOpen && (
-                  <div className="mt-4 rounded-2xl border border-slate-200 bg-white p-4">
-                    <div className="text-sm font-bold text-slate-800">Edit about</div>
-                    <p className="text-xs text-slate-500 mt-1">Visible on your profile card — tell others what you build or fund.</p>
-                    <textarea value={profileAboutDraft} onChange={e=> setProfileAboutDraft(e.target.value)} placeholder="I build... I study... I fund..." className="mt-3 w-full min-h-[110px] rounded-2xl border border-slate-200 bg-slate-50 p-3 text-sm outline-none focus:border-slate-300" />
-                    <div className="mt-3 flex justify-end gap-2">
-                      <button onClick={()=> setProfileEditOpen(false)} className="h-9 px-4 rounded-full border border-slate-200 text-sm font-semibold">Cancel</button>
-                      <button onClick={()=>{
-                        try{
-                          localStorage.setItem(getProfileAboutKey(currentUser.email), profileAboutDraft);
-                          const key2="startify_user_profiles";
-                          const arr=JSON.parse(localStorage.getItem(key2)||"[]");
-                          const idx=arr.findIndex(p=> p.email.toLowerCase()===currentUser.email.toLowerCase() && p.role===currentUser.role);
-                          if(idx>=0){ arr[idx].bio=profileAboutDraft; localStorage.setItem(key2, JSON.stringify(arr)); }
-                          setCurrentUser({...currentUser, bio: profileAboutDraft});
-                          setProfileEditOpen(false);
-                          showToast("✓ About updated");
-                        }catch{ showToast("Failed to save"); }
-                      }} className="h-9 px-5 rounded-full bg-slate-900 text-white text-sm font-bold">Save</button>
-                    </div>
-                  </div>
-                )}
-                {profileSkillsEditOpen && (
-                  <div className="mt-4 rounded-2xl border border-slate-200 bg-white p-4">
-                    {currentUser.role === "talent" ? (
-                      <>
-                        <div className="text-sm font-bold text-slate-800">Edit skills</div>
-                        <p className="text-xs text-slate-500 mt-1">Update your role title and skills — visible to founders.</p>
-                        <div className="mt-3 space-y-3">
-                          <div>
-                            <label className="block text-xs font-semibold text-slate-600 mb-1">Role title</label>
-                            <input value={profileRoleTitleDraft} onChange={e=> setProfileRoleTitleDraft(e.target.value)} placeholder="e.g. Full-Stack Engineer" className="w-full h-10 rounded-xl border border-slate-200 bg-slate-50 px-3 text-sm outline-none focus:border-slate-300" />
-                          </div>
-                          <div>
-                            <label className="block text-xs font-semibold text-slate-600 mb-1">Skills</label>
-                            <input value={profileSkillsDraft} onChange={e=> setProfileSkillsDraft(e.target.value)} placeholder="React, Node.js, Python" className="w-full h-10 rounded-xl border border-slate-200 bg-slate-50 px-3 text-sm outline-none focus:border-slate-300" />
-                          </div>
-                        </div>
-                        <div className="mt-3 flex justify-end gap-2">
-                          <button onClick={()=> setProfileSkillsEditOpen(false)} className="h-9 px-4 rounded-full border border-slate-200 text-sm font-semibold">Cancel</button>
-                          <button onClick={()=>{
-                            try{
-                              const emailLower = currentUser.email.toLowerCase();
-                              const newRoleTitle = profileRoleTitleDraft.trim();
-                              const newSkills = profileSkillsDraft.trim();
-                              setBuilders(prev => prev.map(b => (b.id === currentUser.id || (b.email && b.email.toLowerCase()===emailLower)) ? { ...b, role: newRoleTitle || b.role, skills: newSkills || b.skills } : b));
-                              try{
-                                const key2="startify_user_profiles";
-                                const arr=JSON.parse(localStorage.getItem(key2)||"[]");
-                                const idx=arr.findIndex(p=> p.email.toLowerCase()===emailLower && p.role===currentUser.role);
-                                if(idx>=0){ arr[idx].roleTitle=newRoleTitle; arr[idx].skills=newSkills; localStorage.setItem(key2, JSON.stringify(arr)); }
-                              }catch{}
-                              setCurrentUser({...currentUser, roleTitle: newRoleTitle || currentUser.roleTitle, skills: newSkills || currentUser.skills});
-                              setProfileSkillsEditOpen(false);
-                              showToast("✓ Skills updated");
-                            }catch{ showToast("Failed to save"); }
-                          }} className="h-9 px-5 rounded-full bg-slate-900 text-white text-sm font-bold">Save</button>
-                        </div>
-                      </>
-                    ) : currentUser.role === "backer" ? (
-                      <>
-                        <div className="text-sm font-bold text-slate-800">Edit focus</div>
-                        <p className="text-xs text-slate-500 mt-1">Update your investment focus — visible to founders.</p>
-                        <div className="mt-3">
-                          <label className="block text-xs font-semibold text-slate-600 mb-1">Focus / Expertise</label>
-                          <input value={profileFocusDraft} onChange={e=> setProfileFocusDraft(e.target.value)} placeholder="e.g. EdTech, AI & SaaS" className="w-full h-10 rounded-xl border border-slate-200 bg-slate-50 px-3 text-sm outline-none focus:border-slate-300" />
-                        </div>
-                        <div className="mt-3 flex justify-end gap-2">
-                          <button onClick={()=> setProfileSkillsEditOpen(false)} className="h-9 px-4 rounded-full border border-slate-200 text-sm font-semibold">Cancel</button>
-                          <button onClick={()=>{
-                            try{
-                              const emailLower = currentUser.email.toLowerCase();
-                              const newFocus = profileFocusDraft.trim();
-                              setFunders(prev => prev.map(f => (f.id === currentUser.id || (f.email && f.email.toLowerCase()===emailLower)) ? { ...f, focus: newFocus || f.focus } : f));
-                              try{
-                                const key2="startify_user_profiles";
-                                const arr=JSON.parse(localStorage.getItem(key2)||"[]");
-                                const idx=arr.findIndex(p=> p.email.toLowerCase()===emailLower && p.role===currentUser.role);
-                                if(idx>=0){ arr[idx].focus=newFocus; localStorage.setItem(key2, JSON.stringify(arr)); }
-                              }catch{}
-                              setCurrentUser({...currentUser, focus: newFocus || currentUser.focus});
-                              setProfileSkillsEditOpen(false);
-                              showToast("✓ Focus updated");
-                            }catch{ showToast("Failed to save"); }
-                          }} className="h-9 px-5 rounded-full bg-slate-900 text-white text-sm font-bold">Save</button>
-                        </div>
-                      </>
-                    ) : null}
-                  </div>
-                )}
-              </div>
-            );
-          })()}
+                    {/* Profile moved to Profile tab — dashboard now focuses on activity */}
+          <div class="mb-6">
+            <h2 className="font-heading text-xl font-extrabold text-slate-800">Dashboard</h2>
+            <p className="text-sm text-slate-500">Track your ideas, incoming requests and chats. Edit your profile in the <button onClick={()=>setActiveTab("profile")} className="underline font-semibold text-slate-700 hover:text-slate-900">Profile</button> tab.</p>
+          </div>
 
           {currentUser?._backerPending && (
             <div className="mt-6 rounded-2xl border border-amber-200 bg-amber-50 p-4 flex items-start gap-3">
@@ -2234,6 +1977,184 @@ export default function App() {
                 </div>
               )}
             </div>
+          </div>
+        </section>
+      )}
+
+      {/* PROFILE TAB — dedicated profile for any logged-in user */}
+      {activeTab === "profile" && currentUser && (
+        <section className="mx-auto max-w-[1200px] px-5 md:px-8 py-10">
+          <div className="rounded-[28px] border border-slate-200 bg-white p-4 sm:p-6 md:p-7">
+            <div className="flex gap-3 sm:gap-4 items-start">
+              {(() => {
+                const img = getProfileImage(currentUser.email);
+                return (
+                  <div className="relative shrink-0">
+                    {img ? (
+                      <img src={img} alt={currentUser.name} className="h-16 w-16 sm:h-20 sm:w-20 rounded-2xl object-cover border border-slate-200 shadow-sm" />
+                    ) : (
+                      <div className="h-16 w-16 sm:h-20 sm:w-20 rounded-2xl bg-slate-100 border border-slate-200 grid place-items-center text-2xl sm:text-3xl">👤</div>
+                    )}
+                    <label className="absolute -bottom-1 -right-1 h-7 w-7 rounded-full bg-white border border-slate-200 shadow-sm grid place-items-center text-[10px] font-bold text-slate-600 cursor-pointer hover:bg-slate-50" title="Upload photo">
+                      Edit
+                      <input type="file" accept="image/*" className="hidden" onChange={(e)=>{
+                        const file=e.target.files[0];
+                        if(!file) return;
+                        if(file.size > 2*1024*1024){ showToast("Image max 2MB"); return; }
+                        const reader=new FileReader();
+                        reader.onload=()=>{
+                          try{
+                            localStorage.setItem(getProfileImageKey(currentUser.email), reader.result);
+                            try{
+                              const arr=JSON.parse(localStorage.getItem("startify_user_profiles")||"[]");
+                              const idx=arr.findIndex(p=> p.email.toLowerCase()===currentUser.email.toLowerCase() && p.role===currentUser.role);
+                              if(idx>=0){ arr[idx].profileImage=reader.result; localStorage.setItem("startify_user_profiles", JSON.stringify(arr)); }
+                            }catch{}
+                            showToast("✓ Photo updated");
+                            setProfileSwitcherOpen(v=>v);
+                          }catch{ showToast("Failed to save"); }
+                        };
+                        reader.readAsDataURL(file);
+                      }}/>
+                    </label>
+                  </div>
+                );
+              })()}
+              <div className="min-w-0 flex-1">
+                <div className="flex flex-wrap items-center gap-2">
+                  <h1 className="font-heading text-[22px] sm:text-[28px] font-extrabold leading-none text-slate-900">{currentUser.name}</h1>
+                  <button onClick={()=>{ setProfileNameDraft(currentUser.name); setProfileNameEditOpen(true); }} className="h-7 px-3 rounded-full bg-white border border-slate-200 text-xs font-bold text-slate-600 hover:bg-slate-50">Edit name</button>
+                  <span className={`px-2.5 py-1 rounded-full text-xs font-bold border ${currentUser.role==="founder"?"bg-indigo-50 border-indigo-200 text-indigo-700":currentUser.role==="talent"?"bg-sky-50 border-sky-200 text-sky-700":currentUser.role==="backer"?"bg-violet-50 border-violet-200 text-violet-700":"bg-amber-50 border-amber-200 text-amber-700"}`}>{ROLE_META[currentUser.role]?.label || currentUser.role}</span>
+                </div>
+                <div className="mt-2 text-sm text-slate-600 break-all">{currentUser.email}</div>
+                <div className="mt-1 text-xs text-slate-500">Student ID: <strong className="text-slate-700">{currentUser.email.split("@")[0].toUpperCase()}</strong> • {currentUser.role==="backer"?"Any email allowed":"@uohyd.ac.in verified"}</div>
+                {(() => {
+                  const about = getProfileAbout(currentUser.email) || currentUser.bio || "";
+                  return (
+                    <div className="mt-4">
+                      <div className="text-xs font-bold uppercase tracking-widest text-slate-500">About</div>
+                      {about ? <p className="mt-1 text-sm text-slate-700 leading-5 bg-slate-50 border border-slate-200 rounded-xl p-3">{about}</p> : <p className="text-sm text-slate-400 italic mt-1">No about yet</p>}
+                      <button onClick={()=>{ setProfileAboutDraft(about); setProfileEditOpen(true); }} className="mt-2 h-8 px-3 rounded-full bg-white border border-slate-200 text-xs font-bold text-slate-700 hover:bg-slate-50">{about ? "Edit about" : "Add about"}</button>
+                    </div>
+                  );
+                })()}
+                {currentUser.role === "talent" && (
+                  <div className="mt-4 p-4 rounded-xl bg-slate-50 border border-slate-200">
+                    <div className="text-xs font-bold uppercase tracking-widest text-slate-500">Skills & Role</div>
+                    <div className="mt-1 text-sm font-semibold text-slate-800">{currentUser.roleTitle || "Builder"}</div>
+                    <div className="text-sm text-slate-600 mt-1 break-words">{currentUser.skills || "No skills added"}</div>
+                    <button onClick={()=>{ setProfileRoleTitleDraft(currentUser.roleTitle||""); setProfileSkillsDraft(currentUser.skills||""); setProfileSkillsEditOpen(true); }} className="mt-3 h-8 px-3 rounded-full bg-white border border-slate-200 text-xs font-bold">Edit skills</button>
+                  </div>
+                )}
+                {currentUser.role === "backer" && (
+                  <div className="mt-4 p-4 rounded-xl bg-slate-50 border border-slate-200">
+                    <div className="text-xs font-bold uppercase tracking-widest text-slate-500">Focus</div>
+                    <div className="text-sm text-slate-600 mt-1 break-words">{currentUser.focus || "No focus set"}</div>
+                    <button onClick={()=>{ setProfileFocusDraft(currentUser.focus||""); setProfileSkillsEditOpen(true); }} className="mt-3 h-8 px-3 rounded-full bg-white border border-slate-200 text-xs font-bold">Edit focus</button>
+                  </div>
+                )}
+                {currentUser.role === "founder" && (
+                  <div className="mt-4 p-4 rounded-xl bg-slate-50 border border-slate-200">
+                    <div className="text-xs font-bold uppercase tracking-widest text-slate-500">Founder</div>
+                    <p className="text-sm text-slate-600 mt-1">You can post ideas from Dashboard → Post New Idea. Your ideas appear in Ideas Board after approval.</p>
+                  </div>
+                )}
+              </div>
+            </div>
+            {profileNameEditOpen && (
+              <div className="mt-4 rounded-2xl border border-slate-200 bg-white p-4">
+                <div className="text-sm font-bold">Edit name</div>
+                <input value={profileNameDraft} onChange={e=> setProfileNameDraft(e.target.value)} className="mt-2 w-full h-10 rounded-xl border border-slate-200 bg-slate-50 px-3 text-sm outline-none" />
+                <div className="mt-3 flex justify-end gap-2">
+                  <button onClick={()=> setProfileNameEditOpen(false)} className="h-9 px-4 rounded-full border border-slate-200 text-sm font-semibold">Cancel</button>
+                  <button onClick={()=>{
+                    const t=profileNameDraft.trim(); if(!t){ showToast("Name cannot be empty"); return; }
+                    try{
+                      const arr=JSON.parse(localStorage.getItem("startify_user_profiles")||"[]");
+                      const idx=arr.findIndex(p=> p.email.toLowerCase()===currentUser.email.toLowerCase() && p.role===currentUser.role);
+                      if(idx>=0){ arr[idx].name=t; localStorage.setItem("startify_user_profiles", JSON.stringify(arr)); }
+                      try{
+                        const regs=JSON.parse(localStorage.getItem("startify_registrations")||"[]");
+                        const rIdx=regs.findIndex(r=> r.email.toLowerCase()===currentUser.email.toLowerCase());
+                        if(rIdx>=0){ regs[rIdx].name=t; localStorage.setItem("startify_registrations", JSON.stringify(regs)); }
+                      }catch{}
+                      setCurrentUser({...currentUser, name:t});
+                      setProfileNameEditOpen(false);
+                      showToast("✓ Name updated");
+                    }catch{ showToast("Failed"); }
+                  }} className="h-9 px-5 rounded-full bg-slate-900 text-white text-sm font-bold">Save</button>
+                </div>
+              </div>
+            )}
+            {profileEditOpen && (
+              <div className="mt-4 rounded-2xl border border-slate-200 bg-white p-4">
+                <div className="text-sm font-bold">Edit about</div>
+                <textarea value={profileAboutDraft} onChange={e=> setProfileAboutDraft(e.target.value)} className="mt-2 w-full min-h-[100px] rounded-2xl border border-slate-200 bg-slate-50 p-3 text-sm outline-none" />
+                <div className="mt-3 flex justify-end gap-2">
+                  <button onClick={()=> setProfileEditOpen(false)} className="h-9 px-4 rounded-full border border-slate-200 text-sm">Cancel</button>
+                  <button onClick={()=>{
+                    try{
+                      localStorage.setItem(getProfileAboutKey(currentUser.email), profileAboutDraft);
+                      const arr=JSON.parse(localStorage.getItem("startify_user_profiles")||"[]");
+                      const idx=arr.findIndex(p=> p.email.toLowerCase()===currentUser.email.toLowerCase() && p.role===currentUser.role);
+                      if(idx>=0){ arr[idx].bio=profileAboutDraft; localStorage.setItem("startify_user_profiles", JSON.stringify(arr)); }
+                      setCurrentUser({...currentUser, bio: profileAboutDraft});
+                      setProfileEditOpen(false);
+                      showToast("✓ About updated");
+                    }catch{ showToast("Failed"); }
+                  }} className="h-9 px-5 rounded-full bg-slate-900 text-white text-sm font-bold">Save</button>
+                </div>
+              </div>
+            )}
+            {profileSkillsEditOpen && (
+              <div className="mt-4 rounded-2xl border border-slate-200 bg-white p-4">
+                {currentUser.role === "talent" ? (
+                  <>
+                    <div className="text-sm font-bold">Edit skills</div>
+                    <input value={profileRoleTitleDraft} onChange={e=> setProfileRoleTitleDraft(e.target.value)} placeholder="Role title" className="mt-2 w-full h-10 rounded-xl border border-slate-200 bg-slate-50 px-3 text-sm" />
+                    <input value={profileSkillsDraft} onChange={e=> setProfileSkillsDraft(e.target.value)} placeholder="Skills" className="mt-2 w-full h-10 rounded-xl border border-slate-200 bg-slate-50 px-3 text-sm" />
+                    <div className="mt-3 flex justify-end gap-2">
+                      <button onClick={()=> setProfileSkillsEditOpen(false)} className="h-9 px-4 rounded-full border">Cancel</button>
+                      <button onClick={()=>{
+                        try{
+                          const emailLower=currentUser.email.toLowerCase();
+                          setBuilders(prev=> prev.map(b=> (b.id===currentUser.id || (b.email && b.email.toLowerCase()===emailLower)) ? {...b, role: profileRoleTitleDraft.trim()||b.role, skills: profileSkillsDraft.trim()||b.skills } : b));
+                          try{
+                            const buildersLS=JSON.parse(localStorage.getItem("startify_admin_builders")||"[]");
+                            const idx=buildersLS.findIndex(b=> b.id===currentUser.id || (b.email && b.email.toLowerCase()===emailLower));
+                            if(idx>=0){ buildersLS[idx].role=profileRoleTitleDraft.trim()||buildersLS[idx].role; buildersLS[idx].skills=profileSkillsDraft.trim()||buildersLS[idx].skills; localStorage.setItem("startify_admin_builders", JSON.stringify(buildersLS)); }
+                          }catch{}
+                          const arr=JSON.parse(localStorage.getItem("startify_user_profiles")||"[]");
+                          const pIdx=arr.findIndex(p=> p.email.toLowerCase()===emailLower && p.role===currentUser.role);
+                          if(pIdx>=0){ arr[pIdx].roleTitle=profileRoleTitleDraft.trim(); arr[pIdx].skills=profileSkillsDraft.trim(); localStorage.setItem("startify_user_profiles", JSON.stringify(arr)); }
+                          setCurrentUser({...currentUser, roleTitle: profileRoleTitleDraft.trim(), skills: profileSkillsDraft.trim()});
+                          setProfileSkillsEditOpen(false);
+                          showToast("✓ Skills updated");
+                        }catch{ showToast("Failed"); }
+                      }} className="h-9 px-5 rounded-full bg-slate-900 text-white text-sm font-bold">Save</button>
+                    </div>
+                  </>
+                ) : currentUser.role === "backer" ? (
+                  <>
+                    <div className="text-sm font-bold">Edit focus</div>
+                    <input value={profileFocusDraft} onChange={e=> setProfileFocusDraft(e.target.value)} className="mt-2 w-full h-10 rounded-xl border border-slate-200 bg-slate-50 px-3 text-sm" />
+                    <div className="mt-3 flex justify-end gap-2">
+                      <button onClick={()=> setProfileSkillsEditOpen(false)} className="h-9 px-4 rounded-full border">Cancel</button>
+                      <button onClick={()=>{
+                        try{
+                          const arr=JSON.parse(localStorage.getItem("startify_user_profiles")||"[]");
+                          const idx=arr.findIndex(p=> p.email.toLowerCase()===currentUser.email.toLowerCase() && p.role===currentUser.role);
+                          if(idx>=0){ arr[idx].focus=profileFocusDraft.trim(); localStorage.setItem("startify_user_profiles", JSON.stringify(arr)); }
+                          setCurrentUser({...currentUser, focus: profileFocusDraft.trim()});
+                          setProfileSkillsEditOpen(false);
+                          showToast("✓ Focus updated");
+                        }catch{ showToast("Failed"); }
+                      }} className="h-9 px-5 rounded-full bg-slate-900 text-white text-sm font-bold">Save</button>
+                    </div>
+                  </>
+                ) : null}
+              </div>
+            )}
           </div>
         </section>
       )}
