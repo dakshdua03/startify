@@ -919,13 +919,6 @@ export default function App() {
         </div>
       )}
 
-      {/* UoH launch banner — clean, no gate details */}
-      {!currentUser && (
-        <div className="bg-indigo-600 text-white text-center text-[11px] font-semibold py-2 px-4">
-          Built for <strong>University of Hyderabad</strong> students • Connect • Build • Launch
-        </div>
-      )}
-
       {/* NAVIGATION HEADER — light glass, not sticky on dashboard/chats/profile, no overlap */}
       <nav className={`${activeTab==="dashboard" || activeTab==="chats" || activeTab==="profile" ? "relative" : "sticky top-0"} z-40 backdrop-blur-xl bg-white/75 border-b border-slate-200`}>
         <div className="mx-auto max-w-[1200px] px-5 md:px-8 min-h-[72px] py-3 flex flex-wrap items-center justify-between gap-3">
@@ -938,7 +931,7 @@ export default function App() {
             <div className="hidden sm:flex items-center gap-2 text-[11px] font-semibold text-slate-500 whitespace-nowrap leading-none">
               <span className="font-bold tracking-widest uppercase">University of Hyderabad</span>
               <span className="h-1 w-1 rounded-full bg-slate-300"></span>
-              <span>Connect • Build</span>
+              <span>Connect • Build • Launch</span>
             </div>
           </div>
 
@@ -1149,7 +1142,10 @@ export default function App() {
               <span className="text-[11px] text-slate-500">Swipe →</span>
             </div>
             <div ref={ideasScrollRef} className="flex gap-5 overflow-x-auto snap-x snap-mandatory pb-2 scrollbar-hide scroll-smooth" style={{scrollbarWidth:'none'}}>
-              {ideas.filter(i=> i.status !== "Rejected").slice(0,12).map((idea) => (
+              {[...ideas].filter(i=> i.status !== "Rejected").sort((a,b)=> {
+                const getTime = (x)=> x.created_at?.seconds ? x.created_at.seconds*1000 : (x.created_at?.toMillis ? x.created_at.toMillis() : Date.parse(x.createdDate||0) || Number((x.id||'').split('_')[1]||0));
+                return getTime(b) - getTime(a);
+              }).slice(0,12).map((idea) => (
                 <article key={idea.id} className="snap-start shrink-0 w-[300px] md:w-[360px] rounded-[24px] border border-slate-200 bg-white p-6 shadow-sm flex flex-col">
                   <div className="flex items-center justify-between gap-3">
                     <span className="rounded-full bg-slate-100 px-3 py-1 text-[10px] font-bold text-slate-600">{idea.category}</span>
@@ -1159,9 +1155,6 @@ export default function App() {
                   <p className="mt-1 text-[12px] font-medium text-slate-500">By {idea.founder}</p>
                   <p className="mt-3 text-[13px] leading-5 text-slate-600 line-clamp-3">{idea.desc}</p>
                   <div className="mt-3 text-[11px] font-semibold text-slate-600">Seeking: {idea.seeking}</div>
-                  <div className="mt-4 pt-4 border-t border-slate-200">
-                    <button onClick={() => { setAuthMode("register"); setAuthModalOpen(true); }} className="w-full h-9 rounded-full bg-white border border-slate-200 text-xs font-bold text-slate-700 hover:bg-slate-900 hover:text-white transition">Sign in to connect →</button>
-                  </div>
                 </article>
               ))}
             </div>
@@ -1197,7 +1190,10 @@ export default function App() {
               <span className="text-[11px] text-slate-500">Swipe →</span>
             </div>
             <div ref={ideasScrollRefSignedIn} className="flex gap-5 overflow-x-auto snap-x snap-mandatory pb-2 scroll-smooth" style={{scrollbarWidth:'none'}}>
-              {ideas.filter(i=> i.status !== "Rejected").slice(0,12).map((idea) => (
+              {[...ideas].filter(i=> i.status !== "Rejected").sort((a,b)=> {
+                const getTime = (x)=> x.created_at?.seconds ? x.created_at.seconds*1000 : (x.created_at?.toMillis ? x.created_at.toMillis() : Date.parse(x.createdDate||0) || Number((x.id||'').split('_')[1]||0));
+                return getTime(b) - getTime(a);
+              }).slice(0,12).map((idea) => (
                 <article key={idea.id} className="snap-start shrink-0 w-[300px] md:w-[360px] rounded-[24px] border border-slate-200 bg-white/85 p-6 shadow-sm flex flex-col">
                   <div className="flex items-center justify-between gap-3"><span className="rounded-full bg-slate-100 px-3 py-1 text-[10px] font-bold text-slate-600">{idea.category}</span><span className="text-[10px] font-semibold text-slate-500">{idea.createdDate}</span></div>
                   <h3 className="font-heading mt-4 text-[20px] font-extrabold text-slate-800">{idea.title}</h3>
@@ -2349,21 +2345,13 @@ export default function App() {
                 </p>
               </div>
 
-              {/* Password + link info — no OTP */}
-              <div className="rounded-2xl border border-slate-200 bg-slate-50 p-3">
-                <div className="text-[11px] font-bold text-slate-700">Email verification via link</div>
-                <p className="text-[11px] text-slate-500 mt-1">Create account → we send a verification link to your email (check inbox & spam). Click the link to activate, then Sign In. No OTP needed.{!isSupabaseConfigured && " — configure VITE_FIREBASE_*."}</p>
-                {authMode === "signin" && (
-                  <div className="mt-2 flex flex-wrap gap-2">
-                    <button type="button" onClick={handleResendLink} disabled={authLoading} className="h-8 px-3 rounded-full bg-white border border-slate-200 text-[11px] font-bold text-slate-700 hover:bg-slate-900 hover:text-white transition disabled:opacity-50">
-                      {authLoading ? "..." : "Resend verification link"}
-                    </button>
-                    <button type="button" onClick={handleForgotPassword} disabled={authLoading} className="h-8 px-3 rounded-full bg-white border border-slate-200 text-[11px] font-bold text-slate-700 hover:bg-slate-50 disabled:opacity-50">
-                      Forgot password?
-                    </button>
-                  </div>
-                )}
-              </div>
+              {/* Password + link info — only for register */}
+              {authMode === "register" && (
+                <div className="rounded-2xl border border-slate-200 bg-slate-50 p-3">
+                  <div className="text-[11px] font-bold text-slate-700">Email verification via link</div>
+                  <p className="text-[11px] text-slate-500 mt-1">Create account → we send a verification link to your email (check inbox & spam). Click the link to activate, then Sign In. No OTP needed.</p>
+                </div>
+              )}
 
               <div>
                 <label className="block text-[12px] font-semibold text-slate-600 mb-1">

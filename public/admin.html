@@ -27,6 +27,22 @@ const LS_KEYS = {
 };
 const ADMIN_EMAIL = "admin@startify.net";
 const ADMIN_PASS = localStorage.getItem("startify_admin_pass") || "Startify2026!Admin";
+const ADMINS_KEY = "startify_admins";
+function getAdmins(){
+  try{
+    const stored = JSON.parse(localStorage.getItem(ADMINS_KEY) || "null");
+    if(stored && Array.isArray(stored) && stored.length) return stored;
+  }catch{}
+  const master = [{email: ADMIN_EMAIL.toLowerCase(), password: ADMIN_PASS, role:"master", name:"Master Admin", createdAt: new Date().toISOString()}];
+  localStorage.setItem(ADMINS_KEY, JSON.stringify(master));
+  return master;
+}
+function isMasterAdmin(email){
+  const admins=getAdmins();
+  const found=admins.find(a=> a.email.toLowerCase()===email.toLowerCase());
+  return found && found.role==="master";
+}
+function getCurrentAdminEmail(){ return localStorage.getItem("startify_admin_email") || ADMIN_EMAIL; }
 
 // Demo seed (mirrors src/App.jsx)
 const DEMO_USERS = [
@@ -332,17 +348,26 @@ function render(){
             </div>
             <button type="submit" class="w-full h-11 rounded-full bg-slate-900 text-white font-bold text-sm hover:bg-slate-800 transition">Enter Admin →</button>
             <a href="/" class="block text-center text-xs text-slate-500 hover:text-slate-700 underline">← Back to Startify</a>
-            <button type="button" onclick="restoreAdminAccount(); alert('Admin restored — now login with admin@startify.net / Startify2026!Admin');" class="w-full mt-3 h-9 rounded-full bg-white border border-slate-200 text-xs font-semibold text-slate-600 hover:bg-slate-50">Restore deleted Admin</button>
           </form>
-          <div class="mt-6 rounded-2xl bg-amber-50 border border-amber-200 p-3 text-[11px] leading-4 text-amber-800">This page is <strong>not linked publicly</strong> except via footer “Admin”. Share only with you. Students register with <strong>@uohyd.ac.in</strong> (Founder/Builder); Backers may use any email.</div>
+          <div class="mt-6 rounded-2xl bg-amber-50 border border-amber-200 p-3 text-[11px] leading-4 text-amber-800">Master admin: <strong>admin@startify.net</strong> — create sub-admins inside after login.</div>
         </div>
       </div>`;
     document.getElementById("loginForm").addEventListener("submit", (e)=>{
       e.preventDefault();
       const email=document.getElementById("loginEmail").value.trim().toLowerCase();
       const pass=document.getElementById("loginPass").value;
-      if(email===ADMIN_EMAIL && pass===ADMIN_PASS){
+      const admins=getAdmins();
+      const found=admins.find(a=> a.email.toLowerCase()===email && a.password===pass);
+      // Fallback to hardcoded master if admins list empty
+      const isMasterHardcoded = email===ADMIN_EMAIL.toLowerCase() && pass===ADMIN_PASS;
+      if(found || isMasterHardcoded){
         localStorage.setItem(LS_KEYS.adminSession,"true");
+        localStorage.setItem("startify_admin_email", email);
+        // Ensure master exists in list
+        if(isMasterHardcoded && !admins.some(a=> a.email.toLowerCase()===email)){
+          admins.push({email, password:pass, role:"master", name:"Master Admin", createdAt: new Date().toISOString()});
+          localStorage.setItem(ADMINS_KEY, JSON.stringify(admins));
+        }
         render();
       } else {
         alert("Invalid admin credentials.");
@@ -379,6 +404,8 @@ function render(){
   // messages "today" — mock: count last 24h as total for demo
   const messagesToday=Math.max(1, Math.round(totalMessages*0.6));
 
+  const currentAdminEmail = getCurrentAdminEmail();
+  const isMaster = isMasterAdmin(currentAdminEmail);
   const tabs = [
     ["overview","Overview"],
     ["users","Users"],
@@ -387,9 +414,10 @@ function render(){
     ["backers","Backers"],
     ["pending","Backer Approvals"],
     ["passwords","Passwords"],
-    ["chats","Chats"],
+    ...(isMaster ? [["chats","Chats"]] : []),
     ["events","Events"],
     ["create","Create Account"],
+    ...(isMaster ? [["admins","Admins"]] : []),
   ];
 
   root.innerHTML = `
@@ -405,7 +433,7 @@ function render(){
           </div>
           <div class="flex items-center gap-3">
             <a href="/" class="hidden sm:inline-flex h-9 px-4 rounded-full border border-slate-200 bg-white text-xs font-semibold hover:bg-slate-50">← View Site</a>
-            <span class="hidden sm:inline text-xs text-slate-500">admin@startify.net</span>
+            <span class="hidden sm:inline text-xs text-slate-500">${currentAdminEmail} ${isMaster ? '<span class="ml-1 px-1.5 py-0.5 rounded-full bg-amber-500 text-white text-[10px]">MASTER</span>' : '<span class="ml-1 px-1.5 py-0.5 rounded-full bg-slate-100 border text-[10px]">ADMIN</span>'}</span>
             <button id="logoutBtn" class="h-9 px-4 rounded-full bg-slate-900 text-white text-xs font-bold hover:bg-slate-800">Sign out</button>
           </div>
         </div>
