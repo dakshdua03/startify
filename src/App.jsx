@@ -1157,8 +1157,17 @@ export default function App() {
       {activeTab === "home" && currentUser && (
         <main className="mx-auto max-w-[1200px] px-5 py-10 md:px-8 md:py-12">
           <div className="rounded-[30px] border border-slate-200 bg-gradient-to-br from-white via-slate-50 to-slate-200 p-7 shadow-sm md:p-10">
-            <div className="grid gap-8 lg:grid-cols-[1.3fr_.7fr] lg:items-end"><div><div className="inline-flex items-center gap-1.5 rounded-full bg-indigo-50 border border-indigo-200 px-2.5 py-1 text-[10px] font-bold uppercase tracking-widest text-indigo-700">University of Hyderabad • An initiative for UoH students</div><h1 className="font-heading home-calligraphy mt-3 text-[34px] font-extrabold tracking-tight text-slate-800 md:text-[46px]">Good to see you, {currentUser.name.split(" ")[0]}.</h1><p className="mt-3 max-w-[650px] text-[15px] leading-6 text-slate-600">Your UoH community is actively connecting ideas, talent and support. Explore your dashboard for role-specific matches, or open Chats to continue a conversation.</p></div><div className="rounded-2xl border border-white/80 bg-white/70 p-5 shadow-sm"><div className="text-[11px] font-bold uppercase tracking-widest text-slate-500">MOTIVATION OF THE DAY</div><blockquote className="font-heading mt-3 text-[22px] font-bold leading-tight text-slate-800">“{dailyQuote.text}”</blockquote><div className="mt-2 text-[11px] text-slate-500 italic">— {dailyQuote.author}</div><div className="mt-3 h-1 w-12 rounded-full bg-slate-700" /></div></div>
+            <div className="grid gap-8 lg:grid-cols-[1.3fr_.7fr] lg:items-end"><div><div className="inline-flex items-center gap-1.5 rounded-full bg-indigo-50 border border-indigo-200 px-2.5 py-1 text-[10px] font-bold uppercase tracking-widest text-indigo-700">University of Hyderabad • An initiative for UoH students</div><h1 className="font-heading home-calligraphy mt-3 text-[34px] font-extrabold tracking-tight text-slate-800 md:text-[46px]">Good to see you, {currentUser.name.split(" ")[0]}.</h1><p className="mt-3 max-w-[650px] text-[15px] leading-6 text-slate-600">Your UoH community is actively connecting ideas, talent and support. Explore your Chats for requests and ideas, or open Profile to edit.</p>
+              {currentUser?.role === "founder" && (
+                <button onClick={() => setIdeaModalOpen(true)} className="mt-4 h-11 px-6 rounded-full bg-slate-900 text-white font-bold text-sm hover:bg-black shadow">+ Post Idea</button>
+              )}
+            </div><div className="rounded-2xl border border-white/80 bg-white/70 p-5 shadow-sm"><div className="text-[11px] font-bold uppercase tracking-widest text-slate-500">MOTIVATION OF THE DAY</div><blockquote className="font-heading mt-3 text-[22px] font-bold leading-tight text-slate-800">“{dailyQuote.text}”</blockquote><div className="mt-2 text-[11px] text-slate-500 italic">— {dailyQuote.author}</div><div className="mt-3 h-1 w-12 rounded-full bg-slate-700" /></div></div>
             <div className="mt-8 grid gap-4 sm:grid-cols-2 lg:grid-cols-4"><div className="rounded-2xl border border-slate-200 bg-white/80 p-5"><div className="text-[11px] font-bold uppercase tracking-wide text-slate-500">Live ideas</div><div className="font-heading mt-2 text-3xl font-extrabold text-slate-800">{ideas.length}</div><p className="mt-1 text-[11px] text-slate-500">Projects looking for momentum</p></div><div className="rounded-2xl border border-slate-200 bg-white/80 p-5"><div className="text-[11px] font-bold uppercase tracking-wide text-slate-500">Active people</div><div className="font-heading mt-2 text-3xl font-extrabold text-slate-800">{builders.length + funders.length + ideas.length}</div><p className="mt-1 text-[11px] text-slate-500">Founders, talent, and funders</p></div><div className="rounded-2xl border border-slate-200 bg-white/80 p-5"><div className="text-[11px] font-bold uppercase tracking-wide text-slate-500">Connections made</div><div className="font-heading mt-2 text-3xl font-extrabold text-slate-800">{requests.filter((request) => request.status === "accepted").length}</div><p className="mt-1 text-[11px] text-slate-500">Conversations unlocked</p></div><div className="rounded-2xl border border-slate-200 bg-white/80 p-5"><div className="text-[11px] font-bold uppercase tracking-wide text-slate-500">Upcoming events</div><div className="font-heading mt-2 text-3xl font-extrabold text-slate-800">{events.length}</div><p className="mt-1 text-[11px] text-slate-500">Ways to meet the community</p></div></div>
+            {currentUser?.role === "founder" && (
+              <div className="mt-6 flex justify-center">
+                <button onClick={() => setIdeaModalOpen(true)} className="h-11 px-6 rounded-full bg-slate-900 text-white font-bold text-sm hover:bg-black shadow">+ Post Idea</button>
+              </div>
+            )}
           </div>
           <section className="mt-8"><div className="mb-4 flex items-end justify-between"><div><div className="text-[11px] font-bold uppercase tracking-widest text-slate-500">MARK YOUR CALENDAR</div><h2 className="font-heading mt-1 text-[25px] font-extrabold text-slate-800" style={{color: '#0f172a'}}>Upcoming community events</h2></div><button onClick={() => setActiveTab("home")} className="text-xs font-bold text-slate-700 hover:underline">Go to Chats →</button></div><div className="grid gap-5 md:grid-cols-2">{events.map((event) => <article key={event.id} className="rounded-[24px] border border-slate-200 bg-white p-6 shadow-sm" style={{background: 'rgba(255,255,255,0.92)'}}><div className="flex items-center justify-between gap-3"><span className="rounded-full bg-slate-100 px-3 py-1 text-[10px] font-bold uppercase tracking-wide text-slate-600">{event.category}</span><span className="text-xs font-semibold text-slate-500">{event.date}</span></div><h3 className="font-heading mt-4 text-[19px] font-extrabold" style={{color: '#0f172a'}}>{event.title}</h3><p className="mt-2 text-[13px]" style={{color: '#475569'}}>{event.time} · {event.venue}</p><p className="mt-3 text-[13px] leading-5" style={{color: '#334155'}}>{event.desc}</p></article>)}</div></section>
           <section className="mt-10">
@@ -1640,373 +1649,77 @@ export default function App() {
                 return <button key={req.id} onClick={() => { setActiveChatRequest(req); setChatModalOpen(true); }} className="rounded-[22px] border border-slate-200 bg-white/80 p-5 text-left shadow-sm transition hover:border-slate-300"><div className="flex items-center gap-3"><div className="grid h-11 w-11 place-items-center rounded-full bg-slate-100 font-heading font-bold text-slate-700">{partnerName[0]}</div><div><div className="font-heading font-bold text-slate-800">{partnerName}</div><div className="text-[11px] uppercase tracking-wide text-slate-500">{partnerRole}</div></div></div><div className="mt-5 border-t border-slate-200 pt-4"><div className="text-[11px] font-semibold text-slate-500">Shared interest: {req.targetTitle}</div><p className="mt-2 line-clamp-2 text-[13px] text-slate-600">{latest ? latest.text : "Your connection is ready — send the first message."}</p></div></button>;
               })}
             </div>
-            {myAcceptedConnections.length === 0 && <div className="rounded-[22px] border border-dashed border-slate-200 bg-slate-50/80 py-14 text-center text-sm text-slate-500">No chats yet. Connect with a person whose work interests you, then chat once they accept.</div>}
+            {myAcceptedConnections.length === 0 && <div className="rounded-[22px] border border-dashed border-slate-200 bg-slate-50/80 py-10 text-center text-sm text-slate-500">No chats yet. Connect with a person whose work interests you, then chat once they accept.</div>}
+            {/* Requests for you — merged from Dashboard */}
+            <div className="mt-10 rounded-[28px] border border-slate-200 bg-white p-6 shadow-sm">
+              <h3 className="font-heading font-extrabold text-lg text-slate-800">Requests for you</h3>
+              <p className="text-xs text-slate-500 mt-1">People who want to connect with you</p>
+              <div className="mt-4 space-y-3">
+                {myIncomingRequests.map((req) => (
+                  <div key={req.id} className="p-4 rounded-xl bg-slate-50 border border-slate-200 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                    <div>
+                      <div className="font-semibold text-slate-800 text-sm">{req.senderName} <span className="text-xs font-normal text-slate-500">({req.senderRole})</span> → {req.targetTitle}</div>
+                      <div className="text-xs text-slate-500 mt-1">{req.message}</div>
+                      <div className="text-[11px] text-slate-400 mt-1">{req.createdAt}</div>
+                    </div>
+                    <div className="flex gap-2 shrink-0">
+                      {req.status === "pending" ? (
+                        <>
+                          <button onClick={()=> handleAcceptRequest(req.id)} className="h-8 px-4 rounded-full bg-slate-900 text-white text-xs font-bold">Accept</button>
+                          <button onClick={()=> handleRejectRequest(req.id)} className="h-8 px-4 rounded-full bg-white border border-slate-200 text-xs font-bold">Decline</button>
+                        </>
+                      ) : (
+                        <span className="text-xs px-3 py-1 rounded-full bg-white border border-slate-200">{req.status}</span>
+                      )}
+                    </div>
+                  </div>
+                ))}
+                {myIncomingRequests.length===0 && <div className="text-center py-6 text-xs text-slate-500">No incoming requests</div>}
+              </div>
+            </div>
+            {/* Sent requests */}
+            <div className="mt-6 rounded-[28px] border border-slate-200 bg-white p-6 shadow-sm">
+              <h3 className="font-heading font-extrabold text-lg text-slate-800">Sent requests</h3>
+              <p className="text-xs text-slate-500 mt-1">You sent these — wait for acceptance to chat</p>
+              <div className="mt-4 space-y-3">
+                {myOutgoingRequests.map((req) => (
+                  <div key={req.id} className="p-3.5 rounded-xl bg-slate-50 border border-slate-200 flex items-center justify-between text-xs">
+                    <div>
+                      <div className="font-semibold text-slate-800">To: {req.receiverName}</div>
+                      <div className="text-[11px] text-slate-500">Re: {req.targetTitle} • {req.status}</div>
+                    </div>
+                    <span className="text-[11px] px-2 py-1 rounded-full bg-white border">{req.status}</span>
+                  </div>
+                ))}
+                {myOutgoingRequests.length===0 && <div className="text-center py-6 text-xs text-slate-500">No sent requests yet</div>}
+              </div>
+            </div>
+            {/* Your startup ideas */}
+            <div className="mt-6 rounded-[28px] border border-slate-200 bg-white p-6 shadow-sm">
+              <div className="flex items-center justify-between">
+                <h3 className="font-heading font-extrabold text-lg text-slate-800">Your startup ideas</h3>
+                {currentUser?.role==="founder" && <button onClick={()=> setIdeaModalOpen(true)} className="h-8 px-4 rounded-full bg-slate-900 text-white text-xs font-bold">+ Post Idea</button>}
+              </div>
+              <div className="mt-4 space-y-3">
+                {myIdeas.map((idea) => (
+                  <div key={idea.id} className="p-4 rounded-xl bg-slate-50 border border-slate-200 flex items-center justify-between">
+                    <div>
+                      <div className="font-bold text-slate-800 text-sm">{idea.title}</div>
+                      <div className="text-[11px] text-slate-500">Category: {idea.category} • Seeking: {idea.seeking}</div>
+                      <div className="text-[11px] text-slate-500">{idea.createdDate} • {idea.status}</div>
+                    </div>
+                    <span className="px-2.5 py-1 rounded-full bg-white border text-xs font-medium">{idea.status}</span>
+                  </div>
+                ))}
+                {myIdeas.length===0 && <div className="text-center py-6 text-xs text-slate-500">No ideas yet — post your first from Home</div>}
+              </div>
+            </div>
           </div>
         </section>
       )}
 
-      {/* ==========================================================================
-         TAB 5: ROLE-SPECIFIC DASHBOARD (FOR LOGGED IN USER)
-         ========================================================================== */}
-      {activeTab === "dashboard" && currentUser && (
-        <section className="dashboard-surface mx-auto max-w-[1200px] px-5 md:px-8 py-10">
-          {/* Manual test helpers — hide/show demo data */}
-          {currentUser.role === "admin" && (
-            <div className="mb-4 flex flex-wrap gap-2">
-              <button onClick={()=>{
-                localStorage.setItem("startify_hide_demo","true");
-                // remove demo ids from current state
-                const demoIdeaIds = new Set(INITIAL_IDEAS.map(i=>i.id));
-                const demoBuilderIds = new Set(INITIAL_BUILDERS.map(b=>b.id));
-                const demoFunderIds = new Set(INITIAL_FUNDERS.map(f=>f.id));
-                setIdeas(prev=>prev.filter(i=>!demoIdeaIds.has(i.id)));
-                setBuilders(prev=>prev.filter(b=>!demoBuilderIds.has(b.id)));
-                setFunders(prev=>prev.filter(f=>!demoFunderIds.has(f.id)));
-                showToast("Demo data hidden — new accounts you create at /admin.html will remain. Reload to persist.");
-              }} className="h-8 px-3 rounded-full bg-white border border-slate-200 text-xs font-bold text-slate-700 hover:bg-slate-50">Hide demo data</button>
-              <button onClick={()=>{
-                localStorage.removeItem("startify_hide_demo");
-                showToast("Demo hide cleared — reload page to restore demos");
-                setTimeout(()=>window.location.reload(),800);
-              }} className="h-8 px-3 rounded-full bg-white border border-slate-200 text-xs font-bold text-slate-700 hover:bg-slate-50">Show demos again</button>
-              <a href="/admin.html" target="_blank" className="h-8 px-3 rounded-full bg-slate-900 text-white text-xs font-bold grid place-items-center hover:bg-black">Open /admin.html → create test accounts</a>
-            </div>
-          )}
-                    {/* Profile moved to Profile tab — dashboard now focuses on activity */}
-          <div className="mb-6 flex flex-col sm:flex-row sm:items-start sm:justify-between gap-3">
-            <div>
-              <h2 className="font-heading text-xl font-extrabold text-slate-800">Dashboard</h2>
-              <p className="text-sm text-slate-500">Track your ideas, incoming requests and chats. Edit your profile in the <button onClick={()=>setActiveTab("profile")} className="underline font-semibold text-slate-700 hover:text-slate-900">Profile</button> tab.</p>
-            </div>
-            {currentUser?.role === "founder" && (
-              <button onClick={()=> setIdeaModalOpen(true)} className="h-10 px-5 rounded-full bg-slate-900 text-white font-bold text-sm hover:bg-black shadow shrink-0">+ Post Idea</button>
-            )}
-          </div>
-
-          {currentUser?._backerPending && (
-            <div className="mt-6 rounded-2xl border border-amber-200 bg-amber-50 p-4 flex items-start gap-3">
-              <div className="h-8 w-8 rounded-full bg-amber-500 text-white grid place-items-center font-bold shrink-0">!</div>
-              <div>
-                <div className="font-bold text-sm text-amber-900">Backer registration complete — pending admin approval</div>
-                <div className="text-xs text-amber-800 mt-1">Admin will approve your backer ID shortly. You can browse ideas, but pitching & visibility in the Backers Hub will unlock after approval. For urgent approval, contact admin.</div>
-              </div>
-            </div>
-          )}
-          {currentUser.role !== "admin" && <div className={`mt-8 grid gap-6 ${dashboardGroups.length === 1 ? "lg:grid-cols-1 max-w-[640px]" : "lg:grid-cols-2"}`}>
-            {dashboardGroups.map((group) => {
-              const allowed = canConnect(currentUser.role, group.kind);
-              return <section key={group.title} className="rounded-[24px] border border-slate-200 bg-white p-6">
-              <div className="border-b border-slate-200 pb-4"><div className="text-[11px] font-bold uppercase tracking-widest text-slate-500">DISCOVER</div><h2 className="font-heading mt-1 text-[26px] font-extrabold text-slate-800">{group.title}</h2><p className="mt-1 text-[12px] text-slate-500">{group.subtitle} {group.kind === "backer" && currentUser.role === "talent" ? "· not needed for builders" : ""}</p></div>
-              <div className="mt-4 space-y-3">{group.items.length === 0 ? <div className="py-6 text-center text-sm text-slate-500">Nothing to show here for your role right now.</div> : (group.kind === "builder" ? (showAllBuilders ? group.items : group.items.slice(0,3)) : group.kind === "backer" ? (showAllFunders ? group.items : group.items.slice(0,3)) : (showAllIdeas ? group.items : group.items.slice(0,3))).map((person) => { const isIdea = Boolean(person.title); const name = person.name || person.title; const detail = isIdea ? `${person.category} · ${person.founder}` : person.role || person.focus; return <div key={person.id} className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 rounded-2xl border border-slate-200 bg-slate-50 p-4"><div className="min-w-0 flex-1"><div className="truncate font-heading font-bold text-slate-800">{name}</div><div className="mt-0.5 truncate text-[11.5px] text-slate-500">{detail}</div></div>{allowed ? <button onClick={() => { setTargetConnectItem(person); setConnectModalOpen(true); }} className="w-full sm:w-auto shrink-0 rounded-full border border-slate-200 bg-slate-900 px-4 py-2 text-[11px] font-bold text-white hover:bg-slate-800 transition text-center">Connect</button> : <span className="shrink-0 text-[11px] text-slate-400 px-3 py-1.5 rounded-full bg-white border border-slate-200 text-center">Via ideas</span>}</div>; })}</div>
-              {group.items.length > 3 && (
-                <div className="mt-3 flex justify-center">
-                  <button onClick={() => {
-                    if (group.kind === "builder") setShowAllBuilders(!showAllBuilders);
-                    else if (group.kind === "backer") setShowAllFunders(!showAllFunders);
-                    else setShowAllIdeas(!showAllIdeas);
-                  }} className="h-8 px-4 rounded-full bg-white border border-slate-200 text-xs font-semibold hover:bg-slate-50">
-                    {(group.kind === "builder" ? showAllBuilders : group.kind === "backer" ? showAllFunders : showAllIdeas) ? "Show less" : `Show all ${group.items.length} →`}
-                  </button>
-                </div>
-              )}
-            </section>;})}
-          </div>}
-
-          {currentUser.role === "admin" && <div className="mt-8 grid gap-5 sm:grid-cols-4"><div className="rounded-[22px] border border-white/10 bg-zinc-950 p-6"><div className="text-xs text-zinc-400">Ideas under review</div><div className="font-heading mt-2 text-3xl font-extrabold">{ideas.filter((idea) => idea.status === "Pending Review").length}</div></div><div className="rounded-[22px] border border-white/10 bg-zinc-950 p-6"><div className="text-xs text-zinc-400">Talent profiles</div><div className="font-heading mt-2 text-3xl font-extrabold">{builders.length}</div></div><div className="rounded-[22px] border border-white/10 bg-zinc-950 p-6"><div className="text-xs text-zinc-400">Funders (approved)</div><div className="font-heading mt-2 text-3xl font-extrabold">{funders.length}</div></div><div className="rounded-[22px] border border-amber-200 bg-amber-500 p-6 text-white"><div className="text-xs text-white/80">Backers pending approval</div><div className="font-heading mt-2 text-3xl font-extrabold">{pendingBackers.length}</div></div></div>}
-
-          {currentUser.role === "admin" && (
-            <div className="mt-8 rounded-[24px] border border-slate-200 bg-white p-6">
-              <div className="flex items-center justify-between border-b border-slate-200 pb-4">
-                <h3 className="font-heading font-extrabold text-[24px] text-slate-800">Pending idea approvals</h3>
-                <span className="rounded-full bg-slate-100 border border-slate-200 px-3 py-1 text-xs font-bold text-slate-600">{ideas.filter((idea) => idea.status === "Pending Review").length} pending</span>
-              </div>
-              <div className="mt-4 space-y-3">
-                {ideas.filter((idea) => idea.status === "Pending Review").length === 0 ? (
-                  <div className="py-6 text-center text-sm text-slate-500">No ideas waiting for review.</div>
-                ) : (
-                  ideas.filter((idea) => idea.status === "Pending Review").map((idea) => (
-                    <div key={idea.id} className="flex flex-col gap-3 rounded-2xl border border-slate-200 bg-slate-50 p-4 md:flex-row md:items-center md:justify-between">
-                      <div>
-                        <div className="font-heading text-[20px] font-bold text-slate-800">{idea.title}</div>
-                        <div className="mt-1 text-[12px] text-slate-500">By {idea.founder} • {idea.category}</div>
-                        <p className="mt-2 text-[13px] text-slate-600">{idea.desc}</p>
-                      </div>
-                      <div className="flex gap-2 md:flex-col">
-                        <button onClick={() => handleApproveIdea(idea.id)} className="h-9 rounded-full bg-slate-100 border border-slate-200 px-4 text-[11px] font-bold text-slate-700 hover:bg-slate-200">Approve</button>
-                        <button onClick={() => handleRejectIdea(idea.id)} className="h-9 rounded-full border border-slate-200 px-4 text-[11px] font-bold text-slate-600 hover:bg-slate-100">Reject</button>
-                      </div>
-                    </div>
-                  ))
-                )}
-              </div>
-            </div>
-          )}
-
-          {currentUser.role === "admin" && (
-            <div className="mt-8 rounded-[24px] border border-amber-200 bg-amber-50 p-6">
-              <div className="flex items-center justify-between border-b border-amber-200 pb-4">
-                <h3 className="font-heading font-extrabold text-[24px] text-amber-900">Backers pending approval</h3>
-                <span className="rounded-full bg-amber-500 text-white px-3 py-1 text-xs font-bold">{pendingBackers.length} pending</span>
-              </div>
-              <p className="text-xs text-amber-800 mt-2">Backer IDs require your approval before they appear in the Backers Hub.</p>
-              <div className="mt-4 space-y-3">
-                {pendingBackers.length === 0 ? (
-                  <div className="py-6 text-center text-sm text-amber-700">No backers pending — all verified.</div>
-                ) : (
-                  pendingBackers.map((b) => (
-                    <div key={b.id} className="flex flex-col gap-3 rounded-2xl border border-amber-200 bg-white p-4 md:flex-row md:items-center md:justify-between">
-                      <div>
-                        <div className="font-heading text-[16px] font-bold text-slate-800">{b.name} <span className="text-xs font-normal text-slate-500">• {b.email}</span></div>
-                        <div className="mt-1 text-[12px] text-slate-500">Focus: {b.focus || b.bio || "—"}</div>
-                      </div>
-                      <div className="flex gap-2">
-                        <button onClick={() => {
-                          setFunders([{ id: b.id, name: b.name, email: b.email.toLowerCase(), role: b.roleTitle || "Angel Backer", focus: b.focus || "Tech & AI", bio: b.bio || "Approved backer.", ticketSize: "Pre-Seed & Seed" }, ...funders]);
-                          setPendingBackers(pendingBackers.filter(x=>x.id!==b.id));
-                          showToast(`✓ Approved backer: ${b.name}`);
-                        }} className="h-9 rounded-full bg-slate-900 text-white px-4 text-[11px] font-bold hover:bg-slate-800">Approve →</button>
-                        <button onClick={() => { setPendingBackers(pendingBackers.filter(x=>x.id!==b.id)); showToast("Rejected backer"); }} className="h-9 rounded-full border border-slate-200 px-4 text-[11px] font-bold text-slate-600">Reject</button>
-                      </div>
-                    </div>
-                  ))
-                )}
-              </div>
-            </div>
-          )}
-
-          {/* DASHBOARD GRID */}
-          <div className="mt-8 grid md:grid-cols-2 gap-8">
-            {/* COLUMN 1: INCOMING REQUESTS (Accept / Decline Flow) */}
-            <div className="space-y-6">
-              <div className="rounded-[24px] border border-slate-200 bg-white p-4 sm:p-6">
-                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-slate-200 pb-4">
-                  <div className="min-w-0">
-                    <h3 className="font-heading font-extrabold text-[20px] sm:text-[24px] text-slate-800">
-                      {currentUser.role === "founder" ? "Requests for you & your startup ideas" : "Incoming connection requests"}
-                    </h3>
-                    <div className="text-[12px] text-slate-500">
-                      {currentUser.role === "founder" ? "Requests sent directly to you or one of your startup ideas." : "People who would like to connect with your profile."}
-                    </div>
-                  </div>
-                  <span className="inline-flex items-center justify-center whitespace-nowrap px-3 py-1 rounded-full bg-slate-100 border border-slate-200 text-slate-700 font-bold text-xs shrink-0 self-start sm:self-auto">
-                    {myIncomingRequests.length}
-                  </span>
-                </div>
-
-                <div className="mt-4 space-y-4">
-                  {myIncomingRequests.map((req) => (
-                    <div
-                      key={req.id}
-                      className="p-4 rounded-2xl bg-slate-50 border border-slate-200 flex flex-col justify-between gap-3"
-                    >
-                      <div>
-                        <div className="flex items-center justify-between text-xs">
-                          <span className="font-bold text-slate-800 text-[13.5px]">
-                            {req.senderName}
-                          </span>
-                          <span className="px-2 py-0.5 rounded-full bg-slate-200 text-[10px] text-slate-700 uppercase font-bold border border-slate-200">
-                            {req.senderRole}
-                          </span>
-                        </div>
-                        <div className="text-[11.5px] text-slate-500 mt-0.5">
-                          Re: <strong>{req.targetTitle}</strong> • {req.createdAt}
-                        </div>
-                        <p className="text-[13px] text-slate-600 mt-2 bg-white p-3 rounded-xl border border-slate-200">
-                          "{req.message}"
-                        </p>
-                      </div>
-
-                      <div className="flex items-center justify-end gap-2 pt-2 border-t border-slate-200">
-                        {req.status === "pending" ? (
-                          <>
-                            <button
-                              onClick={() => handleRejectRequest(req.id)}
-                              className="h-8 px-3 rounded-full border border-slate-200 text-[11.5px] font-semibold text-slate-600 hover:bg-slate-100"
-                            >
-                              Decline
-                            </button>
-                            <button
-                              onClick={() => handleAcceptRequest(req.id)}
-                              className="h-8 px-4 rounded-full bg-slate-100 text-slate-700 text-[11.5px] font-bold hover:bg-slate-200"
-                            >
-                              ✓ Accept Request
-                            </button>
-                          </>
-                        ) : req.status === "accepted" ? (
-                          <span className="text-[11.5px] font-bold text-slate-700 flex items-center gap-2">
-                            <span>✓ Accepted</span>
-                            <button
-                              onClick={() => {
-                                setActiveChatRequest(req);
-                                setChatModalOpen(true);
-                              }}
-                              className="h-8 px-4 rounded-full bg-slate-100 text-slate-700 text-[11.5px] font-bold hover:bg-slate-200"
-                            >
-                              Open Live Chat
-                            </button>
-                          </span>
-                        ) : (
-                          <span className="text-[11.5px] text-slate-500 font-medium">Declined</span>
-                        )}
-                      </div>
-                    </div>
-                  ))}
-
-                  {myIncomingRequests.length === 0 && (
-                    <div className="text-center py-8 text-zinc-500 text-xs">
-                      No incoming connection requests yet. Switch demo accounts to test sending requests!
-                    </div>
-                  )}
-                </div>
-              </div>
-
-              {/* OUTGOING REQUESTS */}
-              <div className="rounded-[24px] border border-slate-200 bg-white p-6">
-                <div className="flex items-center justify-between border-b border-slate-200 pb-4">
-                  <h3 className="font-heading font-extrabold text-[24px] text-slate-800">
-                    My Sent Requests
-                  </h3>
-                  <span className="text-xs text-slate-500">{myOutgoingRequests.length} total</span>
-                </div>
-
-                <div className="mt-4 space-y-3">
-                  {myOutgoingRequests.map((req) => (
-                    <div
-                      key={req.id}
-                      className="p-3.5 rounded-xl bg-slate-50 border border-slate-200 flex items-center justify-between text-xs"
-                    >
-                      <div>
-                        <div className="font-semibold text-slate-800">To: {req.receiverName}</div>
-                        <div className="text-[11px] text-slate-500 mt-0.5">Re: {req.targetTitle}</div>
-                      </div>
-                      <div>
-                        {req.status === "accepted" ? (
-                          <button
-                            onClick={() => {
-                              setActiveChatRequest(req);
-                              setChatModalOpen(true);
-                            }}
-                            className="h-8 px-3.5 rounded-full bg-slate-100 text-slate-700 font-bold text-[11px] hover:bg-slate-200"
-                          >
-                            Chat Now
-                          </button>
-                        ) : (
-                          <span className="px-2.5 py-1 rounded-full bg-slate-100 text-slate-600 text-[10.5px] capitalize font-medium border border-slate-200">
-                            {req.status}
-                          </span>
-                        )}
-                      </div>
-                    </div>
-                  ))}
-
-                  {myOutgoingRequests.length === 0 && (
-                    <div className="text-center py-6 text-zinc-500 text-xs">
-                      You haven't sent any connection requests yet. Browse the Ideas or Backers directory to connect!
-                    </div>
-                  )}
-                </div>
-              </div>
-            </div>
-
-            {/* COLUMN 2: ACTIVE CONNECTIONS & DIRECT CHATS */}
-            <div className="space-y-6">
-              <div className="rounded-[24px] border border-slate-200 bg-white p-4 sm:p-6">
-                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-slate-200 pb-4">
-                  <div className="min-w-0">
-                    <h3 className="font-heading font-extrabold text-[20px] sm:text-[24px] text-slate-800">
-                      Active Connections & Direct Chats
-                    </h3>
-                    <div className="text-[12px] text-slate-500">
-                      Unlocked messaging with accepted partners.
-                    </div>
-                  </div>
-                  <span className="inline-flex items-center justify-center whitespace-nowrap px-3 py-1 rounded-full bg-slate-100 border border-slate-200 text-slate-700 font-bold text-xs shrink-0 self-start sm:self-auto">
-                    {myAcceptedConnections.length} Active
-                  </span>
-                </div>
-
-                <div className="mt-4 space-y-3">
-                  {myAcceptedConnections.map((req) => {
-                    const partnerName =
-                      req.senderId === currentUser.id ? req.receiverName : req.senderName;
-                    const partnerRole =
-                      req.senderId === currentUser.id ? req.receiverRole || "partner" : req.senderRole;
-
-                      return (
-                        <div
-                          key={req.id}
-                          className="p-4 rounded-2xl bg-slate-50 border border-slate-200 flex flex-col sm:flex-row sm:items-center justify-between gap-3 transition cursor-pointer"
-                          onClick={() => {
-                            setActiveChatRequest(req);
-                            setChatModalOpen(true);
-                          }}
-                        >
-                          <div className="flex items-center gap-3 min-w-0">
-                            <div className="h-10 w-10 rounded-full bg-slate-100 border border-slate-200 grid place-items-center text-[18px] shrink-0">👤</div>
-                            <div className="min-w-0">
-                              <div className="font-bold text-slate-800 text-[14px] truncate">
-                                {partnerName}
-                              </div>
-                              <div className="text-[11px] text-slate-500 truncate">
-                                Topic: {req.targetTitle} • {partnerRole.toUpperCase()}
-                              </div>
-                            </div>
-                          </div>
-
-                          <button className="w-full sm:w-auto h-9 px-4 rounded-full bg-slate-100 text-slate-700 font-bold text-[11.5px] border border-slate-200 hover:bg-slate-200 shrink-0">
-                            Open Chat
-                          </button>
-                        </div>
-                      );
-                  })}
-
-                  {myAcceptedConnections.length === 0 && (
-                    <div className="text-center py-8 text-zinc-500 text-xs">
-                      No accepted connections yet. Accept an incoming request or send a request to start chatting!
-                    </div>
-                  )}
-                </div>
-              </div>
-
-              {/* ROLE CONTENT (MY IDEAS FOR FOUNDER) */}
-              {currentUser.role === "founder" && (
-                <div className="rounded-[24px] border border-slate-200 bg-white p-6">
-                  <div className="flex items-center justify-between border-b border-slate-200 pb-4">
-                    <h3 className="font-heading font-extrabold text-[24px] text-slate-800">
-                      My Posted Ideas ({myIdeas.length})
-                    </h3>
-                    <button
-                      onClick={() => setIdeaModalOpen(true)}
-                      className="text-xs text-slate-700 font-bold hover:underline"
-                    >
-                      + Add Idea
-                    </button>
-                  </div>
-
-                  <div className="mt-4 space-y-3">
-                    {myIdeas.map((idea) => (
-                      <div
-                        key={idea.id}
-                        className="p-4 rounded-xl bg-slate-50 border border-slate-200 flex items-center justify-between"
-                      >
-                        <div>
-                          <div className="font-bold text-slate-800 text-[14px]">{idea.title}</div>
-                          <div className="text-[11.5px] text-slate-500 mt-0.5">
-                            Category: {idea.category} • Seeking: {idea.seeking}
-                          </div>
-                        </div>
-                        <span className="px-2.5 py-1 rounded-full bg-slate-100 border border-slate-200 text-[10.5px] text-slate-600 font-medium">
-                          {idea.status}
-                        </span>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              )}
-            </div>
-          </div>
-        </section>
-      )}
+      {/* Dashboard removed — merged into Chats and Home, Profile holds personal data */}
+      
 
       {/* PROFILE TAB — dedicated profile for any logged-in user */}
       {activeTab === "profile" && currentUser && (
