@@ -712,11 +712,17 @@ export default function App() {
   };
 
   const handleApproveIdea = (ideaId) => {
+    const nowStr = new Date().toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' });
     setIdeas(
       ideas.map((idea) =>
-        idea.id === ideaId ? { ...idea, status: "Approved & Live", createdDate: "Just now" } : idea
+        idea.id === ideaId ? { ...idea, status: "Approved & Live", createdDate: nowStr } : idea
       )
     );
+    try {
+      const stored = JSON.parse(localStorage.getItem("startify_submitted_ideas")||"[]");
+      const updated = stored.map(i=> i.id===ideaId ? {...i, status:"Approved & Live", createdDate: nowStr} : i);
+      localStorage.setItem("startify_submitted_ideas", JSON.stringify(updated));
+    } catch {}
     showToast("Idea approved and published to the board.");
   };
 
@@ -976,18 +982,16 @@ export default function App() {
               </button>
             ) : (
               <div className="flex items-center gap-2 whitespace-nowrap">
-                <div className="hidden lg:flex items-center gap-2.5 bg-white border border-slate-200 rounded-full pl-1 pr-3 py-1 shadow-sm">
+                <button
+                  onClick={() => setActiveTab("profile")}
+                  title="Open Profile"
+                  className="hidden lg:flex items-center gap-2.5 bg-white border border-slate-200 rounded-full pl-1 pr-3 py-1 shadow-sm hover:border-slate-400 hover:bg-slate-50 transition text-left"
+                >
                   <div className="h-8 w-8 rounded-full bg-slate-100 border border-slate-200 grid place-items-center text-[14px] shrink-0">👤</div>
                   <div className="min-w-0 text-left leading-none">
                     <div className="text-xs font-bold text-slate-800 truncate max-w-[90px]">{currentUser.name.split(" ")[0]}</div>
                     <div className="text-[11px] text-slate-500 truncate">{ROLE_META[currentUser.role]?.label || currentUser.role}</div>
                   </div>
-                </div>
-                <button
-                  onClick={() => setActiveTab("profile")}
-                  className={`h-9 px-4 rounded-full text-xs font-semibold whitespace-nowrap shrink-0 transition ${activeTab === "profile" ? "bg-slate-900 text-white shadow" : "border border-slate-200 bg-white text-slate-700 hover:bg-slate-50"}`}
-                >
-                  Profile
                 </button>
                 <button
                   onClick={() => { setCurrentUser(null); setActiveTab("home"); showToast("Signed out"); }}
@@ -999,9 +1003,9 @@ export default function App() {
             )}
           </div>
 
-          {/* Mobile Menu Button + Profile adjacent to Sign out on top */}
+          {/* Mobile: name itself is profile button + Sign out on top */}
           <div className="md:hidden flex items-center gap-2 shrink-0">
-            {currentUser && <><button onClick={() => setActiveTab("profile")} className="h-9 px-3 rounded-full bg-white border border-slate-200 text-slate-700 text-xs font-bold whitespace-nowrap">Profile</button><button onClick={() => { setCurrentUser(null); setActiveTab("home"); showToast("Signed out"); }} className="h-9 px-3 rounded-full bg-slate-900 text-white text-xs font-bold whitespace-nowrap">Sign out</button></>}
+            {currentUser && <><button onClick={() => setActiveTab("profile")} title="Open Profile" className="h-9 px-3 rounded-full bg-white border border-slate-200 text-slate-800 text-xs font-bold whitespace-nowrap max-w-[110px] truncate">{currentUser.name.split(" ")[0]}</button><button onClick={() => { setCurrentUser(null); setActiveTab("home"); showToast("Signed out"); }} className="h-9 px-3 rounded-full bg-slate-900 text-white text-xs font-bold whitespace-nowrap">Sign out</button></>}
             <button
               onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
               className="h-10 w-10 rounded-full border border-slate-200 bg-white grid place-items-center text-slate-700 shadow-sm shrink-0"
@@ -1115,9 +1119,8 @@ export default function App() {
                 return getTime(b) - getTime(a);
               }).slice(0,12).map((idea) => (
                 <article key={idea.id} className="snap-start shrink-0 w-[300px] md:w-[360px] rounded-[24px] border border-slate-200 bg-white p-6 shadow-sm flex flex-col">
-                  <div className="flex items-center justify-between gap-3">
+                  <div className="flex items-center gap-3">
                     <span className="rounded-full bg-slate-100 px-3 py-1 text-[10px] font-bold text-slate-600">{idea.category}</span>
-                    <span className="text-[10px] font-semibold text-slate-500">{idea.createdDate}</span>
                   </div>
                   <h3 className="font-heading mt-3 text-[18px] font-extrabold text-slate-800">{idea.title}</h3>
                   <p className="mt-1 text-[12px] font-medium text-slate-500">By {idea.founder}</p>
@@ -1163,7 +1166,7 @@ export default function App() {
                 return getTime(b) - getTime(a);
               }).slice(0,12).map((idea) => (
                 <article key={idea.id} className="snap-start shrink-0 w-[300px] md:w-[360px] rounded-[24px] border border-slate-200 bg-white/85 p-6 shadow-sm flex flex-col">
-                  <div className="flex items-center justify-between gap-3"><span className="rounded-full bg-slate-100 px-3 py-1 text-[10px] font-bold text-slate-600">{idea.category}</span><span className="text-[10px] font-semibold text-slate-500">{idea.createdDate}</span></div>
+                  <div className="flex items-center gap-3"><span className="rounded-full bg-slate-100 px-3 py-1 text-[10px] font-bold text-slate-600">{idea.category}</span></div>
                   <h3 className="font-heading mt-4 text-[20px] font-extrabold text-slate-800">{idea.title}</h3>
                   <p className="mt-1 text-[12px] font-medium text-slate-500">By {idea.founder}</p>
                   <p className="mt-3 text-[13px] leading-5 text-slate-600 line-clamp-3">{idea.desc}</p>
@@ -2217,45 +2220,45 @@ export default function App() {
         </section>
       )}
 
-      {/* BOTTOM TAB BAR — for logged-in users, stays at bottom */}
+      {/* BOTTOM TAB BAR — text only, no emojis, for logged-in users */}
       {currentUser && (
         <nav className="fixed bottom-0 left-0 right-0 z-40 bg-white/95 backdrop-blur border-t border-slate-200 shadow-[0_-4px_12px_rgba(0,0,0,0.05)]">
-          <div className="mx-auto max-w-[1200px] px-2 sm:px-6 h-[64px] flex items-center justify-around sm:justify-center gap-1 sm:gap-2 overflow-x-auto">
-            <button onClick={() => setActiveTab("home")} className={`flex flex-col items-center gap-1 px-3 py-1.5 rounded-xl text-[11px] font-semibold whitespace-nowrap ${activeTab === "home" ? "bg-slate-900 text-white" : "text-slate-600 hover:text-slate-900 hover:bg-slate-50"}`}>
-              <span className="text-[14px] leading-none">⌂</span> Home
+          <div className="mx-auto max-w-[1200px] px-2 sm:px-6 h-[60px] flex items-center justify-around sm:justify-center gap-1 sm:gap-2 overflow-x-auto">
+            <button onClick={() => setActiveTab("home")} className={`px-4 py-2 rounded-full text-[12px] font-bold whitespace-nowrap transition ${activeTab === "home" ? "bg-slate-900 text-white shadow" : "text-slate-600 hover:text-slate-900 hover:bg-slate-100"}`}>
+              Home
             </button>
             {showIdeasTab && (
-              <button onClick={() => setActiveTab("ideas")} className={`flex flex-col items-center gap-1 px-3 py-1.5 rounded-xl text-[11px] font-semibold whitespace-nowrap ${activeTab === "ideas" ? "bg-slate-900 text-white" : "text-slate-600 hover:text-slate-900 hover:bg-slate-50"}`}>
-                <span className="text-[14px] leading-none">💡</span> Ideas
+              <button onClick={() => setActiveTab("ideas")} className={`px-4 py-2 rounded-full text-[12px] font-bold whitespace-nowrap transition ${activeTab === "ideas" ? "bg-slate-900 text-white shadow" : "text-slate-600 hover:text-slate-900 hover:bg-slate-100"}`}>
+                Ideas
               </button>
             )}
             {showTalentTab && (
-              <button onClick={() => setActiveTab("talent")} className={`flex flex-col items-center gap-1 px-3 py-1.5 rounded-xl text-[11px] font-semibold whitespace-nowrap ${activeTab === "talent" ? "bg-slate-900 text-white" : "text-slate-600 hover:text-slate-900 hover:bg-slate-50"}`}>
-                <span className="text-[14px] leading-none">🛠️</span> Talent
+              <button onClick={() => setActiveTab("talent")} className={`px-4 py-2 rounded-full text-[12px] font-bold whitespace-nowrap transition ${activeTab === "talent" ? "bg-slate-900 text-white shadow" : "text-slate-600 hover:text-slate-900 hover:bg-slate-100"}`}>
+                Talent
               </button>
             )}
             {showBackersTab && (
-              <button onClick={() => setActiveTab("backers")} className={`flex flex-col items-center gap-1 px-3 py-1.5 rounded-xl text-[11px] font-semibold whitespace-nowrap ${activeTab === "backers" ? "bg-slate-900 text-white" : "text-slate-600 hover:text-slate-900 hover:bg-slate-50"}`}>
-                <span className="text-[14px] leading-none">💰</span> Backers
+              <button onClick={() => setActiveTab("backers")} className={`px-4 py-2 rounded-full text-[12px] font-bold whitespace-nowrap transition ${activeTab === "backers" ? "bg-slate-900 text-white shadow" : "text-slate-600 hover:text-slate-900 hover:bg-slate-100"}`}>
+                Backers
               </button>
             )}
             {showEventsTab && (
-              <button onClick={() => setActiveTab("events")} className={`flex flex-col items-center gap-1 px-3 py-1.5 rounded-xl text-[11px] font-semibold whitespace-nowrap ${activeTab === "events" ? "bg-slate-900 text-white" : "text-slate-600 hover:text-slate-900 hover:bg-slate-50"}`}>
-                <span className="text-[14px] leading-none">📅</span> Events
+              <button onClick={() => setActiveTab("events")} className={`px-4 py-2 rounded-full text-[12px] font-bold whitespace-nowrap transition ${activeTab === "events" ? "bg-slate-900 text-white shadow" : "text-slate-600 hover:text-slate-900 hover:bg-slate-100"}`}>
+                Events
               </button>
             )}
-            <button onClick={() => setActiveTab("chats")} className={`flex flex-col items-center gap-1 px-3 py-1.5 rounded-xl text-[11px] font-semibold whitespace-nowrap relative ${activeTab === "chats" ? "bg-slate-900 text-white" : "text-slate-600 hover:text-slate-900 hover:bg-slate-50"}`}>
-              <span className="text-[14px] leading-none">💬</span> Chats
-              {myIncomingRequests.filter(r=>r.status==="pending").length>0 && <span className="absolute -top-1 -right-1 h-2.5 w-2.5 rounded-full bg-emerald-500 border-2 border-white"></span>}
+            <button onClick={() => setActiveTab("chats")} className={`px-4 py-2 rounded-full text-[12px] font-bold whitespace-nowrap transition relative ${activeTab === "chats" ? "bg-slate-900 text-white shadow" : "text-slate-600 hover:text-slate-900 hover:bg-slate-100"}`}>
+              Chats
+              {myIncomingRequests.filter(r=>r.status==="pending").length>0 && <span className="absolute -top-0.5 -right-0.5 h-2.5 w-2.5 rounded-full bg-emerald-500 border-2 border-white"></span>}
             </button>
           </div>
         </nav>
       )}
-      {/* Spacer for bottom nav */}
-      {currentUser && <div className="h-[64px] shrink-0" />}
+      {/* Spacer for bottom nav so footer stays visible when scrolling up */}
+      {currentUser && <div className="h-[76px] shrink-0" />}
 
-      {/* FOOTER */}
-      <footer className="border-t border-slate-200 bg-white text-slate-500 py-10">
+      {/* FOOTER — extra bottom padding so fixed nav never covers it */}
+      <footer className="border-t border-slate-200 bg-white text-slate-500 py-10 pb-24">
         <div className="mx-auto max-w-[1200px] px-5 md:px-8 flex flex-col md:flex-row items-center justify-between gap-6 text-[12.5px]">
           <div className="flex items-center gap-3.5">
             <img
@@ -2277,7 +2280,7 @@ export default function App() {
               href={MAIN_WHATSAPP_LINK}
               target="_blank"
               rel="noreferrer"
-              className="text-white hover:underline font-semibold"
+              className="h-9 px-4 grid place-items-center rounded-full bg-emerald-500 text-white text-xs font-bold hover:bg-emerald-600 transition whitespace-nowrap"
             >
               WhatsApp Group
             </a>
@@ -2403,13 +2406,7 @@ export default function App() {
                 </p>
               </div>
 
-              {/* Password + link info — only for register */}
-              {authMode === "register" && (
-                <div className="rounded-2xl border border-slate-200 bg-slate-50 p-3">
-                  <div className="text-[11px] font-bold text-slate-700">Email verification via link</div>
-                  <p className="text-[11px] text-slate-500 mt-1">Create account → we send a verification link to your email (check inbox & spam). Click the link to activate, then Sign In. No OTP needed.</p>
-                </div>
-              )}
+
 
               <div>
                 <label className="block text-[12px] font-semibold text-slate-600 mb-1">
