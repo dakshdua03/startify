@@ -336,9 +336,10 @@ export default function App() {
 
   useEffect(() => {
     const hide = localStorage.getItem("startify_hide_demo")==="true";
-    dbService.getIdeas(hide ? [] : INITIAL_IDEAS).then((data) => {
+    const loadIdeas = () => dbService.getIdeas(hide ? [] : INITIAL_IDEAS).then((data) => {
       if (data && data.length > 0) setIdeas(data);
     });
+    loadIdeas();
     // Load admin-persisted talent/backers/events for launch
     try {
       const b = JSON.parse(localStorage.getItem("startify_admin_builders") || "null");
@@ -358,6 +359,28 @@ export default function App() {
       const pb = JSON.parse(localStorage.getItem("startify_pending_backers") || "null");
       if (pb && Array.isArray(pb) && pb.length) setPendingBackers(pb);
     } catch {}
+    // Live update when admin approves in another tab
+    const onStorage = (e) => {
+      if (!e.key || e.key === "startify_submitted_ideas" || e.key === "startify_events" || e.key === "startify_deleted_demos") {
+        loadIdeas();
+        try {
+          const ev = JSON.parse(localStorage.getItem("startify_events") || "null");
+          if (ev && Array.isArray(ev)) {
+            const deletedIds = new Set(ev.filter(x=>x.deleted).map(x=>x.id));
+            const filtered = ev.filter(x=>!x.deleted);
+            setEvents((prev) => {
+              const base = hide ? [] : INITIAL_EVENTS;
+              const merged = [...filtered, ...base.filter(p=>!deletedIds.has(p.id))];
+              const map = new Map(); merged.forEach(x=> map.set(x.id, x)); return Array.from(map.values());
+            });
+          }
+        } catch {}
+      }
+    };
+    window.addEventListener("storage", onStorage);
+    const onVisible = () => { if (!document.hidden) loadIdeas(); };
+    document.addEventListener("visibilitychange", onVisible);
+    return () => { window.removeEventListener("storage", onStorage); document.removeEventListener("visibilitychange", onVisible); };
   }, []);
 
   useEffect(() => {

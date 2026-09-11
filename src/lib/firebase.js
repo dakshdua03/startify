@@ -132,10 +132,11 @@ export const dbService = {
     const filteredDefault = defaultIdeas.filter(i=> !deletedIds.has(i.id));
     const filteredLocal = local.filter(i=> !i.deleted);
     const filteredCloud = cloudIdeas.filter(i=> !i.deleted && !deletedIds.has(i.id));
-    // Merge cloud + local + default (demos treated as real), dedupe by id, cloud newest first
+    // Merge: default -> cloud -> local (local admin approvals win, prevents flicker)
     const map = new Map();
-    [...filteredDefault, ...filteredLocal].forEach(i=> { if(i && i.id) map.set(i.id, i); });
-    filteredCloud.forEach(i=> { if(i && i.id) map.set(i.id, i); });
+    [...filteredDefault].forEach(i=> { if(i && i.id) map.set(i.id, i); });
+    [...filteredCloud].forEach(i=> { if(i && i.id) map.set(i.id, i); });
+    [...filteredLocal].forEach(i=> { if(i && i.id) map.set(i.id, i); });
     const merged = Array.from(map.values());
     if (merged.length > 0) return merged;
     if (filteredCloud.length > 0) return filteredCloud;

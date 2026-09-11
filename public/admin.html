@@ -556,12 +556,12 @@ function render(){
       const all=getAllData().ideas;
       const target=all.find(i=>i.id===id);
       if(!target) return;
-      const updated={...target, status:"Approved & Live", createdDate:"Just now"};
+      const nowStr = new Date().toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' });
+      const updated={...target, status:"Approved & Live", createdDate: nowStr};
       // upsert by id (no duplication)
       const next=stored.filter(i=>i.id!==id);
       save(LS_KEYS.ideas, [updated, ...next]);
-      // also seed dedupe via getAllData handles it
-      alert("Approved: "+target.title);
+      alert("Approved: "+target.title+" — now live on site (refresh site tab if open)");
       render();
     }));
     content.querySelectorAll(".rejectBtn").forEach(b=> b.addEventListener("click", ()=>{
