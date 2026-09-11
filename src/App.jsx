@@ -599,7 +599,29 @@ export default function App() {
               return;
             }
           } catch {}
-          await authService.signUp(email, password);
+          try {
+            await authService.signUp(email, password);
+          } catch (signUpErr) {
+            const signUpMsg = signUpErr?.message || "";
+            // Same email, different role: Firebase Auth is email-unique, so reuse existing Firebase user
+            if (signUpMsg.includes("email-already-in-use") || signUpMsg.includes("already-in-use")) {
+              try {
+                await authService.signIn(email, password);
+                // Password matches existing Firebase account — allow adding second role locally
+                try { await authService.signOut?.(); } catch {}
+              } catch (signInErr) {
+                const inMsg = signInErr?.message || "";
+                if (inMsg.includes("verify your email")) {
+                  // Email exists but unverified — allow adding role, user must still verify
+                } else {
+                  showToast("This email is already registered with a different password. Sign In first, then add another role from the name popup.");
+                  return;
+                }
+              }
+            } else {
+              throw signUpErr;
+            }
+          }
           const pendingUser = {
             id: `user_${Date.now()}`,
             name: authForm.name.trim(),
@@ -1149,11 +1171,11 @@ export default function App() {
                 <div className="text-xs font-bold uppercase tracking-widest text-slate-500">Ecosystem workflow</div>
                 <div className="mt-3 grid grid-cols-1 sm:grid-cols-3 gap-3 sm:gap-4">
                   {[
-                    ["→", "Create account", "Pick a role — Founder, Builder or Backer.", "bg-indigo-600"],
-                    ["→", "Send a request", "Pitch an idea or offer your skills.", "bg-violet-600"],
-                    ["→", "Get accepted & chat", "Chat unlocks after acceptance.", "bg-emerald-600"],
-                  ].map(([n, t, d, bg]) => (
-                    <div key={t} className="flex gap-2.5 text-xs sm:text-[13px] items-start"><span className={`grid h-8 w-8 shrink-0 place-items-center rounded-xl text-sm font-bold text-white ${bg}`}>{n}</span><div className="min-w-0"><div className="font-semibold text-slate-800 leading-tight">{t}</div><div className="text-slate-500 leading-4 text-[11px] sm:text-xs mt-0.5">{d}</div></div></div>
+                    ["→", "Create account", "Pick a role — Founder, Builder or Backer."],
+                    ["→", "Send a request", "Pitch an idea or offer your skills."],
+                    ["→", "Get accepted & chat", "Chat unlocks after acceptance."],
+                  ].map(([n, t, d]) => (
+                    <div key={t} className="flex gap-2.5 text-xs sm:text-[13px] items-start"><span className="grid h-8 w-8 shrink-0 place-items-center rounded-xl text-sm font-bold text-black bg-white border border-slate-200 shadow-sm">{n}</span><div className="min-w-0"><div className="font-semibold text-slate-800 leading-tight">{t}</div><div className="text-slate-500 leading-4 text-[11px] sm:text-xs mt-0.5">{d}</div></div></div>
                   ))}
                 </div>
               </div>
@@ -2344,7 +2366,7 @@ export default function App() {
             <div className="flex items-start justify-between gap-3">
               <div>
                 <div className="font-heading font-extrabold text-[18px]">Switch profile</div>
-                <div className="text-[12px] text-slate-500 mt-0.5 break-all">{currentUser.email} • default logs in first</div>
+                <div className="text-[12px] text-slate-500 mt-0.5 break-all">{currentUser.email}</div>
               </div>
               <button onClick={() => setProfilePopupOpen(false)} className="h-8 w-8 rounded-full border border-slate-200 grid place-items-center text-slate-500 hover:text-slate-800">✕</button>
             </div>
@@ -2399,7 +2421,7 @@ export default function App() {
                 );
               })}
             </div>
-            <button onClick={() => { setProfilePopupOpen(false); setActiveTab("profile"); }} className="mt-4 w-full h-10 rounded-full bg-white border border-slate-200 text-xs font-bold hover:bg-slate-50">Open full Profile →</button>
+            <p className="mt-4 text-center text-[11px] text-slate-400">Full profile lives in the bottom Profile tab</p>
           </div>
         </div>
       )}
@@ -2435,14 +2457,18 @@ export default function App() {
               Chats
               {myIncomingRequests.filter(r=>r.status==="pending").length>0 && <span className="absolute -top-0.5 -right-0.5 h-2.5 w-2.5 rounded-full bg-emerald-500 border-2 border-white"></span>}
             </button>
+            <button onClick={() => setActiveTab("profile")} className={`px-4 py-2 rounded-full text-[12px] font-bold whitespace-nowrap transition ${activeTab === "profile" ? "bg-slate-900 text-white shadow" : "text-slate-600 hover:text-slate-900 hover:bg-slate-100"}`}>
+              Profile
+            </button>
           </div>
         </nav>
       )}
       {/* Spacer for bottom nav so footer stays visible when scrolling up */}
       {currentUser && <div className="h-[76px] shrink-0" />}
 
-      {/* FOOTER — extra bottom padding so fixed nav never covers it */}
-      <footer className="border-t border-slate-200 bg-white text-slate-500 py-10 pb-24">
+      {/* FOOTER — only for logged-out visitors, hidden when logged in */}
+      {!currentUser && (
+      <footer className="border-t border-slate-200 bg-white text-slate-500 py-10">
         <div className="mx-auto max-w-[1200px] px-5 md:px-8 flex flex-col md:flex-row items-center justify-between gap-6 text-[12.5px]">
           <div className="flex items-center gap-3.5">
             <img
@@ -2471,6 +2497,7 @@ export default function App() {
           </div>
         </div>
       </footer>
+      )}
 
       {/* ==========================================================================
          MODALS

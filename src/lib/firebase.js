@@ -77,6 +77,10 @@ export const authService = {
     await sendPasswordResetEmail(auth, email.trim().toLowerCase(), { url: window.location.origin, handleCodeInApp: false });
     return true;
   },
+  async signOut() {
+    if (!auth) return;
+    try { await signOut(auth); } catch {}
+  },
   // Call on app start to handle email link verification redirect
   onAuthStateChanged(callback) {
     if (!auth) return () => {};
