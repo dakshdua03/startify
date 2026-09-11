@@ -277,6 +277,61 @@ export default function App() {
   const ideasScrollRefSignedIn = useRef(null);
   const [profileNameEditOpen, setProfileNameEditOpen] = useState(false);
   const [profileNameDraft, setProfileNameDraft] = useState("");
+  // Profile popup (quick switch, no extra screen)
+  const [profilePopupOpen, setProfilePopupOpen] = useState(false);
+  const [popupEditId, setPopupEditId] = useState(null);
+  const [popupNameDraft, setPopupNameDraft] = useState("");
+  const [popupAboutDraft, setPopupAboutDraft] = useState("");
+  const [popupExtraDraft, setPopupExtraDraft] = useState("");
+  const getDefaultAccount = () => {
+    try { return JSON.parse(localStorage.getItem("startify_default_account") || "null"); } catch { return null; }
+  };
+  const setDefaultAccount = (email, role, id) => {
+    try { localStorage.setItem("startify_default_account", JSON.stringify({ email: email.toLowerCase(), role, id })); } catch {}
+  };
+  const getSameEmailProfiles = (email) => {
+    if (!email) return [];
+    const lower = email.toLowerCase();
+    try {
+      const profiles = JSON.parse(localStorage.getItem("startify_user_profiles") || "[]");
+      const regs = JSON.parse(localStorage.getItem("startify_registrations") || "[]");
+      const fromRegs = regs.filter(r=> (r.email||"").toLowerCase()===lower).map(r=>({ id: r.email, name: r.name, email: r.email, role: r.role==="builder"?"talent":r.role==="funder"?"backer":r.role, bio: r.ideaOrSkills || "", createdAt: r.registeredAt }));
+      const combined = [...profiles.filter(p=> (p.email||"").toLowerCase()===lower), ...fromRegs];
+      // dedupe by role, keep earliest created
+      const byRole = new Map();
+      [...combined, ...DEMO_USERS.filter(u=> (u.email||"").toLowerCase()===lower)].forEach(p=> {
+        if (!byRole.has(p.role)) byRole.set(p.role, p);
+      });
+      return Array.from(byRole.values());
+    } catch { return []; }
+  };
+  const savePopupProfileEdits = (profile) => {
+    const name = popupNameDraft.trim() || profile.name;
+    const about = popupAboutDraft.trim();
+    try {
+      const arr = JSON.parse(localStorage.getItem("startify_user_profiles")||"[]");
+      const idx = arr.findIndex(p=> p.email.toLowerCase()===profile.email.toLowerCase() && p.role===profile.role);
+      if (idx >= 0) {
+        arr[idx].name = name;
+        arr[idx].bio = about || arr[idx].bio || "";
+        if (profile.role === "talent") arr[idx].skills = popupExtraDraft.trim() || arr[idx].skills || "";
+        if (profile.role === "backer") arr[idx].focus = popupExtraDraft.trim() || arr[idx].focus || "";
+        if (profile.role === "talent" && popupExtraDraft.trim()) arr[idx].roleTitle = popupExtraDraft.trim();
+        localStorage.setItem("startify_user_profiles", JSON.stringify(arr));
+      } else {
+        arr.unshift({ id: profile.id || profile.email, name, email: profile.email.toLowerCase(), role: profile.role, bio: about, skills: profile.role==="talent"?popupExtraDraft.trim():"", focus: profile.role==="backer"?popupExtraDraft.trim():"", createdAt: new Date().toISOString() });
+        localStorage.setItem("startify_user_profiles", JSON.stringify(arr));
+      }
+    } catch {}
+    try {
+      localStorage.setItem(getProfileAboutKey(profile.email), about);
+    } catch {}
+    if (currentUser && currentUser.email.toLowerCase()===profile.email.toLowerCase() && currentUser.role===profile.role) {
+      setCurrentUser({ ...currentUser, name, bio: about || currentUser.bio, skills: profile.role==="talent" ? (popupExtraDraft.trim()||currentUser.skills) : currentUser.skills, focus: profile.role==="backer" ? (popupExtraDraft.trim()||currentUser.focus) : currentUser.focus });
+    }
+    setPopupEditId(null);
+    showToast("✓ Profile updated");
+  };
   const getProfileImageKey = (email) => `startify_profile_img_${email.toLowerCase()}`;
   const getProfileAboutKey = (email) => `startify_profile_about_${email.toLowerCase()}`;
   const getProfileImage = (email) => { try { return localStorage.getItem(getProfileImageKey(email)) || ""; } catch { return ""; } };
@@ -593,7 +648,18 @@ export default function App() {
           let existingProfile = null;
           try {
             const profiles = JSON.parse(localStorage.getItem("startify_user_profiles") || "[]");
-            existingProfile = profiles.find(p => p.email.toLowerCase() === email.toLowerCase() && p.role === targetRole) || profiles.find(p => p.email.toLowerCase() === email.toLowerCase()) || null;
+            const matches = profiles.filter(p => p.email.toLowerCase() === email.toLowerCase());
+            // Default account first (user's chosen default), else first-created, else requested role
+            const def = getDefaultAccount();
+            if (def && def.email.toLowerCase() === email.toLowerCase()) {
+              existingProfile = matches.find(p => p.role === def.role) || null;
+            }
+            if (!existingProfile) {
+              existingProfile = matches.sort((a,b)=> new Date(a.createdAt||0) - new Date(b.createdAt||0))[0] || null;
+            }
+            if (!existingProfile) {
+              existingProfile = profiles.find(p => p.email.toLowerCase() === email.toLowerCase() && p.role === targetRole) || null;
+            }
             if (!existingProfile) {
               const regsLocal = JSON.parse(localStorage.getItem("startify_registrations") || "[]");
               const r = regsLocal.find(r => r.email.toLowerCase() === email.toLowerCase());
@@ -983,8 +1049,8 @@ export default function App() {
             ) : (
               <div className="flex items-center gap-2 whitespace-nowrap">
                 <button
-                  onClick={() => setActiveTab("profile")}
-                  title="Open Profile"
+                  onClick={() => { setPopupEditId(null); setProfilePopupOpen(true); }}
+                  title="Switch profile / quick edit"
                   className="hidden lg:flex items-center gap-2.5 bg-white border border-slate-200 rounded-full pl-1 pr-3 py-1 shadow-sm hover:border-slate-400 hover:bg-slate-50 transition text-left"
                 >
                   <div className="h-8 w-8 rounded-full bg-slate-100 border border-slate-200 grid place-items-center text-[14px] shrink-0">👤</div>
@@ -1005,7 +1071,7 @@ export default function App() {
 
           {/* Mobile: name itself is profile button + Sign out on top */}
           <div className="md:hidden flex items-center gap-2 shrink-0">
-            {currentUser && <><button onClick={() => setActiveTab("profile")} title="Open Profile" className="h-9 px-3 rounded-full bg-white border border-slate-200 text-slate-800 text-xs font-bold whitespace-nowrap max-w-[110px] truncate">{currentUser.name.split(" ")[0]}</button><button onClick={() => { setCurrentUser(null); setActiveTab("home"); showToast("Signed out"); }} className="h-9 px-3 rounded-full bg-slate-900 text-white text-xs font-bold whitespace-nowrap">Sign out</button></>}
+            {currentUser && <><button onClick={() => { setPopupEditId(null); setProfilePopupOpen(true); }} title="Switch profile / quick edit" className="h-9 px-3 rounded-full bg-white border border-slate-200 text-slate-800 text-xs font-bold whitespace-nowrap max-w-[110px] truncate">{currentUser.name.split(" ")[0]}</button><button onClick={() => { setCurrentUser(null); setActiveTab("home"); showToast("Signed out"); }} className="h-9 px-3 rounded-full bg-slate-900 text-white text-xs font-bold whitespace-nowrap">Sign out</button></>}
             <button
               onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
               className="h-10 w-10 rounded-full border border-slate-200 bg-white grid place-items-center text-slate-700 shadow-sm shrink-0"
@@ -1674,7 +1740,57 @@ export default function App() {
                 return <button key={req.id} onClick={() => { setActiveChatRequest(req); setChatModalOpen(true); }} className="rounded-[22px] border border-slate-200 bg-white/80 p-5 text-left shadow-sm transition hover:border-slate-300"><div className="flex items-center gap-3"><div className="grid h-11 w-11 place-items-center rounded-full bg-slate-100 font-heading font-bold text-slate-700">{partnerName[0]}</div><div><div className="font-heading font-bold text-slate-800">{partnerName}</div><div className="text-[11px] uppercase tracking-wide text-slate-500">{partnerRole}</div></div></div><div className="mt-5 border-t border-slate-200 pt-4"><div className="text-[11px] font-semibold text-slate-500">Shared interest: {req.targetTitle}</div><p className="mt-2 line-clamp-2 text-[13px] text-slate-600">{latest ? latest.text : "Your connection is ready — send the first message."}</p></div></button>;
               })}
             </div>
-            {myAcceptedConnections.length === 0 && <div className="rounded-[22px] border border-dashed border-slate-200 bg-slate-50/80 py-14 text-center text-sm text-slate-500">No chats yet. Connect with a person whose work interests you, then chat once they accept.</div>}
+            {myAcceptedConnections.length === 0 && <div className="rounded-[22px] border border-dashed border-slate-200 bg-slate-50/80 py-10 text-center text-sm text-slate-500">No chats yet. Connect with a person whose work interests you, then chat once they accept.</div>}
+            {/* Connection requests — received */}
+            <div className="mt-8 rounded-[28px] border border-slate-200 bg-white p-6 shadow-sm">
+              <h3 className="font-heading font-extrabold text-lg text-slate-800">Requests received ({myIncomingRequests.length})</h3>
+              <p className="text-xs text-slate-500 mt-1">People who sent you a connection request</p>
+              <div className="mt-4 space-y-3">
+                {myIncomingRequests.map((req) => (
+                  <div key={req.id} className="p-4 rounded-xl bg-slate-50 border border-slate-200 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                    <div>
+                      <div className="font-semibold text-slate-800 text-sm">{req.senderName} <span className="text-xs font-normal text-slate-500">({req.senderRole})</span> → {req.targetTitle}</div>
+                      <div className="text-xs text-slate-500 mt-1">{req.message}</div>
+                    </div>
+                    <div className="flex gap-2 shrink-0">
+                      {req.status === "pending" ? (
+                        <>
+                          <button onClick={()=> handleAcceptRequest(req.id)} className="h-8 px-4 rounded-full bg-slate-900 text-white text-xs font-bold">Accept</button>
+                          <button onClick={()=> handleRejectRequest(req.id)} className="h-8 px-4 rounded-full bg-white border border-slate-200 text-xs font-bold">Decline</button>
+                        </>
+                      ) : req.status === "accepted" ? (
+                        <button onClick={() => { setActiveChatRequest(req); setChatModalOpen(true); }} className="h-8 px-4 rounded-full bg-emerald-500 text-white text-xs font-bold">Chat →</button>
+                      ) : (
+                        <span className="text-xs px-3 py-1 rounded-full bg-white border border-slate-200">{req.status}</span>
+                      )}
+                    </div>
+                  </div>
+                ))}
+                {myIncomingRequests.length===0 && <div className="text-center py-6 text-xs text-slate-500">No received requests</div>}
+              </div>
+            </div>
+            {/* Connection requests — sent */}
+            <div className="mt-6 rounded-[28px] border border-slate-200 bg-white p-6 shadow-sm">
+              <h3 className="font-heading font-extrabold text-lg text-slate-800">Requests sent ({myOutgoingRequests.length})</h3>
+              <p className="text-xs text-slate-500 mt-1">Requests you sent — chat unlocks after acceptance</p>
+              <div className="mt-4 space-y-3">
+                {myOutgoingRequests.map((req) => (
+                  <div key={req.id} className="p-3.5 rounded-xl bg-slate-50 border border-slate-200 flex items-center justify-between text-xs">
+                    <div>
+                      <div className="font-semibold text-slate-800">To: {req.receiverName}</div>
+                      <div className="text-[11px] text-slate-500">Re: {req.targetTitle}</div>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <span className="text-[11px] px-2 py-1 rounded-full bg-white border">{req.status}</span>
+                      {req.status === "accepted" && (
+                        <button onClick={() => { setActiveChatRequest(req); setChatModalOpen(true); }} className="h-8 px-3 rounded-full bg-slate-900 text-white text-[11px] font-bold">Chat</button>
+                      )}
+                    </div>
+                  </div>
+                ))}
+                {myOutgoingRequests.length===0 && <div className="text-center py-6 text-xs text-slate-500">No sent requests yet</div>}
+              </div>
+            </div>
           </div>
         </section>
       )}
@@ -2218,6 +2334,74 @@ export default function App() {
             )}
           </div>
         </section>
+      )}
+
+      {/* PROFILE POPUP — quick switch + default + per-profile edit, no extra screen */}
+      {profilePopupOpen && currentUser && (
+        <div className="fixed inset-0 z-[60] grid place-items-center p-4">
+          <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={() => setProfilePopupOpen(false)} />
+          <div className="relative w-full max-w-[480px] rounded-[24px] bg-white border border-slate-200 shadow-2xl p-5 sm:p-6 text-slate-800 max-h-[85vh] overflow-y-auto">
+            <div className="flex items-start justify-between gap-3">
+              <div>
+                <div className="font-heading font-extrabold text-[18px]">Switch profile</div>
+                <div className="text-[12px] text-slate-500 mt-0.5 break-all">{currentUser.email} • default logs in first</div>
+              </div>
+              <button onClick={() => setProfilePopupOpen(false)} className="h-8 w-8 rounded-full border border-slate-200 grid place-items-center text-slate-500 hover:text-slate-800">✕</button>
+            </div>
+            <div className="mt-4 space-y-3">
+              {getSameEmailProfiles(currentUser.email).map((p) => {
+                const isActive = currentUser.role === p.role;
+                const def = getDefaultAccount();
+                const isDefault = def && def.email.toLowerCase() === p.email.toLowerCase() && def.role === p.role;
+                const about = getProfileAbout(p.email) || p.bio || "";
+                const editing = popupEditId === `${p.email}|${p.role}`;
+                return (
+                  <div key={`${p.email}|${p.role}`} className={`rounded-2xl border p-4 ${isActive ? "border-slate-900 bg-slate-50" : "border-slate-200 bg-white"}`}>
+                    <div className="flex items-center justify-between gap-2">
+                      <div className="min-w-0">
+                        <div className="font-bold text-sm truncate">{p.name || p.email.split("@")[0]} {isDefault && <span className="ml-1 text-[10px] px-1.5 py-0.5 rounded-full bg-amber-500 text-white">DEFAULT</span>}</div>
+                        <div className="text-[11px] text-slate-500">{ROLE_META[p.role]?.label || p.role} • {p.email}</div>
+                      </div>
+                      <div className="flex gap-1.5 shrink-0">
+                        {!isActive && (
+                          <button onClick={() => {
+                            const full = { id: p.id || p.email, name: p.name || p.email.split("@")[0], email: p.email, role: p.role, bio: about, roleTitle: p.roleTitle, skills: p.skills, focus: p.focus };
+                            setCurrentUser(full);
+                            setProfilePopupOpen(false);
+                            showToast(`Switched to ${ROLE_META[p.role]?.label || p.role}`);
+                          }} className="h-8 px-3 rounded-full bg-slate-900 text-white text-xs font-bold">Switch</button>
+                        )}
+                        {!isDefault && (
+                          <button onClick={() => { setDefaultAccount(p.email, p.role, p.id); showToast(`✓ Default set to ${ROLE_META[p.role]?.label || p.role} — logs in first`); }} className="h-8 px-3 rounded-full bg-white border border-slate-200 text-xs font-bold">Default</button>
+                        )}
+                      </div>
+                    </div>
+                    {!editing ? (
+                      <div className="mt-2">
+                        {about ? <p className="text-xs text-slate-600 leading-4 line-clamp-2">{about}</p> : <p className="text-xs text-slate-400 italic">No about yet</p>}
+                        {p.role === "talent" && <p className="text-[11px] text-slate-500 mt-1">Skills: {p.skills || p.roleTitle || "—"}</p>}
+                        {p.role === "backer" && <p className="text-[11px] text-slate-500 mt-1">Focus: {p.focus || "—"}</p>}
+                        <button onClick={() => { setPopupEditId(`${p.email}|${p.role}`); setPopupNameDraft(p.name || ""); setPopupAboutDraft(about); setPopupExtraDraft(p.role === "talent" ? (p.skills || "") : p.role === "backer" ? (p.focus || "") : ""); }} className="mt-2 h-7 px-3 rounded-full bg-white border border-slate-200 text-[11px] font-bold">Edit {ROLE_META[p.role]?.label || p.role}</button>
+                      </div>
+                    ) : (
+                      <div className="mt-3 space-y-2">
+                        <input value={popupNameDraft} onChange={e=> setPopupNameDraft(e.target.value)} placeholder="Full name" className="w-full h-9 rounded-xl border border-slate-200 bg-slate-50 px-3 text-xs outline-none" />
+                        <textarea value={popupAboutDraft} onChange={e=> setPopupAboutDraft(e.target.value)} placeholder={p.role === "founder" ? "What do you build?" : p.role === "talent" ? "About you + stack" : "What do you fund?"} className="w-full min-h-[64px] rounded-xl border border-slate-200 bg-slate-50 p-2.5 text-xs outline-none" />
+                        {p.role === "talent" && <input value={popupExtraDraft} onChange={e=> setPopupExtraDraft(e.target.value)} placeholder="Skills e.g. React, Node.js" className="w-full h-9 rounded-xl border border-slate-200 bg-slate-50 px-3 text-xs outline-none" />}
+                        {p.role === "backer" && <input value={popupExtraDraft} onChange={e=> setPopupExtraDraft(e.target.value)} placeholder="Focus e.g. EdTech, AI" className="w-full h-9 rounded-xl border border-slate-200 bg-slate-50 px-3 text-xs outline-none" />}
+                        <div className="flex justify-end gap-2">
+                          <button onClick={()=> setPopupEditId(null)} className="h-8 px-3 rounded-full border border-slate-200 text-xs">Cancel</button>
+                          <button onClick={()=> savePopupProfileEdits(p)} className="h-8 px-4 rounded-full bg-slate-900 text-white text-xs font-bold">Save</button>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+            <button onClick={() => { setProfilePopupOpen(false); setActiveTab("profile"); }} className="mt-4 w-full h-10 rounded-full bg-white border border-slate-200 text-xs font-bold hover:bg-slate-50">Open full Profile →</button>
+          </div>
+        </div>
       )}
 
       {/* BOTTOM TAB BAR — text only, no emojis, for logged-in users */}
