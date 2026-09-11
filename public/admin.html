@@ -108,14 +108,14 @@ function deleteUserByEmail(email, id, role){
   } else if(isDemo && otherRolesSameEmail){
     // Don't tombstone demo if other role still exists — just remove this role entry
   }
-  let regs=load(tkey(LS_KEYS.regs), []);
+  let regs=load(LS_KEYS.regs, []);
   // regs role mapping: talent<->builder, backer<->funder
   const regRoleMap = {founder:"founder", talent:"builder", backer:"funder", admin:"admin"};
   const targetRegRole = regRoleMap[role] || role;
   regs=regs.filter(r=> !(r.email.toLowerCase()===email.toLowerCase() && (r.role===targetRegRole || r.role===role)));
   // If no role provided, fallback to email only (legacy)
   if(!role) regs=regs.filter(r=> r.email.toLowerCase()!==email.toLowerCase());
-  save(tkey(LS_KEYS.regs), regs);
+  save(LS_KEYS.regs, regs);
   let builders=load(LS_KEYS.builders, []);
   builders=builders.filter(b=> !(b.id===id || ((b.email||"").toLowerCase()===email.toLowerCase() && role==="talent")));
   save(LS_KEYS.builders, builders);
@@ -139,7 +139,7 @@ function deleteUserByEmail(email, id, role){
     const creds=load(LS_KEYS.credentials, {});
     // Only delete credential if no other role with same email remains
     const remainingProfiles = (()=>{ try{ return JSON.parse(localStorage.getItem("startify_user_profiles")||"[]"); }catch{return [];} })();
-    const stillHasEmail = remainingProfiles.some(p=> p.email.toLowerCase()===email.toLowerCase()) || load(tkey(LS_KEYS.regs), []).some(r=> r.email.toLowerCase()===email.toLowerCase());
+    const stillHasEmail = remainingProfiles.some(p=> p.email.toLowerCase()===email.toLowerCase()) || load(LS_KEYS.regs, []).some(r=> r.email.toLowerCase()===email.toLowerCase());
     if(!stillHasEmail){
       delete creds[email.toLowerCase()];
       save(LS_KEYS.credentials, creds);
@@ -182,9 +182,9 @@ function deleteBuilderById(id){
   builders=builders.filter(b=> b.id!==id);
   save(LS_KEYS.builders, builders);
   if(target && target.email){
-    let regs=load(tkey(LS_KEYS.regs), []);
+    let regs=load(LS_KEYS.regs, []);
     regs=regs.filter(r=> r.email.toLowerCase()!==target.email.toLowerCase());
-    save(tkey(LS_KEYS.regs), regs);
+    save(LS_KEYS.regs, regs);
     try{
       const profs=JSON.parse(localStorage.getItem("startify_user_profiles")||"[]");
       localStorage.setItem("startify_user_profiles", JSON.stringify(profs.filter(p=> p.id!==id && (p.email||"").toLowerCase()!==target.email.toLowerCase())));
@@ -211,9 +211,9 @@ function deleteFunderById(id){
   funders=funders.filter(f=> f.id!==id);
   save(LS_KEYS.funders, funders);
   if(target && target.email){
-    let regs=load(tkey(LS_KEYS.regs), []);
+    let regs=load(LS_KEYS.regs, []);
     regs=regs.filter(r=> r.email.toLowerCase()!==target.email.toLowerCase());
-    save(tkey(LS_KEYS.regs), regs);
+    save(LS_KEYS.regs, regs);
     try{
       const profs=JSON.parse(localStorage.getItem("startify_user_profiles")||"[]");
       localStorage.setItem("startify_user_profiles", JSON.stringify(profs.filter(p=> p.id!==id && (p.email||"").toLowerCase()!==target.email.toLowerCase())));
@@ -258,7 +258,7 @@ function editFunderById(id){
 function deleteIdeaById(id){
   if(!requireMaster()){ alert("Only master admin can delete."); return; }
   if(!confirm(`Delete idea ${id} ?`)) return;
-  let stored=load(tkey(LS_KEYS.ideas), []);
+  let stored=load(LS_KEYS.ideas, []);
   // also need to handle seed: if it's seed, we add tombstone by saving without it? Instead we store deleted marker
   // For seed ideas, we save a filtered list with that id marked as deleted via localStorage hide flag is complex; instead we save stored with that id removed and also save a hidden set
   const all=getAllData().ideas;
@@ -267,9 +267,9 @@ function deleteIdeaById(id){
   // If it's a seed with no stored entry, we need to create a deletion marker: save a dummy with status Rejected to hide? Simpler: add to stored a tombstone with status Deleted
   const isSeed = SEED_IDEAS.some(s=> s.id===id) && !stored.some(s=> s.id===id);
   if(isSeed){
-    save(tkey(LS_KEYS.ideas), [{id, status:"Deleted_By_Admin", deleted:true}, ...next]);
+    save(LS_KEYS.ideas, [{id, status:"Deleted_By_Admin", deleted:true}, ...next]);
   } else {
-    save(tkey(LS_KEYS.ideas), next);
+    save(LS_KEYS.ideas, next);
   }
   // also remove from Firestore? No — local only
   alert("Deleted idea: "+(target?target.title:id));
@@ -284,31 +284,26 @@ function editIdeaById(id){
   const newDesc=prompt("Edit description:", target.desc||"");
   if(newDesc===null) return;
   const updated={...target, title:newTitle.trim()||target.title, desc:newDesc.trim()||target.desc};
-  let stored=load(tkey(LS_KEYS.ideas), []);
+  let stored=load(LS_KEYS.ideas, []);
   const next=stored.filter(i=>i.id!==id);
-  save(tkey(LS_KEYS.ideas), [updated, ...next]);
+  save(LS_KEYS.ideas, [updated, ...next]);
   alert("Updated idea: "+updated.title);
   render();
 }
 
-function isTestMode(){ try { return localStorage.getItem("startify_test_mode")==="true"; } catch { return false; } }
-function tkey(k){ return isTestMode() ? ("test_"+k) : k; }
 function getAllData(){
-  // TEST MODE: ideas + registrations isolated (test_ keys + test_ Firestore collections on site)
-  const ideasKey = tkey(LS_KEYS.ideas);
-  const regsKey = tkey(LS_KEYS.regs);
   // Deduplicate ideas by id — stored overrides seed (prevents replication on approve), deleted tombstones hide seed
-  const storedIdeas = load(ideasKey, []);
+  const storedIdeas = load(LS_KEYS.ideas, []);
   const deletedIds = new Set(storedIdeas.filter(i=> i.deleted).map(i=>i.id));
   const ideaMap = new Map();
-  if(!isTestMode()) SEED_IDEAS.forEach(i=> { if(!deletedIds.has(i.id)) ideaMap.set(i.id, i); });
+  SEED_IDEAS.forEach(i=> { if(!deletedIds.has(i.id)) ideaMap.set(i.id, i); });
   storedIdeas.forEach(i=> { if(i.deleted) ideaMap.delete(i.id); else ideaMap.set(i.id, i); });
   const ideas = Array.from(ideaMap.values());
-  const regs = load(regsKey, null) || (isTestMode() ? [] : [
+  const regs = load(LS_KEYS.regs, null) || [
     {name:"Rahul Sharma", email:"rahul@uohyd.ac.in", role:"founder", registeredAt:"2026-08-23"},
     {name:"Aditi Rao", email:"aditi@uohyd.ac.in", role:"builder", registeredAt:"2026-08-22"},
     {name:"Karan Patel", email:"karan@angelnet.in", role:"funder", registeredAt:"2026-08-21"},
-  ]);
+  ];
   const builders = [...load(LS_KEYS.builders, []), ...SEED_BUILDERS];
   const funders = [...load(LS_KEYS.funders, []), ...SEED_FUNDERS];
   const storedEvents = load(LS_KEYS.events, []);
@@ -451,7 +446,6 @@ function render(){
           </div>
           <div class="flex items-center gap-2">
             <a href="/" class="hidden sm:inline-flex h-9 px-4 rounded-full border border-slate-200 bg-white text-xs font-semibold hover:bg-slate-50">← View Site</a>
-            <button id="testModeBtn" class="h-9 px-3 rounded-full text-xs font-bold border ${(function(){ try{ return localStorage.getItem("startify_test_mode")==="true"; }catch{ return false; } })() ? "bg-amber-500 border-amber-500 text-white" : "bg-white border-slate-200 text-slate-600"}">${(function(){ try{ return localStorage.getItem("startify_test_mode")==="true"; }catch{ return false; } })() ? "TEST MODE" : "Test Mode"}</button>
             <span class="hidden sm:inline text-xs text-slate-500">${currentAdminEmail} ${isMaster ? '<span class="ml-1 px-1.5 py-0.5 rounded-full bg-amber-500 text-white text-[10px]">MASTER</span>' : '<span class="ml-1 px-1.5 py-0.5 rounded-full bg-slate-100 border text-[10px]">ADMIN</span>'}</span>
             <button id="logoutBtn" class="h-9 px-4 rounded-full bg-slate-900 text-white text-xs font-bold hover:bg-slate-800">Sign out</button>
           </div>
@@ -459,7 +453,6 @@ function render(){
       </header>
 
       <div class="mx-auto max-w-[1280px] px-6 py-6">
-        ${isTestMode() ? `<div class="mb-4 rounded-2xl border border-amber-300 bg-amber-50 p-4 text-sm text-amber-800"><strong>TEST MODE</strong> — showing fake ideas/registrations only (test_ keys + test_ Firestore). Real users untouched. Toggle off in header to return to live.</div>` : ``}
         <div class="flex flex-wrap gap-2 mb-6">
           ${tabs.map(([k,label])=>`<button data-tab="${k}" class="tab-btn h-9 px-4 rounded-full border text-xs font-bold transition ${currentTab===k?"bg-slate-900 text-white border-slate-900 shadow":"bg-white text-slate-600 border-slate-200 hover:border-slate-300"}">${label}</button>`).join("")}
         </div>
@@ -476,11 +469,7 @@ function render(){
     localStorage.removeItem(LS_KEYS.adminSession);
     render();
   });
-  document.getElementById("testModeBtn").addEventListener("click", ()=>{
-    const cur = (()=>{ try { return localStorage.getItem("startify_test_mode")==="true"; } catch { return false; } })();
-    try { localStorage.setItem("startify_test_mode", cur ? "false" : "true"); } catch {}
-    render();
-  });
+
 
   const content=document.getElementById("tabContent");
   if(currentTab==="overview"){
@@ -605,7 +594,7 @@ function render(){
     `;
     content.querySelectorAll(".approveBtn").forEach(b=> b.addEventListener("click", ()=>{
       const id=b.dataset.approve;
-      const stored=load(tkey(LS_KEYS.ideas), []);
+      const stored=load(LS_KEYS.ideas, []);
       const all=getAllData().ideas;
       const target=all.find(i=>i.id===id);
       if(!target) return;
@@ -613,19 +602,19 @@ function render(){
       const updated={...target, status:"Approved & Live", createdDate: nowStr};
       // upsert by id (no duplication)
       const next=stored.filter(i=>i.id!==id);
-      save(tkey(LS_KEYS.ideas), [updated, ...next]);
+      save(LS_KEYS.ideas, [updated, ...next]);
       alert("Approved: "+target.title+" — now live on site (refresh site tab if open)");
       render();
     }));
     content.querySelectorAll(".rejectBtn").forEach(b=> b.addEventListener("click", ()=>{
       const id=b.dataset.reject;
-      const stored=load(tkey(LS_KEYS.ideas), []);
+      const stored=load(LS_KEYS.ideas, []);
       const all=getAllData().ideas;
       const target=all.find(i=>i.id===id);
       if(!target) return;
       const updated={...target, status:"Rejected"};
       const next=stored.filter(i=>i.id!==id);
-      save(tkey(LS_KEYS.ideas), [updated, ...next]);
+      save(LS_KEYS.ideas, [updated, ...next]);
       alert("Rejected");
       render();
     }));
@@ -698,9 +687,9 @@ function render(){
         save(LS_KEYS.funders, [{id:target.id, name:target.name, role:target.roleTitle||"Angel Backer", focus:target.focus||"Tech & AI", bio:target.bio||"Approved backer.", ticketSize:"Pre-Seed & Seed"}, ...funders]);
         save(LS_KEYS.pendingBackers, pending.filter(p=>p.id!==id));
         // also update registrations status
-        const regs=load(tkey(LS_KEYS.regs), []);
+        const regs=load(LS_KEYS.regs, []);
         const updated=regs.map(r=> r.email.toLowerCase()===target.email.toLowerCase() ? {...r, status:"approved"} : r);
-        save(tkey(LS_KEYS.regs), updated);
+        save(LS_KEYS.regs, updated);
         alert("Approved backer: "+target.name);
         render();
       }
@@ -921,8 +910,8 @@ function render(){
       const isUoH=email.toLowerCase().endsWith("@uohyd.ac.in");
       if((role==="founder"||role==="talent") && !isUoH){ alert("Founder/Builder must use @uohyd.ac.in"); return; }
       const reg={name, email, role: role==="talent"?"builder": role==="backer"?"funder":role, year:sid, ideaOrSkills:skills, contact:"", registeredAt: new Date().toISOString().slice(0,10)};
-      const regs=load(tkey(LS_KEYS.regs), []);
-      save(tkey(LS_KEYS.regs), [reg, ...regs]);
+      const regs=load(LS_KEYS.regs, []);
+      save(LS_KEYS.regs, [reg, ...regs]);
       if(role==="talent"){
         const builders=load(LS_KEYS.builders, []);
         save(LS_KEYS.builders, [{id:"user_"+Date.now(), name, email, role: "Builder", roleTitle: skills||"Builder", skills: skills||"General", year:"Campus Builder", verifiedStudent:true }, ...builders]);

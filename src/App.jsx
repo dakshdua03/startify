@@ -214,15 +214,7 @@ export const MAIN_WHATSAPP_LINK = "https://chat.whatsapp.com/BOgivVivG5ZLQ1OqoIl
 export default function App() {
   // Visitors begin at the role-selection page. The workspace only opens after sign-in.
   const [currentUser, setCurrentUser] = useState(null);
-  // Test Mode — fake data isolated from real users (ideas/registrations use test_ collections + keys)
-  const [testMode, setTestMode] = useState(() => { try { return localStorage.getItem("startify_test_mode") === "true"; } catch { return false; } });
-  const toggleTestMode = () => {
-    const next = !testMode;
-    try { localStorage.setItem("startify_test_mode", next ? "true" : "false"); } catch {}
-    setTestMode(next);
-    showToast(next ? "TEST MODE ON — fake data only, real users safe" : "LIVE MODE — real data");
-    setTimeout(() => window.location.reload(), 600);
-  };
+
 
   // Data Collections — hide demo if flag set (for manual testing) + respect admin tombstones for deletable demos
   const hideDemoFlag = typeof window !== "undefined" && localStorage.getItem("startify_hide_demo") === "true";
@@ -423,8 +415,24 @@ export default function App() {
       const pb = JSON.parse(localStorage.getItem("startify_pending_backers") || "null");
       if (pb && Array.isArray(pb) && pb.length) setPendingBackers(pb);
     } catch {}
-    // Live update when admin approves in another tab
+    // Live update when admin approves in another tab + chats arrive cross-tab
     const onStorage = (e) => {
+      if (!e.key || e.key === "startify_requests") {
+        try {
+          const req = JSON.parse(localStorage.getItem("startify_requests") || "null");
+          if (req && Array.isArray(req)) {
+            setRequests(() => [...req, ...INITIAL_REQUESTS.filter(s => !req.some(r => r.id === s.id))]);
+          }
+        } catch {}
+      }
+      if (!e.key || e.key === "startify_messages") {
+        try {
+          const msgs = JSON.parse(localStorage.getItem("startify_messages") || "null");
+          if (msgs && Array.isArray(msgs)) {
+            setMessages(() => [...msgs, ...INITIAL_MESSAGES.filter(s => !msgs.some(m => m.id === s.id))]);
+          }
+        } catch {}
+      }
       if (!e.key || e.key === "startify_submitted_ideas" || e.key === "startify_events" || e.key === "startify_deleted_demos") {
         loadIdeas();
         try {
@@ -450,6 +458,21 @@ export default function App() {
   useEffect(() => {
     try { localStorage.setItem("startify_pending_backers", JSON.stringify(pendingBackers)); } catch {}
   }, [pendingBackers]);
+
+  // Persist chats so sent/received requests + messages survive reload and show in Chats
+  // Only persist user-created items (skip seed INITIAL_* so demos stay deletable via tombstones)
+  useEffect(() => {
+    try {
+      const userReqs = requests.filter(r => !INITIAL_REQUESTS.some(s => s.id === r.id));
+      localStorage.setItem("startify_requests", JSON.stringify(userReqs));
+    } catch {}
+  }, [requests]);
+  useEffect(() => {
+    try {
+      const userMsgs = messages.filter(m => !INITIAL_MESSAGES.some(s => s.id === m.id));
+      localStorage.setItem("startify_messages", JSON.stringify(userMsgs));
+    } catch {}
+  }, [messages]);
 
   // --- Password auth helpers (localStorage) ---
   const getCredentials = () => {
@@ -1050,14 +1073,6 @@ export default function App() {
         <div className="fixed bottom-6 right-6 z-[70] bg-black text-white px-5 py-3.5 rounded-2xl shadow-2xl text-sm font-semibold flex items-center gap-3 border border-white/10" style={{backdropFilter:"none", WebkitBackdropFilter:"none"}}>
           <span className="h-2.5 w-2.5 rounded-full bg-emerald-400 shadow-[0_0_8px_rgba(16,185,129,0.6)] shrink-0"></span>
           <span className="leading-5 text-white">{toastMessage}</span>
-        </div>
-      )}
-
-      {/* TEST MODE banner — fake data isolated from real users */}
-      {testMode && (
-        <div className="bg-amber-500 text-white text-center text-[12px] font-bold py-2 px-4 flex items-center justify-center gap-3">
-          <span>TEST MODE — fake data only, real users safe</span>
-          <button onClick={toggleTestMode} className="h-7 px-3 rounded-full bg-white text-amber-700 text-[11px] font-bold">Exit to Live →</button>
         </div>
       )}
 
@@ -2199,15 +2214,6 @@ export default function App() {
       {/* PROFILE TAB — dedicated profile for any logged-in user */}
       {activeTab === "profile" && currentUser && (
         <section className="mx-auto max-w-[1200px] px-5 md:px-8 py-10">
-          {currentUser.role === "admin" && (
-            <div className={`mb-4 rounded-2xl border p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3 ${testMode ? "border-amber-300 bg-amber-50" : "border-slate-200 bg-white"}`}>
-              <div>
-                <div className="text-sm font-bold text-slate-800">{testMode ? "TEST MODE — fake data" : "LIVE MODE — real data"}</div>
-                <div className="text-xs text-slate-500 mt-0.5">{testMode ? "Ideas/registrations use test_ collections + keys. Real users untouched." : "Switch to test with fake accounts without touching real users."}</div>
-              </div>
-              <button onClick={toggleTestMode} className={`h-9 px-4 rounded-full text-xs font-bold whitespace-nowrap ${testMode ? "bg-amber-500 text-white" : "bg-slate-900 text-white"}`}>{testMode ? "Exit to Live →" : "Enter Test Mode"}</button>
-            </div>
-          )}
           <div className="rounded-[28px] border border-slate-200 bg-white p-4 sm:p-6 md:p-7">
             <div className="flex gap-3 sm:gap-4 items-start">
               {(() => {
