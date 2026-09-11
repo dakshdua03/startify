@@ -214,6 +214,15 @@ export const MAIN_WHATSAPP_LINK = "https://chat.whatsapp.com/BOgivVivG5ZLQ1OqoIl
 export default function App() {
   // Visitors begin at the role-selection page. The workspace only opens after sign-in.
   const [currentUser, setCurrentUser] = useState(null);
+  // Test Mode — fake data isolated from real users (ideas/registrations use test_ collections + keys)
+  const [testMode, setTestMode] = useState(() => { try { return localStorage.getItem("startify_test_mode") === "true"; } catch { return false; } });
+  const toggleTestMode = () => {
+    const next = !testMode;
+    try { localStorage.setItem("startify_test_mode", next ? "true" : "false"); } catch {}
+    setTestMode(next);
+    showToast(next ? "TEST MODE ON — fake data only, real users safe" : "LIVE MODE — real data");
+    setTimeout(() => window.location.reload(), 600);
+  };
 
   // Data Collections — hide demo if flag set (for manual testing) + respect admin tombstones for deletable demos
   const hideDemoFlag = typeof window !== "undefined" && localStorage.getItem("startify_hide_demo") === "true";
@@ -1044,6 +1053,14 @@ export default function App() {
         </div>
       )}
 
+      {/* TEST MODE banner — fake data isolated from real users */}
+      {testMode && (
+        <div className="bg-amber-500 text-white text-center text-[12px] font-bold py-2 px-4 flex items-center justify-center gap-3">
+          <span>TEST MODE — fake data only, real users safe</span>
+          <button onClick={toggleTestMode} className="h-7 px-3 rounded-full bg-white text-amber-700 text-[11px] font-bold">Exit to Live →</button>
+        </div>
+      )}
+
       {/* NAVIGATION HEADER — light glass, not sticky on chats/profile, no overlap */}
       <nav className={`${activeTab==="chats" || activeTab==="profile" ? "relative" : "sticky top-0"} z-40 backdrop-blur-xl bg-white/75 border-b border-slate-200`}>
         <div className="mx-auto max-w-[1200px] px-5 md:px-8 min-h-[72px] py-3 flex flex-wrap items-center justify-between gap-3">
@@ -1139,13 +1156,12 @@ export default function App() {
                 <span className="px-3 py-1.5 rounded-full bg-white border border-slate-200 text-slate-600">✓ Direct founder → talent connect</span>
                 <span className="px-3 py-1.5 rounded-full bg-white border border-slate-200 text-slate-600">✓ Chat after acceptance</span>
               </div>
-              {/* Our belief — directly under hero as requested */}
-              <div className="mt-8 rounded-[20px] bg-slate-900 p-5 md:p-6 border border-slate-800 shadow-md overflow-hidden relative">
-                <div className="absolute inset-0 bg-gradient-to-br from-indigo-600/20 via-violet-600/20 to-fuchsia-600/20 pointer-events-none" />
+              {/* Our belief — white card like the rest, no blue */}
+              <div className="mt-8 rounded-[20px] bg-white p-5 md:p-6 border border-slate-200 shadow-sm overflow-hidden relative">
                 <div className="relative">
-                  <div className="inline-flex items-center gap-2 rounded-full bg-white/10 border border-white/15 px-3 py-1 text-[10px] font-bold tracking-widest text-white">OUR BELIEF</div>
-                  <blockquote className="font-heading mt-3 text-[22px] md:text-[26px] font-extrabold leading-tight tracking-tight text-white">“If you can think it, you can build it.”</blockquote>
-                  <p className="mt-2 text-[13px] leading-6 text-white">A platform that connects ideas with people, and people with purpose — where every idea gets space to be built, tested, and launched.</p>
+                  <div className="inline-flex items-center gap-2 rounded-full bg-slate-100 border border-slate-200 px-3 py-1 text-[10px] font-bold tracking-widest text-slate-600">OUR BELIEF</div>
+                  <blockquote className="font-heading mt-3 text-[22px] md:text-[26px] font-extrabold leading-tight tracking-tight text-slate-900">“If you can think it, you can build it.”</blockquote>
+                  <p className="mt-2 text-[13px] leading-6 text-slate-600">A platform that connects ideas with people, and people with purpose — where every idea gets space to be built, tested, and launched.</p>
                 </div>
               </div>
             </div>
@@ -2183,6 +2199,15 @@ export default function App() {
       {/* PROFILE TAB — dedicated profile for any logged-in user */}
       {activeTab === "profile" && currentUser && (
         <section className="mx-auto max-w-[1200px] px-5 md:px-8 py-10">
+          {currentUser.role === "admin" && (
+            <div className={`mb-4 rounded-2xl border p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3 ${testMode ? "border-amber-300 bg-amber-50" : "border-slate-200 bg-white"}`}>
+              <div>
+                <div className="text-sm font-bold text-slate-800">{testMode ? "TEST MODE — fake data" : "LIVE MODE — real data"}</div>
+                <div className="text-xs text-slate-500 mt-0.5">{testMode ? "Ideas/registrations use test_ collections + keys. Real users untouched." : "Switch to test with fake accounts without touching real users."}</div>
+              </div>
+              <button onClick={toggleTestMode} className={`h-9 px-4 rounded-full text-xs font-bold whitespace-nowrap ${testMode ? "bg-amber-500 text-white" : "bg-slate-900 text-white"}`}>{testMode ? "Exit to Live →" : "Enter Test Mode"}</button>
+            </div>
+          )}
           <div className="rounded-[28px] border border-slate-200 bg-white p-4 sm:p-6 md:p-7">
             <div className="flex gap-3 sm:gap-4 items-start">
               {(() => {
@@ -2255,7 +2280,7 @@ export default function App() {
                 {currentUser.role === "founder" && (
                   <div className="mt-4 p-4 rounded-xl bg-slate-50 border border-slate-200">
                     <div className="text-xs font-bold uppercase tracking-widest text-slate-500">Founder</div>
-                    <p className="text-sm text-slate-600 mt-1">You can post ideas from Dashboard → Post New Idea. Your ideas appear in Ideas Board after approval.</p>
+                    <p className="text-sm text-slate-600 mt-1">Your ideas appear in Ideas Board after approval.</p>
                   </div>
                 )}
               </div>
@@ -2421,7 +2446,7 @@ export default function App() {
                 );
               })}
             </div>
-            <p className="mt-4 text-center text-[11px] text-slate-400">Full profile lives in the bottom Profile tab</p>
+
           </div>
         </div>
       )}

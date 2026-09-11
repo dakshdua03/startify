@@ -122,15 +122,18 @@ export const dbService = {
   },
   async saveServices(services) { localStorage.setItem("startify_offered_services", JSON.stringify(services)); return true; },
   async getIdeas(defaultIdeas = []) {
+    const testMode = (()=>{ try { return localStorage.getItem("startify_test_mode")==="true"; } catch { return false; } })();
+    const ideasCol = testMode ? "test_ideas" : "ideas";
+    const ideasLsKey = testMode ? "test_startify_submitted_ideas" : "startify_submitted_ideas";
     let cloudIdeas = [];
     if (isFirebaseConfigured && db) {
       try {
-        const q = query(collection(db, "ideas"), orderBy("created_at", "desc"), limit(50));
+        const q = query(collection(db, ideasCol), orderBy("created_at", "desc"), limit(50));
         const snap = await getDocs(q);
         cloudIdeas = snap.docs.map(d => ({ id: d.id, ...d.data() }));
       } catch (err) { console.warn("Firestore fetch ideas failed, using local", err); }
     }
-    const local = (()=>{ try{ return JSON.parse(localStorage.getItem("startify_submitted_ideas")||"[]"); }catch{return [];} })();
+    const local = (()=>{ try{ return JSON.parse(localStorage.getItem(ideasLsKey)||"[]"); }catch{return [];} })();
     // Handle soft-deleted demos (admin tombstones)
     const deletedIds = new Set(local.filter(i=> i.deleted).map(i=>i.id));
     const filteredDefault = defaultIdeas.filter(i=> !deletedIds.has(i.id));
@@ -148,12 +151,15 @@ export const dbService = {
     return filteredDefault;
   },
   async saveIdea(idea) {
-    const existing = JSON.parse(localStorage.getItem("startify_submitted_ideas") || "[]");
-    localStorage.setItem("startify_submitted_ideas", JSON.stringify([idea, ...existing]));
+    const testMode = (()=>{ try { return localStorage.getItem("startify_test_mode")==="true"; } catch { return false; } })();
+    const ideasCol = testMode ? "test_ideas" : "ideas";
+    const ideasLsKey = testMode ? "test_startify_submitted_ideas" : "startify_submitted_ideas";
+    const existing = JSON.parse(localStorage.getItem(ideasLsKey) || "[]");
+    localStorage.setItem(ideasLsKey, JSON.stringify([idea, ...existing]));
     if (isFirebaseConfigured && db) {
       try {
         // Use same id locally and in Firestore to prevent duplicate entries when merging
-        await setDoc(doc(db, "ideas", idea.id), {
+        await setDoc(doc(db, ideasCol, idea.id), {
           id: idea.id,
           title: idea.title, category: idea.category, founder: idea.founder, email: idea.email || "", founderId: idea.founderId || "",
           desc: idea.desc, seeking: idea.seeking, status: idea.status || "Pending Review",
@@ -165,15 +171,18 @@ export const dbService = {
     return true;
   },
   async getRegistrations() {
+    const testMode = (()=>{ try { return localStorage.getItem("startify_test_mode")==="true"; } catch { return false; } })();
+    const regsCol = testMode ? "test_registrations" : "registrations";
+    const regsLsKey = testMode ? "test_startify_registrations" : "startify_registrations";
     if (isFirebaseConfigured && db) {
       try {
-        const q = query(collection(db, "registrations"), orderBy("created_at", "desc"), limit(100));
+        const q = query(collection(db, regsCol), orderBy("created_at", "desc"), limit(100));
         const snap = await getDocs(q);
         const data = snap.docs.map(d => d.data());
         if (data && data.length > 0) return data;
       } catch (e) { console.warn("Firestore registration fetch fallback", e); }
     }
-    const local = localStorage.getItem("startify_registrations");
+    const local = localStorage.getItem(regsLsKey);
     return local ? JSON.parse(local) : [
       { name: "Rahul Sharma", email: "rahul@uohyd.ac.in", role: "founder", year: "3rd Year", ideaOrSkills: "Building EdTech AI Assistant", contact: "9876543210", registeredAt: "2026-08-23" },
       { name: "Aditi Rao", email: "aditi@uohyd.ac.in", role: "builder", year: "4th Year CSE", ideaOrSkills: "React, Tailwind, Node.js", contact: "9123456789", registeredAt: "2026-08-22" },
@@ -181,10 +190,13 @@ export const dbService = {
     ];
   },
   async saveRegistration(reg) {
-    const existing = JSON.parse(localStorage.getItem("startify_registrations") || "[]");
-    localStorage.setItem("startify_registrations", JSON.stringify([reg, ...existing]));
+    const testMode = (()=>{ try { return localStorage.getItem("startify_test_mode")==="true"; } catch { return false; } })();
+    const regsCol = testMode ? "test_registrations" : "registrations";
+    const regsLsKey = testMode ? "test_startify_registrations" : "startify_registrations";
+    const existing = JSON.parse(localStorage.getItem(regsLsKey) || "[]");
+    localStorage.setItem(regsLsKey, JSON.stringify([reg, ...existing]));
     try { await fetch("/api/bookings", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(reg) }); } catch (e) { console.warn("Cloudflare API ping", e); }
-    if (isFirebaseConfigured && db) { try { await addDoc(collection(db, "registrations"), { ...reg, created_at: serverTimestamp() }); } catch (err) { console.warn("Firestore registration save error", err); } }
+    if (isFirebaseConfigured && db) { try { await addDoc(collection(db, regsCol), { ...reg, created_at: serverTimestamp() }); } catch (err) { console.warn("Firestore registration save error", err); } }
     return true;
   },
   async getPayments() {
