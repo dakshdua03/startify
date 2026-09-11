@@ -63,41 +63,84 @@ const SEED_EVENTS = [
 
 function load(key, fallback){ try{ const v=localStorage.getItem(key); return v? JSON.parse(v): fallback; }catch(e){return fallback;} }
 function save(key, val){ localStorage.setItem(key, JSON.stringify(val)); }
-function deleteUserByEmail(email, id){
-  if(!confirm(`Delete user ${email} ? This will remove from all stores for testing.`)) return;
-  // Handle demo hard-coded users via tombstone so they stay deleted after reload
-  const isDemo = DEMO_USERS.some(d=> d.email.toLowerCase()===email.toLowerCase());
-  if(isDemo){
+function deleteUserByEmail(email, id, role){
+  const roleLabel = role || "account";
+  if(email.toLowerCase()==="admin@startify.net"){
+    if(!confirm(`⚠️ Delete ADMIN ${email} ? This will lock admin login!`)) return;
+    if(!confirm(`Confirm again — delete admin? You can restore via 'Restore Admin' button on login.`)) return;
+  } else {
+    if(!confirm(`Delete ${roleLabel} ${email} ? Only this role will be removed (other roles with same email kept).`)) return;
+  }
+  // Demo tombstone: only if this is the last role for that email
+  const isDemo = DEMO_USERS.some(d=> d.email.toLowerCase()===email.toLowerCase() && d.role===role);
+  // Check if other roles with same email remain after deletion
+  const allUsers = getAllData().uniqUsers;
+  const otherRolesSameEmail = allUsers.some(u=> u.email.toLowerCase()===email.toLowerCase() && u.role!==role && u.id!==id);
+  if(isDemo && !otherRolesSameEmail){
     const deleted = load("startify_deleted_demos", []);
     if(!deleted.includes(email.toLowerCase())){ deleted.push(email.toLowerCase()); save("startify_deleted_demos", deleted); }
+  } else if(isDemo && otherRolesSameEmail){
+    // Don't tombstone demo if other role still exists — just remove this role entry
   }
   let regs=load(LS_KEYS.regs, []);
-  regs=regs.filter(r=> r.email.toLowerCase()!==email.toLowerCase());
+  // regs role mapping: talent<->builder, backer<->funder
+  const regRoleMap = {founder:"founder", talent:"builder", backer:"funder", admin:"admin"};
+  const targetRegRole = regRoleMap[role] || role;
+  regs=regs.filter(r=> !(r.email.toLowerCase()===email.toLowerCase() && (r.role===targetRegRole || r.role===role)));
+  // If no role provided, fallback to email only (legacy)
+  if(!role) regs=regs.filter(r=> r.email.toLowerCase()!==email.toLowerCase());
   save(LS_KEYS.regs, regs);
   let builders=load(LS_KEYS.builders, []);
-  builders=builders.filter(b=> b.id!==id && (b.email||"").toLowerCase()!==email.toLowerCase());
+  builders=builders.filter(b=> !(b.id===id || ((b.email||"").toLowerCase()===email.toLowerCase() && role==="talent")));
   save(LS_KEYS.builders, builders);
   let funders=load(LS_KEYS.funders, []);
-  funders=funders.filter(f=> f.id!==id && (f.email||"").toLowerCase()!==email.toLowerCase());
+  funders=funders.filter(f=> !(f.id===id || ((f.email||"").toLowerCase()===email.toLowerCase() && role==="backer")));
   save(LS_KEYS.funders, funders);
   let pending=load(LS_KEYS.pendingBackers, []);
-  pending=pending.filter(p=> p.id!==id && p.email.toLowerCase()!==email.toLowerCase());
+  pending=pending.filter(p=> !(p.id===id || (p.email.toLowerCase()===email.toLowerCase() && role==="backer")));
   save(LS_KEYS.pendingBackers, pending);
   try{
     const profs=JSON.parse(localStorage.getItem("startify_user_profiles")||"[]");
-    localStorage.setItem("startify_user_profiles", JSON.stringify(profs.filter(p=> p.email.toLowerCase()!==email.toLowerCase() && p.id!==id)));
+    // Only remove this role, keep other roles with same email
+    const filtered = profs.filter(p=> !(p.email.toLowerCase()===email.toLowerCase() && p.role===role && p.id===id) && !(p.email.toLowerCase()===email.toLowerCase() && p.role===role && !id));
+    // If role not provided, fallback
+    const finalFiltered = role ? profs.filter(p=> !(p.email.toLowerCase()===email.toLowerCase() && p.role===role)) : profs.filter(p=> p.email.toLowerCase()!==email.toLowerCase() && p.id!==id);
+    // Use role-aware filter
+    const toSave = profs.filter(p=> !(p.email.toLowerCase()===email.toLowerCase() && p.role===role));
+    localStorage.setItem("startify_user_profiles", JSON.stringify(role ? toSave : filtered));
   }catch{}
   try{
     const creds=load(LS_KEYS.credentials, {});
-    delete creds[email.toLowerCase()];
-    save(LS_KEYS.credentials, creds);
+    // Only delete credential if no other role with same email remains
+    const remainingProfiles = (()=>{ try{ return JSON.parse(localStorage.getItem("startify_user_profiles")||"[]"); }catch{return [];} })();
+    const stillHasEmail = remainingProfiles.some(p=> p.email.toLowerCase()===email.toLowerCase()) || load(LS_KEYS.regs, []).some(r=> r.email.toLowerCase()===email.toLowerCase());
+    if(!stillHasEmail){
+      delete creds[email.toLowerCase()];
+      save(LS_KEYS.credentials, creds);
+    }
   }catch{}
   try{
     const profiles=load(LS_KEYS.profiles, []);
-    save(LS_KEYS.profiles, profiles.filter(p=> p.email.toLowerCase()!==email.toLowerCase() && p.id!==id));
+    save(LS_KEYS.profiles, profiles.filter(p=> !(p.email.toLowerCase()===email.toLowerCase() && p.role===role)));
   }catch{}
-  // Also remove from Firestore local idea ownership? No need
-  alert("Deleted: "+email + (isDemo ? " (demo hidden — reload to keep hidden)" : ""));
+  alert("Deleted: "+email+" ("+roleLabel+")" + (isDemo && !otherRolesSameEmail ? " (demo hidden)" : ""));
+  render();
+}
+function restoreAdminAccount(){
+  const deleted = load("startify_deleted_demos", []);
+  const filtered = deleted.filter(e=> e !== "admin@startify.net");
+  save("startify_deleted_demos", filtered);
+  // Ensure admin credential exists
+  const creds = load(LS_KEYS.credentials, {});
+  creds["admin@startify.net"] = "Startify2026!Admin";
+  save(LS_KEYS.credentials, creds);
+  // Ensure admin profile exists
+  const profs = load(LS_KEYS.profiles, []);
+  if(!profs.some(p=> p.email.toLowerCase()==="admin@startify.net")){
+    profs.push({id:"user_admin", name:"Startify Admin", email:"admin@startify.net", role:"admin", createdAt: new Date().toISOString()});
+    save(LS_KEYS.profiles, profs);
+  }
+  alert("Admin restored: admin@startify.net / Startify2026!Admin");
   render();
 }
 function deleteBuilderById(id){
@@ -289,6 +332,7 @@ function render(){
             </div>
             <button type="submit" class="w-full h-11 rounded-full bg-slate-900 text-white font-bold text-sm hover:bg-slate-800 transition">Enter Admin →</button>
             <a href="/" class="block text-center text-xs text-slate-500 hover:text-slate-700 underline">← Back to Startify</a>
+            <button type="button" onclick="restoreAdminAccount(); alert('Admin restored — now login with admin@startify.net / Startify2026!Admin');" class="w-full mt-3 h-9 rounded-full bg-white border border-slate-200 text-xs font-semibold text-slate-600 hover:bg-slate-50">Restore deleted Admin</button>
           </form>
           <div class="mt-6 rounded-2xl bg-amber-50 border border-amber-200 p-3 text-[11px] leading-4 text-amber-800">This page is <strong>not linked publicly</strong> except via footer “Admin”. Share only with you. Students register with <strong>@uohyd.ac.in</strong> (Founder/Builder); Backers may use any email.</div>
         </div>
@@ -469,14 +513,19 @@ function render(){
               ${data.uniqUsers.map(u=>{
                 const escEmail = u.email.replace(/'/g, "\\'");
                 const escId = (u.id||"").toString().replace(/'/g, "\\'");
+                const escRole = (u.role||"").toString().replace(/'/g, "\\'");
                 const demoNote = DEMO_USERS.some(d=> d.email.toLowerCase()===u.email.toLowerCase()) ? ' • demo' : '';
-                const delBtn = `<button onclick="deleteUserByEmail('${escEmail}','${escId}')" class="h-7 px-3 rounded-full bg-white border border-red-200 text-red-600 text-xs font-bold hover:bg-red-50">Delete</button>`;
+                const delBtn = `<button onclick="deleteUserByEmail('${escEmail}','${escId}','${escRole}')" class="h-7 px-3 rounded-full bg-white border border-red-200 text-red-600 text-xs font-bold hover:bg-red-50">Delete</button>`;
                 return `<tr><td class="py-3 font-semibold">${u.name||'<span class="text-slate-400 italic">no name</span>'}</td><td class="py-3 text-slate-600">${u.email}</td><td class="py-3"><span class="px-2 py-1 rounded-full text-xs font-bold border ${u.role==="founder"?"bg-indigo-50 border-indigo-200 text-indigo-700": u.role==="talent"?"bg-sky-50 border-sky-200 text-sky-700": u.role==="backer"?"bg-violet-50 border-violet-200 text-violet-700":"bg-slate-100 border-slate-200"}">${u.role}</span></td><td class="py-3 text-xs text-slate-500">${(u.source||u.registeredAt||u.createdAt||"demo")+demoNote}</td><td class="py-3">${delBtn}</td></tr>`;
               }).join("")}
             </tbody>
           </table>
         </div>
-        <p class="mt-3 text-[11px] text-slate-500">Delete removes user from <code>startify_registrations</code>, <code>startify_admin_builders</code>, <code>startify_admin_funders</code>, <code>startify_pending_backers</code> and unified profiles — useful for testing.</p>
+        <p class="mt-3 text-[11px] text-slate-500">Delete removes only the selected role (other roles with same email are kept). Use Delete per row.</p>
+        <div class="mt-3 flex gap-2">
+          <button onclick="restoreAdminAccount()" class="h-8 px-4 rounded-full bg-slate-900 text-white text-xs font-bold">Restore Admin (admin@startify.net)</button>
+          <span class="text-xs text-slate-500 py-2">If you deleted admin by mistake</span>
+        </div>
       </div>
     `;
   } else if(currentTab==="ideas"){
