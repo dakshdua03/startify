@@ -26,7 +26,7 @@ const LS_KEYS = {
   adminSession: "startify_admin_session"
 };
 const ADMIN_EMAIL = "admin@startify.net";
-const ADMIN_PASS = "startifyUoH2025";
+const ADMIN_PASS = localStorage.getItem("startify_admin_pass") || "Startify2026!Admin";
 
 // Demo seed (mirrors src/App.jsx)
 const DEMO_USERS = [
@@ -65,6 +65,12 @@ function load(key, fallback){ try{ const v=localStorage.getItem(key); return v? 
 function save(key, val){ localStorage.setItem(key, JSON.stringify(val)); }
 function deleteUserByEmail(email, id){
   if(!confirm(`Delete user ${email} ? This will remove from all stores for testing.`)) return;
+  // Handle demo hard-coded users via tombstone so they stay deleted after reload
+  const isDemo = DEMO_USERS.some(d=> d.email.toLowerCase()===email.toLowerCase());
+  if(isDemo){
+    const deleted = load("startify_deleted_demos", []);
+    if(!deleted.includes(email.toLowerCase())){ deleted.push(email.toLowerCase()); save("startify_deleted_demos", deleted); }
+  }
   let regs=load(LS_KEYS.regs, []);
   regs=regs.filter(r=> r.email.toLowerCase()!==email.toLowerCase());
   save(LS_KEYS.regs, regs);
@@ -90,13 +96,19 @@ function deleteUserByEmail(email, id){
     const profiles=load(LS_KEYS.profiles, []);
     save(LS_KEYS.profiles, profiles.filter(p=> p.email.toLowerCase()!==email.toLowerCase() && p.id!==id));
   }catch{}
-  alert("Deleted: "+email);
+  // Also remove from Firestore local idea ownership? No need
+  alert("Deleted: "+email + (isDemo ? " (demo hidden — reload to keep hidden)" : ""));
   render();
 }
 function deleteBuilderById(id){
   if(!confirm(`Delete builder ${id} ?`)) return;
+  const isSeed = SEED_BUILDERS.some(s=> s.id===id);
+  if(isSeed){
+    const deleted=load("startify_deleted_builders", []);
+    if(!deleted.includes(id)){ deleted.push(id); save("startify_deleted_builders", deleted); }
+  }
   let builders=load(LS_KEYS.builders, []);
-  const target=builders.find(b=> b.id===id);
+  const target=builders.find(b=> b.id===id) || SEED_BUILDERS.find(s=> s.id===id);
   builders=builders.filter(b=> b.id!==id);
   save(LS_KEYS.builders, builders);
   if(target && target.email){
@@ -118,8 +130,13 @@ function deleteBuilderById(id){
 }
 function deleteFunderById(id){
   if(!confirm(`Delete backer ${id} ?`)) return;
+  const isSeed = SEED_FUNDERS.some(s=> s.id===id);
+  if(isSeed){
+    const deleted=load("startify_deleted_funders", []);
+    if(!deleted.includes(id)){ deleted.push(id); save("startify_deleted_funders", deleted); }
+  }
   let funders=load(LS_KEYS.funders, []);
-  const target=funders.find(f=> f.id===id);
+  const target=funders.find(f=> f.id===id) || SEED_FUNDERS.find(s=> s.id===id);
   funders=funders.filter(f=> f.id!==id);
   save(LS_KEYS.funders, funders);
   if(target && target.email){
@@ -225,13 +242,19 @@ function getAllData(){
   const pendingBackers = load(LS_KEYS.pendingBackers, []);
   const credentials = load(LS_KEYS.credentials, {});
   const profiles = load(LS_KEYS.profiles, []);
+  const deletedDemos = load("startify_deleted_demos", []);
+  const filteredDemos = DEMO_USERS.filter(d=> !deletedDemos.includes(d.email.toLowerCase()));
+  const deletedBuilders = load("startify_deleted_builders", []);
+  const filteredSeedBuilders = SEED_BUILDERS.filter(b=> !deletedBuilders.includes(b.id));
+  const deletedFunders = load("startify_deleted_funders", []);
+  const filteredSeedFunders = SEED_FUNDERS.filter(f=> !deletedFunders.includes(f.id));
   // Include profiles (normal site registrations via password+link) so admin sees all accounts
   const credUsers = Object.keys(credentials).map(email=> {
     const p = profiles.find(x=> x.email.toLowerCase()===email.toLowerCase());
     const r = regs.find(x=> x.email.toLowerCase()===email.toLowerCase());
     return {id: p?.id || r?.id || email, name: p?.name || r?.name || email.split("@")[0], email, role: p?.role || r?.role || "founder", createdAt: p?.createdAt || r?.registeredAt || "—", source:"credential"};
   });
-  const allUsers = [...DEMO_USERS.map(u=>({...u, source:"demo"})), ...regs.map(r=>({id:r.email, name:r.name, email:r.email, role: r.role==="builder"?"talent":r.role==="funder"?"backer":r.role, createdAt:r.registeredAt, source:"registration"})), ...profiles.map(p=>({id:p.id, name:p.name, email:p.email, role:p.role, createdAt:p.createdAt, source:"profile"})), ...credUsers.map(c=>({...c, source:"credential"})), ...builders.map(b=>({id:b.id, name:b.name, email:b.email||b.id+"@uohyd.ac.in", role:"talent", source:"builder"})), ...funders.map(f=>({id:f.id, name:f.name, email:f.email||f.id+"@startify.net", role:"backer", source:"funder"})), ...pendingBackers.map(p=>({id:p.id, name:p.name, email:p.email, role:"backer", createdAt:p.createdAt, pending:true, source:"pending"}))];
+  const allUsers = [...filteredDemos.map(u=>({...u, source:"demo"})), ...regs.map(r=>({id:r.email, name:r.name, email:r.email, role: r.role==="builder"?"talent":r.role==="funder"?"backer":r.role, createdAt:r.registeredAt, source:"registration"})), ...profiles.map(p=>({id:p.id, name:p.name, email:p.email, role:p.role, createdAt:p.createdAt, source:"profile"})), ...credUsers.map(c=>({...c, source:"credential"})), ...[...builders, ...filteredSeedBuilders].map(b=>({id:b.id, name:b.name, email:b.email||b.id+"@uohyd.ac.in", role:"talent", source:"builder"})), ...[...funders, ...filteredSeedFunders].map(f=>({id:f.id, name:f.name, email:f.email||f.id+"@startify.net", role:"backer", source:"funder"})), ...pendingBackers.map(p=>({id:p.id, name:p.name, email:p.email, role:"backer", createdAt:p.createdAt, pending:true, source:"pending"}))];
   // de-dupe by email+role so same email with different roles shows separately, then group same email together
   const seen=new Set(); const uniqUsers=[];
   for(const u of allUsers){ const key=u.email.toLowerCase()+"|"+u.role; if(!seen.has(key)){ seen.add(key); uniqUsers.push(u); } }

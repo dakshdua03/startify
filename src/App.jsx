@@ -215,11 +215,15 @@ export default function App() {
   // Visitors begin at the role-selection page. The workspace only opens after sign-in.
   const [currentUser, setCurrentUser] = useState(null);
 
-  // Data Collections — hide demo if flag set (for manual testing)
+  // Data Collections — hide demo if flag set (for manual testing) + respect admin tombstones for deletable demos
   const hideDemoFlag = typeof window !== "undefined" && localStorage.getItem("startify_hide_demo") === "true";
-  const [ideas, setIdeas] = useState(hideDemoFlag ? [] : INITIAL_IDEAS);
-  const [funders, setFunders] = useState(hideDemoFlag ? [] : INITIAL_FUNDERS);
-  const [builders, setBuilders] = useState(hideDemoFlag ? [] : INITIAL_BUILDERS);
+  const getDeletedSet = (key) => { try { return new Set(JSON.parse(localStorage.getItem(key) || "[]")); } catch { return new Set(); } };
+  const deletedBuilders = typeof window !== "undefined" ? getDeletedSet("startify_deleted_builders") : new Set();
+  const deletedFunders = typeof window !== "undefined" ? getDeletedSet("startify_deleted_funders") : new Set();
+  const deletedIdeaIds = typeof window !== "undefined" ? new Set((()=>{ try { return JSON.parse(localStorage.getItem("startify_submitted_ideas")||"[]").filter(x=>x.deleted).map(x=>x.id); } catch { return []; } })()) : new Set();
+  const [ideas, setIdeas] = useState(hideDemoFlag ? [] : INITIAL_IDEAS.filter(i=> !deletedIdeaIds.has(i.id)));
+  const [funders, setFunders] = useState(hideDemoFlag ? [] : INITIAL_FUNDERS.filter(f=> !deletedFunders.has(f.id)));
+  const [builders, setBuilders] = useState(hideDemoFlag ? [] : INITIAL_BUILDERS.filter(b=> !deletedBuilders.has(b.id)));
   const [events, setEvents] = useState(hideDemoFlag ? [] : INITIAL_EVENTS);
   const [requests, setRequests] = useState(hideDemoFlag ? [] : INITIAL_REQUESTS);
   const [messages, setMessages] = useState(hideDemoFlag ? [] : INITIAL_MESSAGES);

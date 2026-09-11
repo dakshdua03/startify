@@ -20,7 +20,7 @@ Share this link — anyone at UoH can join as Founder (@uohyd.ac.in), Builder (@
 - **Events** — Demo Day, speed networking
 - **Chats & Requests** — connect → accept → message
 - **Dashboard** — your ideas, incoming/outgoing requests
-- **Admin** — `/admin.html` → Ideas/Talent/Registrations/Payments (password `startifyUoH2025`, change in `public/admin.html:28`)
+- **Admin** — `/admin.html` → Ideas/Talent/Registrations/Payments (default password `startifyUoH2025`, change via `localStorage.setItem("startify_admin_pass","newpass")` or edit `public/admin.html` before deploy)
 
 ## Tech Stack
 - **Frontend:** React 18 + Vite + Tailwind, deployed on **Cloudflare Pages** (free, commercial allowed, unlimited bandwidth)
