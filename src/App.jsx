@@ -449,7 +449,7 @@ export default function App() {
   // Switch Current User (Demo Account Switcher)
   const handleSwitchUser = (user) => {
     setCurrentUser(user);
-    setActiveTab("dashboard");
+    setActiveTab("home");
     showToast(`Logged in as ${user.name} (${user.role.toUpperCase()})`);
   };
 
@@ -485,7 +485,7 @@ export default function App() {
       showToast(`Backer account "${newUser.name}" is pending admin approval. You'll be visible after approval.`);
       const pendingUser = { ...newUser, _backerPending: true };
       setCurrentUser(pendingUser);
-      setActiveTab("dashboard");
+      setActiveTab("home");
     } else {
       if (targetRole === "talent") {
         const newBuilder = {
@@ -506,7 +506,7 @@ export default function App() {
       }
       dbService.saveRegistration({ name: newUser.name, email: newUser.email, role: targetRole==="talent"?"builder":"founder", ideaOrSkills: targetRole==="talent"? (authForm.skills||"Talent") : "Founder", contact:"", registeredAt: new Date().toISOString().slice(0,10), status:"verified" });
       setCurrentUser(newUser);
-      setActiveTab("dashboard");
+      setActiveTab("home");
       showToast(`Registered as ${targetRole.toUpperCase()}! Welcome, ${newUser.name}.`);
     }
     setAuthModalOpen(false);
@@ -569,7 +569,7 @@ export default function App() {
             if (hasStored && !checkCredential(email, password)) { showToast("Incorrect password for demo account."); return; }
             if (!hasStored) saveCredential(email, password);
             setCurrentUser(demoUserEarly);
-            setActiveTab("dashboard");
+            setActiveTab("home");
             showToast(`Welcome back, ${demoUserEarly.name}! (Demo)`);
             setAuthModalOpen(false);
             setAuthForm({ name: "", email: "", password: "", roleTitle: "", skills: "", focus: "", bio: "" });
@@ -603,7 +603,7 @@ export default function App() {
           if (existingProfile) {
             const reuseUser = { id: existingProfile.id, name: existingProfile.name || email.split("@")[0], email: existingProfile.email, role: existingProfile.role || targetRole, bio: existingProfile.bio || "", roleTitle: existingProfile.roleTitle, skills: existingProfile.skills, focus: existingProfile.focus };
             setCurrentUser(reuseUser);
-            setActiveTab("dashboard");
+            setActiveTab("home");
             showToast(`Welcome back, ${reuseUser.name}!`);
             setAuthModalOpen(false);
             setAuthForm({ name: "", email: "", password: "", roleTitle: "", skills: "", focus: "", bio: "" });
@@ -613,7 +613,7 @@ export default function App() {
           // Firebase verified but no local profile — create one from email
           const fbUser = { id: email, name: authForm.name || email.split("@")[0], email, role: targetRole, bio: "" };
           setCurrentUser(fbUser);
-          setActiveTab("dashboard");
+          setActiveTab("home");
           showToast(`Welcome, ${email}!`);
           setAuthModalOpen(false);
           setAuthForm({ name: "", email: "", password: "", roleTitle: "", skills: "", focus: "", bio: "" });
@@ -647,7 +647,7 @@ export default function App() {
       if (demoUser) {
         if (hasStoredPassword && !checkCredential(email, password)) { showToast("Incorrect password."); return; }
         if (!hasStoredPassword) saveCredential(email, password);
-        setCurrentUser(demoUser); setActiveTab("dashboard"); showToast(`Welcome back, ${demoUser.name}!`);
+        setCurrentUser(demoUser); setActiveTab("home"); showToast(`Welcome back, ${demoUser.name}!`);
         setAuthModalOpen(false); setAuthForm({ name: "", email: "", password: "", roleTitle: "", skills: "", focus: "", bio: "" }); setResetMode(false); return;
       }
       let existingProfile = null;
@@ -659,7 +659,7 @@ export default function App() {
         if (hasStoredPassword && !checkCredential(email, password)) { showToast("Incorrect password. Click Forgot password?"); return; }
         if (!hasStoredPassword) saveCredential(email, password);
         const reuseUser = { id: existingProfile.id, name: existingProfile.name || email.split("@")[0], email: existingProfile.email, role: existingProfile.role || targetRole, bio: existingProfile.bio || "" };
-        setCurrentUser(reuseUser); setActiveTab("dashboard"); showToast(`Welcome back, ${reuseUser.name}!`);
+        setCurrentUser(reuseUser); setActiveTab("home"); showToast(`Welcome back, ${reuseUser.name}!`);
         setAuthModalOpen(false); setAuthForm({ name: "", email: "", password: "", roleTitle: "", skills: "", focus: "", bio: "" }); setResetMode(false); return;
       }
       showToast("No account found for this email. Switch to Create Account."); return;
@@ -919,8 +919,8 @@ export default function App() {
         </div>
       )}
 
-      {/* NAVIGATION HEADER — light glass, not sticky on dashboard/chats/profile, no overlap */}
-      <nav className={`${activeTab==="dashboard" || activeTab==="chats" || activeTab==="profile" ? "relative" : "sticky top-0"} z-40 backdrop-blur-xl bg-white/75 border-b border-slate-200`}>
+      {/* NAVIGATION HEADER — light glass, not sticky on chats/profile, no overlap */}
+      <nav className={`${activeTab==="chats" || activeTab==="profile" ? "relative" : "sticky top-0"} z-40 backdrop-blur-xl bg-white/75 border-b border-slate-200`}>
         <div className="mx-auto max-w-[1200px] px-5 md:px-8 min-h-[72px] py-3 flex flex-wrap items-center justify-between gap-3">
           <div className="flex items-center gap-3.5 cursor-pointer" onClick={() => setActiveTab(currentUser ? "dashboard" : "home")}>
             <img
@@ -930,8 +930,6 @@ export default function App() {
             />
             <div className="hidden sm:flex items-center gap-2 text-[11px] font-semibold text-slate-500 whitespace-nowrap leading-none">
               <span className="font-bold tracking-widest uppercase">University of Hyderabad</span>
-              <span className="h-1 w-1 rounded-full bg-slate-300"></span>
-              <span>Connect • Build • Launch</span>
             </div>
           </div>
 
@@ -977,19 +975,13 @@ export default function App() {
                 </button>
               )}
               <button
-                onClick={() => setActiveTab("dashboard")}
-                className={`px-3 py-1.5 rounded-full transition relative whitespace-nowrap shrink-0 ${activeTab === "dashboard" ? "bg-slate-900 text-white font-bold shadow" : "text-slate-600 hover:text-slate-900"}`}
+                onClick={() => setActiveTab("chats")}
+                className={`px-3 py-1.5 rounded-full transition relative whitespace-nowrap shrink-0 ${activeTab === "chats" ? "bg-slate-900 text-white font-bold shadow" : "text-slate-600 hover:text-slate-900"}`}
               >
-                {currentUser.role === "admin" ? "Admin workspace" : "My Dashboard"}
+                Chats
                 {myIncomingRequests.filter((r) => r.status === "pending").length > 0 && (
                   <span className="ml-1.5 h-2 w-2 rounded-full bg-emerald-500 inline-block animate-pulse" />
                 )}
-              </button>
-              <button
-                onClick={() => setActiveTab("chats")}
-                className={`px-3 py-1.5 rounded-full transition whitespace-nowrap shrink-0 ${activeTab === "chats" ? "bg-slate-900 text-white font-bold shadow" : "text-slate-600 hover:text-slate-900"}`}
-              >
-                Chats
                 {myAcceptedConnections.length > 0 && <span className="ml-1.5 inline-grid h-5 min-w-[20px] place-items-center rounded-full bg-white text-[10px] font-bold text-slate-900 px-1 border border-slate-200">{myAcceptedConnections.length}</span>}
               </button>
               <button
@@ -1050,8 +1042,7 @@ export default function App() {
               {showTalentTab && <button onClick={() => { setActiveTab("talent"); setMobileMenuOpen(false); }} className={`block w-full text-left py-2 px-3 rounded-xl ${activeTab === "talent" ? "bg-slate-900 text-white" : "text-slate-700"}`}>Skilled Talent</button>}
               {showBackersTab && <button onClick={() => { setActiveTab("backers"); setMobileMenuOpen(false); }} className={`block w-full text-left py-2 px-3 rounded-xl ${activeTab === "backers" ? "bg-slate-900 text-white" : "text-slate-700"}`}>Backers Hub</button>}
               {showEventsTab && <button onClick={() => { setActiveTab("events"); setMobileMenuOpen(false); }} className={`block w-full text-left py-2 px-3 rounded-xl ${activeTab === "events" ? "bg-slate-900 text-white" : "text-slate-700"}`}>Events & Meetups</button>}
-              <button onClick={() => { setActiveTab("dashboard"); setMobileMenuOpen(false); }} className={`block w-full text-left py-2 px-3 rounded-xl font-bold ${activeTab === "dashboard" ? "bg-slate-900 text-white" : "text-slate-700"}`}>{currentUser.role === "admin" ? "Admin workspace" : "My Dashboard"} ({currentUser.role.toUpperCase()})</button>
-              <button onClick={() => { setActiveTab("chats"); setMobileMenuOpen(false); }} className={`block w-full text-left py-2 px-3 rounded-xl ${activeTab === "chats" ? "bg-slate-900 text-white" : "text-slate-700"}`}>Chats</button>
+              <button onClick={() => { setActiveTab("chats"); setMobileMenuOpen(false); }} className={`block w-full text-left py-2 px-3 rounded-xl font-bold ${activeTab === "chats" ? "bg-slate-900 text-white" : "text-slate-700"}`}>Chats {myIncomingRequests.filter(r=>r.status==="pending").length>0 && <span className="ml-1 inline-block h-2 w-2 rounded-full bg-emerald-500"></span>} {myAcceptedConnections.length>0 && <span className="ml-1 text-xs bg-slate-200 px-1.5 py-0.5 rounded-full">{myAcceptedConnections.length}</span>}</button>
               <button onClick={() => { setActiveTab("profile"); setMobileMenuOpen(false); }} className={`block w-full text-left py-2 px-3 rounded-xl ${activeTab === "profile" ? "bg-slate-900 text-white" : "text-slate-700"}`}>Profile</button>
             </>}
             {!currentUser && <button onClick={() => { setAuthMode("register"); setAuthModalOpen(true); setMobileMenuOpen(false); }} className="block w-full text-left py-2 px-3 rounded-xl bg-slate-900 text-white font-bold">Join Startify →</button>}
@@ -1110,11 +1101,11 @@ export default function App() {
                 <div className="text-xs font-bold uppercase tracking-widest text-slate-500">Ecosystem workflow</div>
                 <div className="mt-3 grid grid-cols-1 sm:grid-cols-3 gap-3 sm:gap-4">
                   {[
-                    ["1", "Create account", "Pick a role — Founder, Builder or Backer.", "bg-indigo-600"],
-                    ["2", "Send a request", "Pitch an idea or offer your skills.", "bg-violet-600"],
-                    ["3", "Get accepted & chat", "Chat unlocks after acceptance.", "bg-emerald-600"],
+                    ["→", "Create account", "Pick a role — Founder, Builder or Backer.", "bg-indigo-600"],
+                    ["→", "Send a request", "Pitch an idea or offer your skills.", "bg-violet-600"],
+                    ["→", "Get accepted & chat", "Chat unlocks after acceptance.", "bg-emerald-600"],
                   ].map(([n, t, d, bg]) => (
-                    <div key={t} className="flex gap-2.5 text-xs sm:text-[13px] items-start"><span className={`grid h-8 w-8 shrink-0 place-items-center rounded-xl text-xs font-bold text-white ${bg}`}>{n}</span><div className="min-w-0"><div className="font-semibold text-slate-800 leading-tight">{t}</div><div className="text-slate-500 leading-4 text-[11px] sm:text-xs mt-0.5">{d}</div></div></div>
+                    <div key={t} className="flex gap-2.5 text-xs sm:text-[13px] items-start"><span className={`grid h-8 w-8 shrink-0 place-items-center rounded-xl text-sm font-bold text-white ${bg}`}>{n}</span><div className="min-w-0"><div className="font-semibold text-slate-800 leading-tight">{t}</div><div className="text-slate-500 leading-4 text-[11px] sm:text-xs mt-0.5">{d}</div></div></div>
                   ))}
                 </div>
               </div>
@@ -1124,9 +1115,8 @@ export default function App() {
           <section className="mt-8">
             <div className="mb-4 flex items-end justify-between gap-4">
               <div>
-                <div className="text-[11px] font-bold uppercase tracking-widest text-slate-500">STARTIFY CORE • WHY WE STARTED</div>
                 <h2 className="font-heading mt-1 text-[25px] font-extrabold text-slate-900">Ideas gaining momentum</h2>
-                <p className="text-[13px] text-slate-600 mt-1">Real UoH student ideas looking for co-founders — swipe to explore, sign in to connect.</p>
+                <p className="text-[13px] text-slate-600 mt-1">Real UoH student ideas looking for co-founders — swipe to explore, join to connect.</p>
               </div>
               <div className="hidden sm:flex items-center gap-2 shrink-0">
                 <button onClick={()=> ideasScrollRef.current?.scrollBy({left:-320, behavior:'smooth'})} className="h-9 w-9 rounded-full bg-white border border-slate-200 grid place-items-center text-slate-700 hover:bg-slate-900 hover:text-white transition" aria-label="Previous">‹</button>
@@ -1170,7 +1160,7 @@ export default function App() {
             <div className="grid gap-8 lg:grid-cols-[1.3fr_.7fr] lg:items-end"><div><div className="inline-flex items-center gap-1.5 rounded-full bg-indigo-50 border border-indigo-200 px-2.5 py-1 text-[10px] font-bold uppercase tracking-widest text-indigo-700">University of Hyderabad • An initiative for UoH students</div><h1 className="font-heading home-calligraphy mt-3 text-[34px] font-extrabold tracking-tight text-slate-800 md:text-[46px]">Good to see you, {currentUser.name.split(" ")[0]}.</h1><p className="mt-3 max-w-[650px] text-[15px] leading-6 text-slate-600">Your UoH community is actively connecting ideas, talent and support. Explore your dashboard for role-specific matches, or open Chats to continue a conversation.</p></div><div className="rounded-2xl border border-white/80 bg-white/70 p-5 shadow-sm"><div className="text-[11px] font-bold uppercase tracking-widest text-slate-500">MOTIVATION OF THE DAY</div><blockquote className="font-heading mt-3 text-[22px] font-bold leading-tight text-slate-800">“{dailyQuote.text}”</blockquote><div className="mt-2 text-[11px] text-slate-500 italic">— {dailyQuote.author}</div><div className="mt-3 h-1 w-12 rounded-full bg-slate-700" /></div></div>
             <div className="mt-8 grid gap-4 sm:grid-cols-2 lg:grid-cols-4"><div className="rounded-2xl border border-slate-200 bg-white/80 p-5"><div className="text-[11px] font-bold uppercase tracking-wide text-slate-500">Live ideas</div><div className="font-heading mt-2 text-3xl font-extrabold text-slate-800">{ideas.length}</div><p className="mt-1 text-[11px] text-slate-500">Projects looking for momentum</p></div><div className="rounded-2xl border border-slate-200 bg-white/80 p-5"><div className="text-[11px] font-bold uppercase tracking-wide text-slate-500">Active people</div><div className="font-heading mt-2 text-3xl font-extrabold text-slate-800">{builders.length + funders.length + ideas.length}</div><p className="mt-1 text-[11px] text-slate-500">Founders, talent, and funders</p></div><div className="rounded-2xl border border-slate-200 bg-white/80 p-5"><div className="text-[11px] font-bold uppercase tracking-wide text-slate-500">Connections made</div><div className="font-heading mt-2 text-3xl font-extrabold text-slate-800">{requests.filter((request) => request.status === "accepted").length}</div><p className="mt-1 text-[11px] text-slate-500">Conversations unlocked</p></div><div className="rounded-2xl border border-slate-200 bg-white/80 p-5"><div className="text-[11px] font-bold uppercase tracking-wide text-slate-500">Upcoming events</div><div className="font-heading mt-2 text-3xl font-extrabold text-slate-800">{events.length}</div><p className="mt-1 text-[11px] text-slate-500">Ways to meet the community</p></div></div>
           </div>
-          <section className="mt-8"><div className="mb-4 flex items-end justify-between"><div><div className="text-[11px] font-bold uppercase tracking-widest text-slate-500">MARK YOUR CALENDAR</div><h2 className="font-heading mt-1 text-[25px] font-extrabold text-slate-800" style={{color: '#0f172a'}}>Upcoming community events</h2></div><button onClick={() => setActiveTab("dashboard")} className="text-xs font-bold text-slate-700 hover:underline">Go to my dashboard →</button></div><div className="grid gap-5 md:grid-cols-2">{events.map((event) => <article key={event.id} className="rounded-[24px] border border-slate-200 bg-white p-6 shadow-sm" style={{background: 'rgba(255,255,255,0.92)'}}><div className="flex items-center justify-between gap-3"><span className="rounded-full bg-slate-100 px-3 py-1 text-[10px] font-bold uppercase tracking-wide text-slate-600">{event.category}</span><span className="text-xs font-semibold text-slate-500">{event.date}</span></div><h3 className="font-heading mt-4 text-[19px] font-extrabold" style={{color: '#0f172a'}}>{event.title}</h3><p className="mt-2 text-[13px]" style={{color: '#475569'}}>{event.time} · {event.venue}</p><p className="mt-3 text-[13px] leading-5" style={{color: '#334155'}}>{event.desc}</p></article>)}</div></section>
+          <section className="mt-8"><div className="mb-4 flex items-end justify-between"><div><div className="text-[11px] font-bold uppercase tracking-widest text-slate-500">MARK YOUR CALENDAR</div><h2 className="font-heading mt-1 text-[25px] font-extrabold text-slate-800" style={{color: '#0f172a'}}>Upcoming community events</h2></div><button onClick={() => setActiveTab("home")} className="text-xs font-bold text-slate-700 hover:underline">Go to Chats →</button></div><div className="grid gap-5 md:grid-cols-2">{events.map((event) => <article key={event.id} className="rounded-[24px] border border-slate-200 bg-white p-6 shadow-sm" style={{background: 'rgba(255,255,255,0.92)'}}><div className="flex items-center justify-between gap-3"><span className="rounded-full bg-slate-100 px-3 py-1 text-[10px] font-bold uppercase tracking-wide text-slate-600">{event.category}</span><span className="text-xs font-semibold text-slate-500">{event.date}</span></div><h3 className="font-heading mt-4 text-[19px] font-extrabold" style={{color: '#0f172a'}}>{event.title}</h3><p className="mt-2 text-[13px]" style={{color: '#475569'}}>{event.time} · {event.venue}</p><p className="mt-3 text-[13px] leading-5" style={{color: '#334155'}}>{event.desc}</p></article>)}</div></section>
           <section className="mt-10">
             <div className="mb-4 flex items-end justify-between gap-4">
               <div>
@@ -1181,7 +1171,7 @@ export default function App() {
               <div className="hidden sm:flex items-center gap-2 shrink-0">
                 <button onClick={()=> ideasScrollRefSignedIn.current?.scrollBy({left:-320, behavior:'smooth'})} className="h-9 w-9 rounded-full bg-white border border-slate-200 grid place-items-center text-slate-700 hover:bg-slate-900 hover:text-white" aria-label="Prev">‹</button>
                 <button onClick={()=> ideasScrollRefSignedIn.current?.scrollBy({left:320, behavior:'smooth'})} className="h-9 w-9 rounded-full bg-slate-900 text-white grid place-items-center hover:bg-black" aria-label="Next">›</button>
-                <button onClick={() => setActiveTab("dashboard")} className="h-9 px-4 rounded-full bg-white border border-slate-200 text-xs font-bold hover:bg-slate-50">Dashboard →</button>
+                <button onClick={() => setActiveTab("home")} className="h-9 px-4 rounded-full bg-white border border-slate-200 text-xs font-bold hover:bg-slate-50">Dashboard →</button>
               </div>
             </div>
             <div className="flex sm:hidden items-center gap-2 mb-3">
@@ -1223,7 +1213,7 @@ export default function App() {
             </p>
             <div className="mt-5 flex flex-wrap gap-3">
               {currentUser?.role === "founder" && <button onClick={() => setIdeaModalOpen(true)} className="h-10 px-5 rounded-full bg-slate-900 text-white font-bold text-[13px] hover:bg-slate-800 shadow transition">Post Your Idea</button>}
-              {currentUser && <button onClick={() => setActiveTab("dashboard")} className="h-10 px-5 rounded-full bg-white border border-slate-200 text-slate-700 font-bold text-[13px] hover:bg-slate-50 shadow-sm transition">Open My Dashboard</button>}
+              {currentUser && <button onClick={() => setActiveTab("home")} className="h-10 px-5 rounded-full bg-white border border-slate-200 text-slate-700 font-bold text-[13px] hover:bg-slate-50 shadow-sm transition">Open Chats</button>}
               {!currentUser && <button onClick={() => { setAuthMode("register"); setAuthModalOpen(true); }} className="h-10 px-5 rounded-full bg-slate-900 text-white font-bold text-[13px] hover:bg-slate-800 shadow transition">Get Started</button>}
             </div>
           </div>
