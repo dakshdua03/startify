@@ -802,19 +802,17 @@ export default function App() {
         const msg = err?.message || "Auth failed";
         if (msg.includes("email-already-in-use")) showToast("Email already registered — please Sign In or reset password.");
         else if (msg.includes("wrong-password") || msg.includes("invalid-credential") || msg.includes("INVALID_LOGIN_CREDENTIALS")) {
-          let existsLocally = false;
-          try {
-            const pcs = JSON.parse(localStorage.getItem("startify_user_profiles")||"[]");
-            const rcs = JSON.parse(localStorage.getItem("startify_registrations")||"[]");
-            const ccs = getCredentials();
-            existsLocally = DEMO_USERS.some(u=>u.email.toLowerCase()===email.toLowerCase()) || pcs.some(p=>p.email.toLowerCase()===email.toLowerCase()) || rcs.some(r=>r.email.toLowerCase()===email.toLowerCase()) || !!ccs[email.toLowerCase()];
-          } catch {}
-          if (!existsLocally) showToast("No account with this email — check spelling or Create Account.");
-          else showToast("Incorrect password for this email. Use Forgot password?");
+          showToast("Incorrect password or account credentials. Please check password or click Forgot password.");
         }
-        else if (msg.includes("verify your email")) showToast(msg);
-        else if (msg.toLowerCase().includes("user-not-found") || msg.toLowerCase().includes("email not found")) showToast("No account with this email — check spelling or Create Account.");
-        else showToast(msg);
+        else if (msg.includes("verify your email")) {
+          showToast(msg);
+        }
+        else if (msg.toLowerCase().includes("user-not-found") || msg.toLowerCase().includes("email not found")) {
+          showToast("No account found with this email. Please check spelling or switch to Create Account.");
+        }
+        else {
+          showToast(msg);
+        }
         return;
       } finally { setAuthLoading(false); }
     }
