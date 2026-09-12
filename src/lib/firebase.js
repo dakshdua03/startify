@@ -1,6 +1,6 @@
 // Startify Database Service (Firebase + Local Fallback) — Password + Email Link
 import { initializeApp, getApps } from 'firebase/app';
-import { getFirestore, collection, addDoc, getDocs, query, orderBy, limit, serverTimestamp, doc, setDoc } from 'firebase/firestore';
+import { getFirestore, collection, addDoc, getDocs, query, orderBy, limit, serverTimestamp, doc, setDoc, deleteDoc, onSnapshot } from 'firebase/firestore';
 import { getAuth, createUserWithEmailAndPassword, signInWithEmailAndPassword, sendEmailVerification, sendPasswordResetEmail, signOut, onAuthStateChanged } from 'firebase/auth';
 
 const firebaseConfig = {
@@ -206,6 +206,208 @@ export const dbService = {
     const existing = JSON.parse(localStorage.getItem("startify_payments") || "[]");
     localStorage.setItem("startify_payments", JSON.stringify([payment, ...existing]));
     if (isFirebaseConfigured && db) { try { await addDoc(collection(db, "payments"), { ...payment, created_at: serverTimestamp() }); } catch (err) { console.warn("Firestore payment save error", err); } }
+    return true;
+  },
+
+  // ---- Profiles (name/about/skills/focus per email+role) ----
+  async getProfiles() {
+    if (isFirebaseConfigured && db) {
+      try {
+        const snap = await getDocs(query(collection(db, "profiles"), limit(500)));
+        const data = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+        if (data.length) return data;
+      } catch (e) { console.warn("Firestore profiles fetch fallback", e); }
+    }
+    try { return JSON.parse(localStorage.getItem("startify_user_profiles") || "[]"); } catch { return []; }
+  },
+  async saveProfile(profile) {
+    try {
+      const arr = JSON.parse(localStorage.getItem("startify_user_profiles") || "[]");
+      const idx = arr.findIndex(p => p.email.toLowerCase() === profile.email.toLowerCase() && p.role === profile.role);
+      if (idx >= 0) arr[idx] = { ...arr[idx], ...profile };
+      else arr.unshift(profile);
+      localStorage.setItem("startify_user_profiles", JSON.stringify(arr));
+    } catch {}
+    if (isFirebaseConfigured && db) {
+      try {
+        const docId = `${profile.email.toLowerCase()}_${profile.role}`;
+        await setDoc(doc(db, "profiles", docId), { ...profile, updated_at: serverTimestamp() }, { merge: true });
+      } catch (e) { console.warn("Firestore profile save error", e); }
+    }
+    return true;
+  },
+  async deleteProfile(email, role) {
+    try {
+      const arr = JSON.parse(localStorage.getItem("startify_user_profiles") || "[]");
+      localStorage.setItem("startify_user_profiles", JSON.stringify(arr.filter(p => !(p.email.toLowerCase() === email.toLowerCase() && p.role === role))));
+    } catch {}
+    if (isFirebaseConfigured && db) {
+      try { await deleteDoc(doc(db, "profiles", `${email.toLowerCase()}_${role}`)); } catch (e) { console.warn("Firestore profile delete error", e); }
+    }
+    return true;
+  },
+
+  // ---- Connection requests (chats) ----
+  async getRequests() {
+    if (isFirebaseConfigured && db) {
+      try {
+        const snap = await getDocs(query(collection(db, "requests"), orderBy("created_at", "desc"), limit(200)));
+        const data = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+        if (data.length) return data;
+      } catch (e) { console.warn("Firestore requests fetch fallback", e); }
+    }
+    try { return JSON.parse(localStorage.getItem("startify_requests") || "[]"); } catch { return []; }
+  },
+  async saveRequest(req) {
+    try {
+      const arr = JSON.parse(localStorage.getItem("startify_requests") || "[]");
+      const idx = arr.findIndex(r => r.id === req.id);
+      if (idx >= 0) arr[idx] = req; else arr.unshift(req);
+      localStorage.setItem("startify_requests", JSON.stringify(arr));
+    } catch {}
+    if (isFirebaseConfigured && db) {
+      try { await setDoc(doc(db, "requests", req.id), { ...req, updated_at: serverTimestamp(), created_at: req.created_at || serverTimestamp() }, { merge: true }); } catch (e) { console.warn("Firestore request save error", e); }
+    }
+    return true;
+  },
+  subscribeRequests(callback) {
+    if (!isFirebaseConfigured || !db) return () => {};
+    try {
+      const q = query(collection(db, "requests"), orderBy("created_at", "desc"), limit(200));
+      return onSnapshot(q, (snap) => {
+        callback(snap.docs.map(d => ({ id: d.id, ...d.data() })));
+      });
+    } catch { return () => {}; }
+  },
+
+  // ---- Chat messages ----
+  async getMessages() {
+    if (isFirebaseConfigured && db) {
+      try {
+        const snap = await getDocs(query(collection(db, "messages"), orderBy("created_at", "desc"), limit(300)));
+        const data = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+        if (data.length) return data;
+      } catch (e) { console.warn("Firestore messages fetch fallback", e); }
+    }
+    try { return JSON.parse(localStorage.getItem("startify_messages") || "[]"); } catch { return []; }
+  },
+  async saveMessage(msg) {
+    try {
+      const arr = JSON.parse(localStorage.getItem("startify_messages") || "[]");
+      if (!arr.some(m => m.id === msg.id)) { arr.push(msg); localStorage.setItem("startify_messages", JSON.stringify(arr)); }
+    } catch {}
+    if (isFirebaseConfigured && db) {
+      try { await setDoc(doc(db, "messages", msg.id), { ...msg, created_at: msg.created_at || serverTimestamp() }, { merge: true }); } catch (e) { console.warn("Firestore message save error", e); }
+    }
+    return true;
+  },
+  subscribeMessages(callback) {
+    if (!isFirebaseConfigured || !db) return () => {};
+    try {
+      const q = query(collection(db, "messages"), orderBy("created_at", "desc"), limit(300));
+      return onSnapshot(q, (snap) => {
+        callback(snap.docs.map(d => ({ id: d.id, ...d.data() })));
+      });
+    } catch { return () => {}; }
+  },
+
+  // ---- Talent / Backer directories (admin-created) ----
+  async getBuilders() {
+    if (isFirebaseConfigured && db) {
+      try {
+        const snap = await getDocs(query(collection(db, "builders"), limit(200)));
+        const data = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+        if (data.length) return data;
+      } catch (e) { console.warn("Firestore builders fetch fallback", e); }
+    }
+    try { return JSON.parse(localStorage.getItem("startify_admin_builders") || "[]"); } catch { return []; }
+  },
+  async saveBuilder(b) {
+    try {
+      const arr = JSON.parse(localStorage.getItem("startify_admin_builders") || "[]");
+      const idx = arr.findIndex(x => x.id === b.id);
+      if (idx >= 0) arr[idx] = b; else arr.unshift(b);
+      localStorage.setItem("startify_admin_builders", JSON.stringify(arr));
+    } catch {}
+    if (isFirebaseConfigured && db) {
+      try { await setDoc(doc(db, "builders", b.id), { ...b, updated_at: serverTimestamp() }, { merge: true }); } catch (e) { console.warn("Firestore builder save error", e); }
+    }
+    return true;
+  },
+  async deleteBuilder(id) {
+    try {
+      const arr = JSON.parse(localStorage.getItem("startify_admin_builders") || "[]");
+      localStorage.setItem("startify_admin_builders", JSON.stringify(arr.filter(x => x.id !== id)));
+    } catch {}
+    if (isFirebaseConfigured && db) {
+      try { await deleteDoc(doc(db, "builders", id)); } catch (e) { console.warn("Firestore builder delete error", e); }
+    }
+    return true;
+  },
+  async getFunders() {
+    if (isFirebaseConfigured && db) {
+      try {
+        const snap = await getDocs(query(collection(db, "funders"), limit(200)));
+        const data = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+        if (data.length) return data;
+      } catch (e) { console.warn("Firestore funders fetch fallback", e); }
+    }
+    try { return JSON.parse(localStorage.getItem("startify_admin_funders") || "[]"); } catch { return []; }
+  },
+  async saveFunder(f) {
+    try {
+      const arr = JSON.parse(localStorage.getItem("startify_admin_funders") || "[]");
+      const idx = arr.findIndex(x => x.id === f.id);
+      if (idx >= 0) arr[idx] = f; else arr.unshift(f);
+      localStorage.setItem("startify_admin_funders", JSON.stringify(arr));
+    } catch {}
+    if (isFirebaseConfigured && db) {
+      try { await setDoc(doc(db, "funders", f.id), { ...f, updated_at: serverTimestamp() }, { merge: true }); } catch (e) { console.warn("Firestore funder save error", e); }
+    }
+    return true;
+  },
+  async deleteFunder(id) {
+    try {
+      const arr = JSON.parse(localStorage.getItem("startify_admin_funders") || "[]");
+      localStorage.setItem("startify_admin_funders", JSON.stringify(arr.filter(x => x.id !== id)));
+    } catch {}
+    if (isFirebaseConfigured && db) {
+      try { await deleteDoc(doc(db, "funders", id)); } catch (e) { console.warn("Firestore funder delete error", e); }
+    }
+    return true;
+  },
+
+  // ---- Events ----
+  async getEventsStore() {
+    if (isFirebaseConfigured && db) {
+      try {
+        const snap = await getDocs(query(collection(db, "events"), limit(100)));
+        const data = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+        if (data.length) return data;
+      } catch (e) { console.warn("Firestore events fetch fallback", e); }
+    }
+    try { return JSON.parse(localStorage.getItem("startify_events") || "[]"); } catch { return []; }
+  },
+  async saveEventStore(ev) {
+    try {
+      const arr = JSON.parse(localStorage.getItem("startify_events") || "[]");
+      const idx = arr.findIndex(x => x.id === ev.id);
+      if (idx >= 0) arr[idx] = ev; else arr.unshift(ev);
+      localStorage.setItem("startify_events", JSON.stringify(arr));
+    } catch {}
+    if (isFirebaseConfigured && db) {
+      try { await setDoc(doc(db, "events", ev.id), { ...ev, updated_at: serverTimestamp() }, { merge: true }); } catch (e) { console.warn("Firestore event save error", e); }
+    }
+    return true;
+  },
+  async deleteEventStore(id) {
+    try {
+      const arr = JSON.parse(localStorage.getItem("startify_events") || "[]");
+      localStorage.setItem("startify_events", JSON.stringify(arr.filter(x => x.id !== id)));
+    } catch {}
+    if (isFirebaseConfigured && db) {
+      try { await deleteDoc(doc(db, "events", id)); } catch (e) { console.warn("Firestore event delete error", e); }
+    }
     return true;
   }
 };

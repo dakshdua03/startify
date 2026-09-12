@@ -34,17 +34,24 @@ await authService.sendPasswordReset(email)
    ```
    Keep `%LINK%` (required). Set `Authentication → Settings → General → Public-facing name: Startify` so `%APP_NAME%` → Startify.
 3. `Build → Authentication → Settings → Authorized domains` → add `localhost`, `startify2.pages.dev`, `startify-daksh-accelerator.pages.dev`
-4. `Build → Firestore Database → Rules` (for ideas/registrations/payments):
+4. `Build → Firestore Database → Rules` (all collections — profiles/chats/directories/events sync cross-device):
 ```js
 rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
-    match /ideas/{doc} { allow read: if true; allow write: if true; }
+    match /ideas/{doc} { allow read, write: if true; }
     match /registrations/{doc} { allow read, write: if true; }
     match /payments/{doc} { allow read, write: if true; }
+    match /profiles/{doc} { allow read, write: if true; }
+    match /requests/{doc} { allow read, write: if true; }
+    match /messages/{doc} { allow read, write: if true; }
+    match /builders/{doc} { allow read, write: if true; }
+    match /funders/{doc} { allow read, write: if true; }
+    match /events/{doc} { allow read, write: if true; }
   }
 }
 ```
+Collections auto-create on first write (`saveProfile/saveRequest/saveMessage/saveBuilder/saveFunder/saveEventStore`). Passwords stay in Firebase Auth only — never in Firestore.
 
 ### 2. Env Vars (local + Cloudflare Pages)
 

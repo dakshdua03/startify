@@ -309,6 +309,7 @@ export default function App() {
   const savePopupProfileEdits = (profile) => {
     const name = popupNameDraft.trim() || profile.name;
     const about = popupAboutDraft.trim();
+    let savedProfile = null;
     try {
       const arr = JSON.parse(localStorage.getItem("startify_user_profiles")||"[]");
       const idx = arr.findIndex(p=> p.email.toLowerCase()===profile.email.toLowerCase() && p.role===profile.role);
@@ -319,11 +320,14 @@ export default function App() {
         if (profile.role === "backer") arr[idx].focus = popupExtraDraft.trim() || arr[idx].focus || "";
         if (profile.role === "talent" && popupExtraDraft.trim()) arr[idx].roleTitle = popupExtraDraft.trim();
         localStorage.setItem("startify_user_profiles", JSON.stringify(arr));
+        savedProfile = arr[idx];
       } else {
-        arr.unshift({ id: profile.id || profile.email, name, email: profile.email.toLowerCase(), role: profile.role, bio: about, skills: profile.role==="talent"?popupExtraDraft.trim():"", focus: profile.role==="backer"?popupExtraDraft.trim():"", createdAt: new Date().toISOString() });
+        savedProfile = { id: profile.id || profile.email, name, email: profile.email.toLowerCase(), role: profile.role, bio: about, skills: profile.role==="talent"?popupExtraDraft.trim():"", focus: profile.role==="backer"?popupExtraDraft.trim():"", createdAt: new Date().toISOString() };
+        arr.unshift(savedProfile);
         localStorage.setItem("startify_user_profiles", JSON.stringify(arr));
       }
     } catch {}
+    if (savedProfile) dbService.saveProfile(savedProfile);
     try {
       localStorage.setItem(getProfileAboutKey(profile.email), about);
     } catch {}
@@ -415,6 +419,33 @@ export default function App() {
       const pb = JSON.parse(localStorage.getItem("startify_pending_backers") || "null");
       if (pb && Array.isArray(pb) && pb.length) setPendingBackers(pb);
     } catch {}
+    // Firestore sync: pull cloud directories + chats (real-time via subscribe below)
+    dbService.getBuilders().then((cb) => { if (cb && cb.length) setBuilders((prev) => {
+      const map = new Map(); [...prev, ...cb].forEach(x=> map.set(x.id, x)); return Array.from(map.values());
+    }); });
+    dbService.getFunders().then((cf) => { if (cf && cf.length) setFunders((prev) => {
+      const map = new Map(); [...prev, ...cf].forEach(x=> map.set(x.id, x)); return Array.from(map.values());
+    }); });
+    dbService.getEventsStore().then((ce) => { if (ce && ce.length) setEvents((prev) => {
+      const map = new Map(); [...ce.filter(x=>!x.deleted), ...prev].forEach(x=> map.set(x.id, x)); return Array.from(map.values());
+    }); });
+    dbService.getRequests().then((cr) => { if (cr && cr.length) setRequests((prev) => {
+      const map = new Map(); [...cr, ...prev].forEach(x=> map.set(x.id, x)); return Array.from(map.values());
+    }); });
+    dbService.getMessages().then((cm) => { if (cm && cm.length) setMessages((prev) => {
+      const map = new Map(); [...cm, ...prev].forEach(x=> map.set(x.id, x)); return Array.from(map.values());
+    }); });
+    // Realtime: Firestore onSnapshot for chats so two devices sync without reload
+    const unsubReq = dbService.subscribeRequests ? dbService.subscribeRequests((cloudReqs) => {
+      if (cloudReqs && cloudReqs.length) setRequests((prev) => {
+        const map = new Map(); [...cloudReqs, ...prev].forEach(x=> map.set(x.id, x)); return Array.from(map.values());
+      });
+    }) : () => {};
+    const unsubMsg = dbService.subscribeMessages ? dbService.subscribeMessages((cloudMsgs) => {
+      if (cloudMsgs && cloudMsgs.length) setMessages((prev) => {
+        const map = new Map(); [...cloudMsgs, ...prev].forEach(x=> map.set(x.id, x)); return Array.from(map.values());
+      });
+    }) : () => {};
     // Live update when admin approves in another tab + chats arrive cross-tab
     const onStorage = (e) => {
       if (!e.key || e.key === "startify_requests") {
@@ -452,7 +483,7 @@ export default function App() {
     window.addEventListener("storage", onStorage);
     const onVisible = () => { if (!document.hidden) loadIdeas(); };
     document.addEventListener("visibilitychange", onVisible);
-    return () => { window.removeEventListener("storage", onStorage); document.removeEventListener("visibilitychange", onVisible); };
+    return () => { window.removeEventListener("storage", onStorage); document.removeEventListener("visibilitychange", onVisible); unsubReq(); unsubMsg(); };
   }, []);
 
   useEffect(() => {
@@ -543,15 +574,16 @@ export default function App() {
   // Sign In / Registration Handler — UoH students must use @uohyd.ac.in (backer open to outside) + password (no OTP)
   const isUoHEmail = (email) => email.trim().toLowerCase().endsWith("@uohyd.ac.in");
   const completeRegistration = (newUser, targetRole) => {
-    // Persist to unified profile store so same-email switching works
+    // Persist to unified profile store so same-email switching works (local + Firestore)
+    const derivedSid = newUser.email.split("@")[0].toUpperCase();
+    const normalized={ id:newUser.id, name:newUser.name, email:newUser.email.toLowerCase(), role:newUser.role, studentId: derivedSid, roleTitle:newUser.roleTitle||"", skills:newUser.skills||"", focus:newUser.focus||"", bio:newUser.bio||"", createdAt:new Date().toISOString() };
     try {
       const key="startify_user_profiles";
       const existing=JSON.parse(localStorage.getItem(key)||"[]");
-      const derivedSid = newUser.email.split("@")[0].toUpperCase();
-      const normalized={ id:newUser.id, name:newUser.name, email:newUser.email.toLowerCase(), role:newUser.role, studentId: derivedSid, roleTitle:newUser.roleTitle||"", skills:newUser.skills||"", focus:newUser.focus||"", bio:newUser.bio||"", createdAt:new Date().toISOString() };
       const filtered=existing.filter(p=> !(p.email.toLowerCase()===normalized.email.toLowerCase() && p.role===normalized.role));
       localStorage.setItem(key, JSON.stringify([normalized, ...filtered]));
     } catch {}
+    dbService.saveProfile(normalized);
     // Save password for this email
     if (authForm.password) saveCredential(newUser.email, authForm.password);
     if (targetRole === "backer") {
@@ -586,10 +618,7 @@ export default function App() {
             status: "Available for Collaboration"
           };
         setBuilders(prev=> [newBuilder, ...prev]);
-        try {
-          const existingB = JSON.parse(localStorage.getItem("startify_admin_builders")||"[]");
-          localStorage.setItem("startify_admin_builders", JSON.stringify([newBuilder, ...existingB]));
-        } catch {}
+        dbService.saveBuilder(newBuilder);
       }
       dbService.saveRegistration({ name: newUser.name, email: newUser.email, role: targetRole==="talent"?"builder":"founder", ideaOrSkills: targetRole==="talent"? (authForm.skills||"Talent") : "Founder", contact:"", registeredAt: new Date().toISOString().slice(0,10), status:"verified" });
       setCurrentUser(newUser);
@@ -877,6 +906,7 @@ export default function App() {
     };
 
     setRequests([newReq, ...requests]);
+    dbService.saveRequest(newReq);
     setConnectModalOpen(false);
     showToast(`✓ Connection request sent to ${recipientName}!`);
     setConnectForm({ message: "" });
@@ -884,17 +914,19 @@ export default function App() {
 
   // Accept Connection Request
   const handleAcceptRequest = (reqId) => {
-    setRequests(
-      requests.map((r) => (r.id === reqId ? { ...r, status: "accepted" } : r))
-    );
+    const updated = requests.map((r) => (r.id === reqId ? { ...r, status: "accepted" } : r));
+    setRequests(updated);
+    const target = updated.find(r => r.id === reqId);
+    if (target) dbService.saveRequest(target);
     showToast("Request accepted! You can now talk and message directly.");
   };
 
   // Reject Connection Request
   const handleRejectRequest = (reqId) => {
-    setRequests(
-      requests.map((r) => (r.id === reqId ? { ...r, status: "rejected" } : r))
-    );
+    const updated = requests.map((r) => (r.id === reqId ? { ...r, status: "rejected" } : r));
+    setRequests(updated);
+    const target = updated.find(r => r.id === reqId);
+    if (target) dbService.saveRequest(target);
     showToast("Request declined.");
   };
 
@@ -913,6 +945,7 @@ export default function App() {
     };
 
     setMessages([...messages, newMsg]);
+    dbService.saveMessage(newMsg);
     setChatInputText("");
   };
 
@@ -1726,6 +1759,7 @@ export default function App() {
                               const isSeed = INITIAL_EVENTS.some(s=>s.id===ev.id);
                               const next=events.filter(x=>x.id!==ev.id);
                               setEvents(next);
+                              dbService.deleteEventStore(ev.id);
                               try{
                                 const stored = JSON.parse(localStorage.getItem("startify_events")||"[]");
                                 const filteredStored = stored.filter(x=>x.id!==ev.id);
@@ -2964,6 +2998,7 @@ export default function App() {
                 const updated = [newEvent, ...events];
                 setEvents(updated);
                 try { localStorage.setItem("startify_events", JSON.stringify(updated)); } catch {}
+                dbService.saveEventStore(newEvent);
                 setEventAddModalOpen(false);
                 setEventForm({ title: "", date: "", time: "", venue: "", category: "Pitch Night", desc: "", thumbnail: "", organizer: "", capacity: "", eventType: "Offline", tags: "", link: "" });
                 showToast("Event created and published.");

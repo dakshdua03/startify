@@ -5,12 +5,89 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Startify Admin — University of Hyderabad</title>
 <script src="https://cdn.tailwindcss.com"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js"></script>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Outfit:wght@600;700;800&display=swap" rel="stylesheet">
 <style>body{font-family:Inter,sans-serif} .font-heading{font-family:Outfit,sans-serif}</style>
 </head>
 <body class="bg-[#f1f5f9] text-slate-800">
 <div id="app"></div>
 <script>
+// Firestore backend (same project as site: startify-01) — localStorage remains as fallback/offline mirror
+const FIREBASE_CONFIG = {
+  apiKey: "AIzaSyDa2GrOS9xmrZGI-0W8BLE_vLu9XJr3i0A",
+  authDomain: "startify-01.firebaseapp.com",
+  projectId: "startify-01",
+  storageBucket: "startify-01.firebasestorage.app",
+  messagingSenderId: "451497028667",
+  appId: "1:451497028667:web:356d1693d60a204095c01e"
+};
+let FSDB = null;
+try {
+  if (window.firebase && FIREBASE_CONFIG.apiKey) {
+    firebase.initializeApp(FIREBASE_CONFIG);
+    FSDB = firebase.firestore();
+  }
+} catch (e) { console.warn("Admin Firestore init failed", e); }
+async function fsGet(col, max=300){
+  if (!FSDB) return [];
+  try {
+    const snap = await FSDB.collection(col).limit(max).get();
+    return snap.docs.map(d => ({ id: d.id, ...d.data() }));
+  } catch (e) { console.warn("Admin Firestore read failed", col, e); return []; }
+}
+async function fsSet(col, id, data){
+  if (!FSDB || !id) return;
+  try { await FSDB.collection(col).doc(id).set(data, { merge: true }); } catch (e) { console.warn("Admin Firestore write failed", col, e); }
+}
+async function fsDel(col, id){
+  if (!FSDB || !id) return;
+  try { await FSDB.collection(col).doc(id).delete(); } catch (e) { console.warn("Admin Firestore delete failed", col, e); }
+}
+// Pull cloud collections into localStorage mirror so existing render() logic works cross-device
+async function syncFromFirestore(){
+  if (!FSDB) return;
+  try {
+    const [ideas, profiles, requests, messages, builders, funders, events] = await Promise.all([
+      fsGet("ideas"), fsGet("profiles", 500), fsGet("requests"), fsGet("messages"), fsGet("builders"), fsGet("funders"), fsGet("events", 100)
+    ]);
+    if (ideas.length) {
+      const cur = load(LS_KEYS.ideas, []);
+      const map = new Map(); [...cur, ...ideas].forEach(x=> { if(x && x.id && !x.deleted) map.set(x.id, x); });
+      save(LS_KEYS.ideas, Array.from(map.values()));
+    }
+    if (profiles.length) {
+      const cur = load(LS_KEYS.profiles, []);
+      const map = new Map(); [...cur, ...profiles].forEach(x=> { if(x && x.email) map.set((x.email+"|"+x.role).toLowerCase(), x); });
+      save(LS_KEYS.profiles, Array.from(map.values()));
+    }
+    if (builders.length) {
+      const cur = load(LS_KEYS.builders, []);
+      const map = new Map(); [...cur, ...builders].forEach(x=> { if(x && x.id) map.set(x.id, x); });
+      save(LS_KEYS.builders, Array.from(map.values()));
+    }
+    if (funders.length) {
+      const cur = load(LS_KEYS.funders, []);
+      const map = new Map(); [...cur, ...funders].forEach(x=> { if(x && x.id) map.set(x.id, x); });
+      save(LS_KEYS.funders, Array.from(map.values()));
+    }
+    if (events.length) {
+      const cur = load(LS_KEYS.events, []);
+      const map = new Map(); [...cur, ...events.filter(x=>!x.deleted)].forEach(x=> { if(x && x.id) map.set(x.id, x); });
+      save(LS_KEYS.events, Array.from(map.values()));
+    }
+    if (requests.length) {
+      const cur = load(LS_KEYS.requests, []);
+      const map = new Map(); [...cur, ...requests].forEach(x=> { if(x && x.id) map.set(x.id, x); });
+      save(LS_KEYS.requests, Array.from(map.values()));
+    }
+    if (messages.length) {
+      const cur = load(LS_KEYS.messages, []);
+      const map = new Map(); [...cur, ...messages].forEach(x=> { if(x && x.id) map.set(x.id, x); });
+      save(LS_KEYS.messages, Array.from(map.values()));
+    }
+  } catch (e) { console.warn("Admin sync failed", e); }
+}
 const LS_KEYS = {
   ideas: "startify_submitted_ideas",
   regs: "startify_registrations",
@@ -147,8 +224,9 @@ function deleteUserByEmail(email, id, role){
   }catch{}
   try{
     const profiles=load(LS_KEYS.profiles, []);
-    save(LS_KEYS.profiles, profiles.filter(p=> !(p.email.toLowerCase()===email.toLowerCase() && p.role===role)));
+    save(LS_KEYS.profiles, profiles.filter(p=> p.email.toLowerCase()!==email.toLowerCase() && p.role===role));
   }catch{}
+  try { fsDel("profiles", email.toLowerCase()+"_"+role); } catch {}
   alert("Deleted: "+email+" ("+roleLabel+")" + (isDemo && !otherRolesSameEmail ? " (demo hidden)" : ""));
   render();
 }
@@ -181,6 +259,7 @@ function deleteBuilderById(id){
   const target=builders.find(b=> b.id===id) || SEED_BUILDERS.find(s=> s.id===id);
   builders=builders.filter(b=> b.id!==id);
   save(LS_KEYS.builders, builders);
+  try { fsDel("builders", id); } catch {}
   if(target && target.email){
     let regs=load(LS_KEYS.regs, []);
     regs=regs.filter(r=> r.email.toLowerCase()!==target.email.toLowerCase());
@@ -210,6 +289,7 @@ function deleteFunderById(id){
   const target=funders.find(f=> f.id===id) || SEED_FUNDERS.find(s=> s.id===id);
   funders=funders.filter(f=> f.id!==id);
   save(LS_KEYS.funders, funders);
+  try { fsDel("funders", id); } catch {}
   if(target && target.email){
     let regs=load(LS_KEYS.regs, []);
     regs=regs.filter(r=> r.email.toLowerCase()!==target.email.toLowerCase());
@@ -238,6 +318,7 @@ function editBuilderById(id){
   const updated={...target, name:newName.trim()||target.name, skills:newSkills.trim()||target.skills};
   const next=builders.filter(b=> b.id!==id);
   save(LS_KEYS.builders, [updated, ...next]);
+  try { fsSet("builders", id, updated); } catch {}
   alert("Updated builder: "+updated.name);
   render();
 }
@@ -252,6 +333,7 @@ function editFunderById(id){
   const updated={...target, name:newName.trim()||target.name, focus:newFocus.trim()||target.focus};
   const next=funders.filter(f=> f.id!==id);
   save(LS_KEYS.funders, [updated, ...next]);
+  try { fsSet("funders", id, updated); } catch {}
   alert("Updated backer: "+updated.name);
   render();
 }
@@ -268,8 +350,10 @@ function deleteIdeaById(id){
   const isSeed = SEED_IDEAS.some(s=> s.id===id) && !stored.some(s=> s.id===id);
   if(isSeed){
     save(LS_KEYS.ideas, [{id, status:"Deleted_By_Admin", deleted:true}, ...next]);
+    try { fsSet("ideas", id, { id, deleted: true, status: "Deleted_By_Admin" }); } catch {}
   } else {
     save(LS_KEYS.ideas, next);
+    try { fsDel("ideas", id); } catch {}
   }
   // also remove from Firestore? No — local only
   alert("Deleted idea: "+(target?target.title:id));
@@ -287,6 +371,7 @@ function editIdeaById(id){
   let stored=load(LS_KEYS.ideas, []);
   const next=stored.filter(i=>i.id!==id);
   save(LS_KEYS.ideas, [updated, ...next]);
+  try { fsSet("ideas", id, updated); } catch {}
   alert("Updated idea: "+updated.title);
   render();
 }
@@ -603,6 +688,7 @@ function render(){
       // upsert by id (no duplication)
       const next=stored.filter(i=>i.id!==id);
       save(LS_KEYS.ideas, [updated, ...next]);
+      try { fsSet("ideas", id, updated); } catch {}
       alert("Approved: "+target.title+" — now live on site (refresh site tab if open)");
       render();
     }));
@@ -615,6 +701,7 @@ function render(){
       const updated={...target, status:"Rejected"};
       const next=stored.filter(i=>i.id!==id);
       save(LS_KEYS.ideas, [updated, ...next]);
+      try { fsSet("ideas", id, updated); } catch {}
       alert("Rejected");
       render();
     }));
@@ -684,7 +771,9 @@ function render(){
       const target=pending.find(p=>p.id===id);
       if(target){
         const funders=load(LS_KEYS.funders, []);
-        save(LS_KEYS.funders, [{id:target.id, name:target.name, role:target.roleTitle||"Angel Backer", focus:target.focus||"Tech & AI", bio:target.bio||"Approved backer.", ticketSize:"Pre-Seed & Seed"}, ...funders]);
+        const nf={id:target.id, name:target.name, role:target.roleTitle||"Angel Backer", focus:target.focus||"Tech & AI", bio:target.bio||"Approved backer.", ticketSize:"Pre-Seed & Seed"};
+        save(LS_KEYS.funders, [nf, ...funders]);
+        try { fsSet("funders", nf.id, nf); } catch {}
         save(LS_KEYS.pendingBackers, pending.filter(p=>p.id!==id));
         // also update registrations status
         const regs=load(LS_KEYS.regs, []);
@@ -807,6 +896,7 @@ function render(){
       const stored=load(LS_KEYS.events, []);
       const next=[ev, ...stored.filter(x=>x.id!==id)];
       save(LS_KEYS.events, next);
+      try { fsSet("events", ev.id, ev); } catch {}
       thumbData=""; document.getElementById("adminEventForm").reset(); document.getElementById("evThumbPreview").innerHTML=""; document.getElementById("evEditId").value="";
       render();
     });
@@ -836,6 +926,7 @@ function render(){
       if(!confirm("Delete event "+id+"?")) return;
       const stored=load(LS_KEYS.events, []);
       save(LS_KEYS.events, stored.filter(x=>x.id!==id));
+      try { fsDel("events", id); } catch {}
       // also handle seed deletion via tombstone? For events, seeds are in SEED_EVENTS, so we need tombstone logic similar to ideas
       // For now, if it's a seed and not in stored, add deleted marker
       const isSeed = SEED_EVENTS.some(s=> s.id===id) && !stored.some(s=> s.id===id);
@@ -914,7 +1005,9 @@ function render(){
       save(LS_KEYS.regs, [reg, ...regs]);
       if(role==="talent"){
         const builders=load(LS_KEYS.builders, []);
-        save(LS_KEYS.builders, [{id:"user_"+Date.now(), name, email, role: "Builder", roleTitle: skills||"Builder", skills: skills||"General", year:"Campus Builder", verifiedStudent:true }, ...builders]);
+        const nb={id:"user_"+Date.now(), name, email, role: "Builder", roleTitle: skills||"Builder", skills: skills||"General", year:"Campus Builder", verifiedStudent:true };
+        save(LS_KEYS.builders, [nb, ...builders]);
+        try { fsSet("builders", nb.id, nb); } catch {}
       }
       const creds=load(LS_KEYS.credentials, {});
       // admin creates with default password; user can change later
@@ -925,6 +1018,7 @@ function render(){
         const normalized={id: role==="talent" ? "user_"+Date.now() : email, name, email: email.toLowerCase(), role: role==="talent"?"talent":role, studentId:derivedSid2, roleTitle: skills||"", skills: role==="talent"?skills:"", focus: role==="backer"?skills:"", bio:"", createdAt: new Date().toISOString()};
         const filtered=profs.filter(p=> !(p.email.toLowerCase()===normalized.email.toLowerCase() && p.role===normalized.role));
         save(LS_KEYS.profiles, [normalized, ...filtered]);
+        try { fsSet("profiles", normalized.email.toLowerCase()+"_"+normalized.role, normalized); } catch {}
       }catch{}
       if(role==="backer"){
         const pending=load(LS_KEYS.pendingBackers, []);
@@ -1012,6 +1106,8 @@ function render(){
 }
 
 render();
+// Pull Firestore cloud data into local mirror on load (cross-device sync)
+syncFromFirestore().then(()=>{ try{ render(); }catch{} });
 </script>
 </body>
 </html>
