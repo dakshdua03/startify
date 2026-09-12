@@ -148,9 +148,9 @@ nav.sticky .bg-zinc-950.p-5 .text-white {
 }
 
 /* General dark bg fallback for non-nav/non-footer areas */
-.bg-\[\\#121214\],
-.bg-\[\\#121214\]\/90,
-.bg-\[\\#202728\] {
+.bg-\[\#121214\],
+.bg-\[\#121214\]\/90,
+.bg-\[\#202728\] {
   background: rgba(255,255,255,0.50) !important;
   backdrop-filter: blur(22px) !important;
   -webkit-backdrop-filter: blur(22px) !important;
@@ -385,7 +385,7 @@ button[type="submit"].bg-white:hover {
 }
 
 /* Chat modal body */
-.bg-\[\\#121214\] {
+.bg-\[\#121214\] {
   background: rgba(245,246,248,0.90) !important;
 }
 

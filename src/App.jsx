@@ -1057,7 +1057,13 @@ export default function App() {
   const myIncomingRequests = requests.filter((r) => r.receiverId === currentUser?.id || sameEmailIds.has(r.receiverId) || (currentEmail && (r.receiverEmail||"").toLowerCase() === currentEmail));
   const myOutgoingRequests = requests.filter((r) => r.senderId === currentUser?.id || sameEmailIds.has(r.senderId) || (currentEmail && (r.senderEmail||"").toLowerCase() === currentEmail));
   const myAcceptedConnections = requests.filter(
-    (r) => (sameEmailIds.has(r.senderId) || sameEmailIds.has(r.receiverId) || r.senderId === currentUser?.id || r.receiverId === currentUser?.id) && r.status === "accepted"
+    (r) =>
+      (sameEmailIds.has(r.senderId) ||
+        sameEmailIds.has(r.receiverId) ||
+        r.senderId === currentUser?.id ||
+        r.receiverId === currentUser?.id ||
+        (currentEmail && ((r.senderEmail || "").toLowerCase() === currentEmail || (r.receiverEmail || "").toLowerCase() === currentEmail))) &&
+      r.status === "accepted"
   );
   const myIdeas = ideas.filter((i) => isOwnIdea(i));
   // Events: split into Upcoming / Past so past events stay visible but separate
