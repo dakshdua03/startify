@@ -295,10 +295,9 @@ export const dbService = {
   async getBuilders() {
     if (isFirebaseConfigured && db) {
       try {
-        const snap = await getDocs(query(collection(db, "builders"), limit(200)));
-        const data = snap.docs.map(d => ({ id: d.id, ...d.data() }));
-        if (data.length) return data;
-      } catch (e) { console.warn("Firestore builders fetch fallback", e); }
+        const snap = await getDocs(collection(db, "builders"));
+        return snap.docs.map(d => ({ id: d.id, ...d.data() }));
+      } catch (e) { console.warn("Firestore builders fetch error", e); }
     }
     try { return JSON.parse(localStorage.getItem("startify_admin_builders") || "[]"); } catch { return []; }
   },
@@ -327,10 +326,9 @@ export const dbService = {
   async getFunders() {
     if (isFirebaseConfigured && db) {
       try {
-        const snap = await getDocs(query(collection(db, "funders"), limit(200)));
-        const data = snap.docs.map(d => ({ id: d.id, ...d.data() }));
-        if (data.length) return data;
-      } catch (e) { console.warn("Firestore funders fetch fallback", e); }
+        const snap = await getDocs(collection(db, "funders"));
+        return snap.docs.map(d => ({ id: d.id, ...d.data() }));
+      } catch (e) { console.warn("Firestore funders fetch error", e); }
     }
     try { return JSON.parse(localStorage.getItem("startify_admin_funders") || "[]"); } catch { return []; }
   },
@@ -361,10 +359,9 @@ export const dbService = {
   async getEventsStore() {
     if (isFirebaseConfigured && db) {
       try {
-        const snap = await getDocs(query(collection(db, "events"), limit(100)));
-        const data = snap.docs.map(d => ({ id: d.id, ...d.data() }));
-        if (data.length) return data;
-      } catch (e) { console.warn("Firestore events fetch fallback", e); }
+        const snap = await getDocs(collection(db, "events"));
+        return snap.docs.map(d => ({ id: d.id, ...d.data() }));
+      } catch (e) { console.warn("Firestore events fetch error", e); }
     }
     try { return JSON.parse(localStorage.getItem("startify_events") || "[]"); } catch { return []; }
   },
