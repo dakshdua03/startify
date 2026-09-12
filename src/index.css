@@ -6,7 +6,7 @@
 @layer base {
   html { font-size: 17px; }
   body {
-    background: #e8eaed;
+    background: #ffffff;
     color: #111111;
     font-family: 'Inter', system-ui, sans-serif;
     font-size: 16.5px;
@@ -33,12 +33,12 @@
 .text-sm { font-size: 15px !important; }
 
 /* ═══════════════════════════════════════════════════════════════════
-   GLASSY GREY THEME  –  grey bg · frosted white cards · black text
+   LIGHT THEME  –  clean white bg · frosted cards · black text
    ═══════════════════════════════════════════════════════════════════ */
 
 /* ── Page-level background ── */
 .min-h-screen {
-  background: linear-gradient(168deg, #dfe2e6 0%, #c9cdd2 50%, #d6d9dd 100%) !important;
+  background: #ffffff !important;
 }
 
 /* ── Custom Scrollbar ── */
