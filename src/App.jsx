@@ -207,13 +207,23 @@ export const INITIAL_MESSAGES = [
 
 export const MAIN_WHATSAPP_LINK = "https://chat.whatsapp.com/BOgivVivG5ZLQ1OqoIl3wi?s=cl&p=a&mlu=4";
 
-/* ==========================================================================
-   MAIN APPLICATION COMPONENT
-   ========================================================================== */
-
 export default function App() {
-  // Visitors begin at the role-selection page. The workspace only opens after sign-in.
-  const [currentUser, setCurrentUser] = useState(null);
+  const [currentUser, setCurrentUser] = useState(() => {
+    try {
+      const saved = localStorage.getItem("startify_current_user");
+      return saved ? JSON.parse(saved) : null;
+    } catch { return null; }
+  });
+
+  useEffect(() => {
+    try {
+      if (currentUser) {
+        localStorage.setItem("startify_current_user", JSON.stringify(currentUser));
+      } else {
+        localStorage.removeItem("startify_current_user");
+      }
+    } catch {}
+  }, [currentUser]);
 
 
   // Data Collections — hide demo if flag set (for manual testing) + respect admin tombstones for deletable demos
@@ -419,7 +429,17 @@ export default function App() {
       const pb = JSON.parse(localStorage.getItem("startify_pending_backers") || "null");
       if (pb && Array.isArray(pb) && pb.length) setPendingBackers(pb);
     } catch {}
-    // Firestore sync: pull cloud directories + chats (real-time via subscribe below)
+    // Firestore sync: pull cloud directories + profiles + chats (real-time via subscribe below)
+    dbService.getProfiles().then((cps) => {
+      if (cps && Array.isArray(cps) && cps.length) {
+        try {
+          const local = JSON.parse(localStorage.getItem("startify_user_profiles") || "[]");
+          const map = new Map();
+          [...local, ...cps].forEach(p => { if (p && p.email && p.role) map.set(`${p.email.toLowerCase()}_${p.role}`, p); });
+          localStorage.setItem("startify_user_profiles", JSON.stringify(Array.from(map.values())));
+        } catch {}
+      }
+    });
     dbService.getBuilders().then((cb) => { if (cb && cb.length) setBuilders((prev) => {
       const map = new Map(); [...prev, ...cb].forEach(x=> map.set(x.id, x)); return Array.from(map.values());
     }); });
@@ -730,27 +750,36 @@ export default function App() {
           await authService.signIn(email, password);
           let existingProfile = null;
           try {
-            const profiles = JSON.parse(localStorage.getItem("startify_user_profiles") || "[]");
+            let cloudProfiles = [];
+            try { cloudProfiles = await dbService.getProfiles(); } catch {}
+            const localProfiles = JSON.parse(localStorage.getItem("startify_user_profiles") || "[]");
+            const map = new Map();
+            [...localProfiles, ...cloudProfiles].forEach(p => {
+              if (p && p.email && p.role) map.set(`${p.email.toLowerCase()}_${p.role}`, p);
+            });
+            const profiles = Array.from(map.values());
+            try { localStorage.setItem("startify_user_profiles", JSON.stringify(profiles)); } catch {}
+
             const matches = profiles.filter(p => p.email.toLowerCase() === email.toLowerCase());
-            // Default account first (user's chosen default), else first-created, else requested role
             const def = getDefaultAccount();
             if (def && def.email.toLowerCase() === email.toLowerCase()) {
               existingProfile = matches.find(p => p.role === def.role) || null;
             }
             if (!existingProfile) {
-              existingProfile = matches.sort((a,b)=> new Date(a.createdAt||0) - new Date(b.createdAt||0))[0] || null;
+              existingProfile = matches.find(p => p.role === targetRole) || null;
             }
             if (!existingProfile) {
-              existingProfile = profiles.find(p => p.email.toLowerCase() === email.toLowerCase() && p.role === targetRole) || null;
+              existingProfile = matches.sort((a,b)=> new Date(a.createdAt||0) - new Date(b.createdAt||0))[0] || null;
             }
             if (!existingProfile) {
               const regsLocal = JSON.parse(localStorage.getItem("startify_registrations") || "[]");
               const r = regsLocal.find(r => r.email.toLowerCase() === email.toLowerCase());
               if (r) existingProfile = { id: r.email, name: r.name, email: r.email, role: r.role==="builder"?"talent":r.role==="funder"?"backer":r.role, bio: "" };
             }
-          } catch {}
+          } catch (e) { console.warn("Sign in profile fetch warning", e); }
+
           if (existingProfile) {
-            const reuseUser = { id: existingProfile.id, name: existingProfile.name || email.split("@")[0], email: existingProfile.email, role: existingProfile.role || targetRole, bio: existingProfile.bio || "", roleTitle: existingProfile.roleTitle, skills: existingProfile.skills, focus: existingProfile.focus };
+            const reuseUser = { id: existingProfile.id || existingProfile.email, name: existingProfile.name || email.split("@")[0], email: existingProfile.email, role: existingProfile.role || targetRole, bio: existingProfile.bio || "", roleTitle: existingProfile.roleTitle, skills: existingProfile.skills, focus: existingProfile.focus };
             setCurrentUser(reuseUser);
             setActiveTab("home");
             showToast(`Welcome back, ${reuseUser.name}!`);
@@ -759,11 +788,12 @@ export default function App() {
             setResetMode(false);
             return;
           }
-          // Firebase verified but no local profile — create one from email
-          const fbUser = { id: email, name: authForm.name || email.split("@")[0], email, role: targetRole, bio: "" };
+          // Firebase verified but no local/cloud profile — create one from email & save to Firestore
+          const fbUser = { id: `user_${Date.now()}`, name: authForm.name || email.split("@")[0], email: email.toLowerCase(), role: targetRole, bio: "", createdAt: new Date().toISOString() };
+          dbService.saveProfile(fbUser);
           setCurrentUser(fbUser);
           setActiveTab("home");
-          showToast(`Welcome, ${email}!`);
+          showToast(`Welcome, ${fbUser.name}!`);
           setAuthModalOpen(false);
           setAuthForm({ name: "", email: "", password: "", roleTitle: "", skills: "", focus: "", bio: "" });
           return;
