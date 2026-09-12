@@ -4,12 +4,12 @@ import { getFirestore, collection, addDoc, getDocs, query, orderBy, limit, serve
 import { getAuth, createUserWithEmailAndPassword, signInWithEmailAndPassword, sendEmailVerification, sendPasswordResetEmail, signOut, onAuthStateChanged } from 'firebase/auth';
 
 const firebaseConfig = {
-  apiKey: import.meta.env.VITE_FIREBASE_API_KEY || "",
-  authDomain: import.meta.env.VITE_FIREBASE_AUTH_DOMAIN || "",
-  projectId: import.meta.env.VITE_FIREBASE_PROJECT_ID || "",
-  storageBucket: import.meta.env.VITE_FIREBASE_STORAGE_BUCKET || "",
-  messagingSenderId: import.meta.env.VITE_FIREBASE_MESSAGING_SENDER_ID || "",
-  appId: import.meta.env.VITE_FIREBASE_APP_ID || "",
+  apiKey: import.meta.env.VITE_FIREBASE_API_KEY || "AIzaSyDa2GrOS9xmrZGI-0W8BLE_vLu9XJr3i0A",
+  authDomain: import.meta.env.VITE_FIREBASE_AUTH_DOMAIN || "startify-01.firebaseapp.com",
+  projectId: import.meta.env.VITE_FIREBASE_PROJECT_ID || "startify-01",
+  storageBucket: import.meta.env.VITE_FIREBASE_STORAGE_BUCKET || "startify-01.firebasestorage.app",
+  messagingSenderId: import.meta.env.VITE_FIREBASE_MESSAGING_SENDER_ID || "451497028667",
+  appId: import.meta.env.VITE_FIREBASE_APP_ID || "1:451497028667:web:356d1693d60a204095c01e",
 };
 
 export const isFirebaseConfigured = !!firebaseConfig.apiKey && !!firebaseConfig.projectId;
