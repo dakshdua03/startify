@@ -125,8 +125,7 @@ export const dbService = {
     let cloudIdeas = [];
     if (isFirebaseConfigured && db) {
       try {
-        const q = query(collection(db, "ideas"), orderBy("created_at", "desc"), limit(50));
-        const snap = await getDocs(q);
+        const snap = await getDocs(collection(db, "ideas"));
         cloudIdeas = snap.docs.map(d => ({ id: d.id, ...d.data() }));
       } catch (err) { console.warn("Firestore fetch ideas failed, using local", err); }
     }
@@ -136,15 +135,13 @@ export const dbService = {
     const filteredDefault = defaultIdeas.filter(i=> !deletedIds.has(i.id));
     const filteredLocal = local.filter(i=> !i.deleted);
     const filteredCloud = cloudIdeas.filter(i=> !i.deleted && !deletedIds.has(i.id));
-    // Merge: default -> cloud -> local (local admin approvals win, prevents flicker)
+    // Merge: default -> local -> cloud (cloud always takes ultimate priority)
     const map = new Map();
     [...filteredDefault].forEach(i=> { if(i && i.id) map.set(i.id, i); });
-    [...filteredCloud].forEach(i=> { if(i && i.id) map.set(i.id, i); });
     [...filteredLocal].forEach(i=> { if(i && i.id) map.set(i.id, i); });
+    [...filteredCloud].forEach(i=> { if(i && i.id) map.set(i.id, i); });
     const merged = Array.from(map.values());
     if (merged.length > 0) return merged;
-    if (filteredCloud.length > 0) return filteredCloud;
-    if (filteredLocal.length > 0) return [...filteredLocal, ...filteredDefault];
     return filteredDefault;
   },
   async saveIdea(idea) {
@@ -152,7 +149,6 @@ export const dbService = {
     localStorage.setItem("startify_submitted_ideas", JSON.stringify([idea, ...existing]));
     if (isFirebaseConfigured && db) {
       try {
-        // Use same id locally and in Firestore to prevent duplicate entries when merging
         await setDoc(doc(db, "ideas", idea.id), {
           id: idea.id,
           title: idea.title, category: idea.category, founder: idea.founder, email: idea.email || "", founderId: idea.founderId || "",
@@ -167,18 +163,12 @@ export const dbService = {
   async getRegistrations() {
     if (isFirebaseConfigured && db) {
       try {
-        const q = query(collection(db, "registrations"), orderBy("created_at", "desc"), limit(100));
-        const snap = await getDocs(q);
-        const data = snap.docs.map(d => d.data());
-        if (data && data.length > 0) return data;
+        const snap = await getDocs(collection(db, "registrations"));
+        return snap.docs.map(d => d.data());
       } catch (e) { console.warn("Firestore registration fetch fallback", e); }
     }
     const local = localStorage.getItem("startify_registrations");
-    return local ? JSON.parse(local) : [
-      { name: "Rahul Sharma", email: "rahul@uohyd.ac.in", role: "founder", year: "3rd Year", ideaOrSkills: "Building EdTech AI Assistant", contact: "9876543210", registeredAt: "2026-08-23" },
-      { name: "Aditi Rao", email: "aditi@uohyd.ac.in", role: "builder", year: "4th Year CSE", ideaOrSkills: "React, Tailwind, Node.js", contact: "9123456789", registeredAt: "2026-08-22" },
-      { name: "Karan Patel", email: "karan@angelnet.in", role: "funder", year: "Alumni", ideaOrSkills: "Angel investor looking for SaaS ideas", contact: "9988776655", registeredAt: "2026-08-21" }
-    ];
+    return local ? JSON.parse(local) : [];
   },
   async saveRegistration(reg) {
     const existing = JSON.parse(localStorage.getItem("startify_registrations") || "[]");
@@ -190,17 +180,12 @@ export const dbService = {
   async getPayments() {
     if (isFirebaseConfigured && db) {
       try {
-        const q = query(collection(db, "payments"), orderBy("created_at", "desc"), limit(100));
-        const snap = await getDocs(q);
-        const data = snap.docs.map(d => d.data());
-        if (data && data.length > 0) return data;
+        const snap = await getDocs(collection(db, "payments"));
+        return snap.docs.map(d => d.data());
       } catch (e) { console.warn("Firestore payment fetch fallback", e); }
     }
     const local = localStorage.getItem("startify_payments");
-    return local ? JSON.parse(local) : [
-      { paymentId: "pay_sample_101", service: "Idea Validation Sprint", amount: 999, user: "Rahul Sharma", contact: "9876543210", timestamp: "2026-08-23 14:30", status: "SUCCESS" },
-      { paymentId: "pay_sample_102", service: "Pro Founder Pass", amount: 299, user: "Priya Roy", contact: "9811223344", timestamp: "2026-08-23 16:10", status: "SUCCESS" }
-    ];
+    return local ? JSON.parse(local) : [];
   },
   async savePayment(payment) {
     const existing = JSON.parse(localStorage.getItem("startify_payments") || "[]");
@@ -213,10 +198,9 @@ export const dbService = {
   async getProfiles() {
     if (isFirebaseConfigured && db) {
       try {
-        const snap = await getDocs(query(collection(db, "profiles"), limit(500)));
-        const data = snap.docs.map(d => ({ id: d.id, ...d.data() }));
-        if (data.length) return data;
-      } catch (e) { console.warn("Firestore profiles fetch fallback", e); }
+        const snap = await getDocs(collection(db, "profiles"));
+        return snap.docs.map(d => ({ id: d.id, ...d.data() }));
+      } catch (e) { console.warn("Firestore profiles fetch error", e); }
     }
     try { return JSON.parse(localStorage.getItem("startify_user_profiles") || "[]"); } catch { return []; }
   },
@@ -251,10 +235,9 @@ export const dbService = {
   async getRequests() {
     if (isFirebaseConfigured && db) {
       try {
-        const snap = await getDocs(query(collection(db, "requests"), orderBy("created_at", "desc"), limit(200)));
-        const data = snap.docs.map(d => ({ id: d.id, ...d.data() }));
-        if (data.length) return data;
-      } catch (e) { console.warn("Firestore requests fetch fallback", e); }
+        const snap = await getDocs(collection(db, "requests"));
+        return snap.docs.map(d => ({ id: d.id, ...d.data() }));
+      } catch (e) { console.warn("Firestore requests fetch error", e); }
     }
     try { return JSON.parse(localStorage.getItem("startify_requests") || "[]"); } catch { return []; }
   },
@@ -273,10 +256,9 @@ export const dbService = {
   subscribeRequests(callback) {
     if (!isFirebaseConfigured || !db) return () => {};
     try {
-      const q = query(collection(db, "requests"), orderBy("created_at", "desc"), limit(200));
-      return onSnapshot(q, (snap) => {
+      return onSnapshot(collection(db, "requests"), (snap) => {
         callback(snap.docs.map(d => ({ id: d.id, ...d.data() })));
-      });
+      }, (err) => console.warn("Requests snapshot error:", err));
     } catch { return () => {}; }
   },
 
@@ -284,10 +266,9 @@ export const dbService = {
   async getMessages() {
     if (isFirebaseConfigured && db) {
       try {
-        const snap = await getDocs(query(collection(db, "messages"), orderBy("created_at", "desc"), limit(300)));
-        const data = snap.docs.map(d => ({ id: d.id, ...d.data() }));
-        if (data.length) return data;
-      } catch (e) { console.warn("Firestore messages fetch fallback", e); }
+        const snap = await getDocs(collection(db, "messages"));
+        return snap.docs.map(d => ({ id: d.id, ...d.data() }));
+      } catch (e) { console.warn("Firestore messages fetch error", e); }
     }
     try { return JSON.parse(localStorage.getItem("startify_messages") || "[]"); } catch { return []; }
   },
@@ -304,10 +285,9 @@ export const dbService = {
   subscribeMessages(callback) {
     if (!isFirebaseConfigured || !db) return () => {};
     try {
-      const q = query(collection(db, "messages"), orderBy("created_at", "desc"), limit(300));
-      return onSnapshot(q, (snap) => {
+      return onSnapshot(collection(db, "messages"), (snap) => {
         callback(snap.docs.map(d => ({ id: d.id, ...d.data() })));
-      });
+      }, (err) => console.warn("Messages snapshot error:", err));
     } catch { return () => {}; }
   },
 

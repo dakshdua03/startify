@@ -426,24 +426,24 @@ export default function App() {
     dbService.getFunders().then((cf) => { if (cf && cf.length) setFunders((prev) => {
       const map = new Map(); [...prev, ...cf].forEach(x=> map.set(x.id, x)); return Array.from(map.values());
     }); });
-    dbService.getEventsStore().then((ce) => { if (ce && ce.length) setEvents((prev) => {
-      const map = new Map(); [...ce.filter(x=>!x.deleted), ...prev].forEach(x=> map.set(x.id, x)); return Array.from(map.values());
+    dbService.getEventsStore().then((ce) => { if (ce && Array.isArray(ce)) setEvents((prev) => {
+      const map = new Map(); [...prev, ...ce.filter(x=>!x.deleted)].forEach(x=> map.set(x.id, x)); return Array.from(map.values());
     }); });
-    dbService.getRequests().then((cr) => { if (cr && cr.length) setRequests((prev) => {
-      const map = new Map(); [...cr, ...prev].forEach(x=> map.set(x.id, x)); return Array.from(map.values());
+    dbService.getRequests().then((cr) => { if (cr && Array.isArray(cr)) setRequests((prev) => {
+      const map = new Map(); [...prev, ...cr].forEach(x=> map.set(x.id, x)); return Array.from(map.values());
     }); });
-    dbService.getMessages().then((cm) => { if (cm && cm.length) setMessages((prev) => {
-      const map = new Map(); [...cm, ...prev].forEach(x=> map.set(x.id, x)); return Array.from(map.values());
+    dbService.getMessages().then((cm) => { if (cm && Array.isArray(cm)) setMessages((prev) => {
+      const map = new Map(); [...prev, ...cm].forEach(x=> map.set(x.id, x)); return Array.from(map.values());
     }); });
     // Realtime: Firestore onSnapshot for chats so two devices sync without reload
     const unsubReq = dbService.subscribeRequests ? dbService.subscribeRequests((cloudReqs) => {
-      if (cloudReqs && cloudReqs.length) setRequests((prev) => {
-        const map = new Map(); [...cloudReqs, ...prev].forEach(x=> map.set(x.id, x)); return Array.from(map.values());
+      if (cloudReqs && Array.isArray(cloudReqs)) setRequests((prev) => {
+        const map = new Map(); [...prev, ...cloudReqs].forEach(x=> map.set(x.id, x)); return Array.from(map.values());
       });
     }) : () => {};
     const unsubMsg = dbService.subscribeMessages ? dbService.subscribeMessages((cloudMsgs) => {
-      if (cloudMsgs && cloudMsgs.length) setMessages((prev) => {
-        const map = new Map(); [...cloudMsgs, ...prev].forEach(x=> map.set(x.id, x)); return Array.from(map.values());
+      if (cloudMsgs && Array.isArray(cloudMsgs)) setMessages((prev) => {
+        const map = new Map(); [...prev, ...cloudMsgs].forEach(x=> map.set(x.id, x)); return Array.from(map.values());
       });
     }) : () => {};
     // Live update when admin approves in another tab + chats arrive cross-tab
