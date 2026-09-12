@@ -895,9 +895,11 @@ export default function App() {
     const newReq = {
       id: `req_${Date.now()}`,
       senderId: currentUser.id,
+      senderEmail: currentUser.email.toLowerCase(),
       senderName: currentUser.name,
       senderRole: currentUser.role,
       receiverId: recipientId,
+      receiverEmail: (targetConnectItem.email || "").toLowerCase(),
       receiverName: recipientName,
       targetTitle: targetConnectItem.title || targetConnectItem.name,
       message: connectForm.message,
@@ -1051,9 +1053,9 @@ export default function App() {
   // Events visible to all logged-in roles
   const showEventsTab = !!currentUser;
 
-  // User Dashboard Filtered Data
-  const myIncomingRequests = requests.filter((r) => r.receiverId === currentUser?.id || sameEmailIds.has(r.receiverId));
-  const myOutgoingRequests = requests.filter((r) => r.senderId === currentUser?.id || sameEmailIds.has(r.senderId));
+  // User Dashboard Filtered Data (match by id + email so cross-device + admin-created ids still route)
+  const myIncomingRequests = requests.filter((r) => r.receiverId === currentUser?.id || sameEmailIds.has(r.receiverId) || (currentEmail && (r.receiverEmail||"").toLowerCase() === currentEmail));
+  const myOutgoingRequests = requests.filter((r) => r.senderId === currentUser?.id || sameEmailIds.has(r.senderId) || (currentEmail && (r.senderEmail||"").toLowerCase() === currentEmail));
   const myAcceptedConnections = requests.filter(
     (r) => (sameEmailIds.has(r.senderId) || sameEmailIds.has(r.receiverId) || r.senderId === currentUser?.id || r.receiverId === currentUser?.id) && r.status === "accepted"
   );
@@ -1328,29 +1330,6 @@ export default function App() {
             </div>
           </section>
         </main>
-      )}
-
-      {/* HERO BANNER — only for Ideas board, not for Talent/Backers (those details live in Profile) */}
-      {activeTab === "ideas" && (
-        <section className="mx-auto max-w-[1200px] px-5 md:px-8 pt-8 pb-6">
-          <div className="max-w-[760px] rounded-[24px] bg-white border border-slate-200 p-6 shadow-sm">
-            <div className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-slate-50 border border-slate-200 text-xs text-slate-700 font-semibold shadow-sm">
-              <span className="h-2 w-2 rounded-full bg-emerald-500 animate-pulse" />
-              University of Hyderabad • Students Only Community
-            </div>
-            <h1 className="font-heading text-[30px] sm:text-[38px] md:text-[44px] font-extrabold leading-[1.08] tracking-tight mt-4 text-slate-900">
-              Campus Ideas Board
-            </h1>
-            <p className="text-[14.5px] md:text-[15px] leading-[1.65] text-slate-600 mt-3 max-w-[620px]">
-              Browse UoH student ideas — founder, builder and backer details live in your Profile. Connect directly after acceptance.
-            </p>
-            <div className="mt-5 flex flex-wrap gap-3">
-              {currentUser?.role === "founder" && <button onClick={() => setIdeaModalOpen(true)} className="h-10 px-5 rounded-full bg-slate-900 text-white font-bold text-[13px] hover:bg-slate-800 shadow transition">Post Your Idea</button>}
-              {currentUser && <button onClick={() => setActiveTab("home")} className="h-10 px-5 rounded-full bg-white border border-slate-200 text-slate-700 font-bold text-[13px] hover:bg-slate-50 shadow-sm transition">Open Chats</button>}
-              {!currentUser && <button onClick={() => { setAuthMode("register"); setAuthModalOpen(true); }} className="h-10 px-5 rounded-full bg-slate-900 text-white font-bold text-[13px] hover:bg-slate-800 shadow transition">Get Started</button>}
-            </div>
-          </div>
-        </section>
       )}
 
       {/* ==========================================================================
@@ -2319,8 +2298,23 @@ export default function App() {
                 )}
                 {currentUser.role === "founder" && (
                   <div className="mt-4 p-4 rounded-xl bg-slate-50 border border-slate-200">
-                    <div className="text-xs font-bold uppercase tracking-widest text-slate-500">Founder</div>
-                    <p className="text-sm text-slate-600 mt-1">Your ideas appear in Ideas Board after approval.</p>
+                    <div className="flex items-center justify-between">
+                      <div className="text-xs font-bold uppercase tracking-widest text-slate-500">My Posted Ideas ({myIdeas.length})</div>
+                      <button onClick={() => setIdeaModalOpen(true)} className="h-7 px-3 rounded-full bg-slate-900 text-white text-[11px] font-bold">+ Post Idea</button>
+                    </div>
+                    <div className="mt-3 space-y-2">
+                      {myIdeas.length === 0 && <p className="text-xs text-slate-400 italic">No ideas yet — post your first above.</p>}
+                      {myIdeas.map((idea) => (
+                        <div key={idea.id} className="p-3 rounded-xl bg-white border border-slate-200 flex items-center justify-between gap-2">
+                          <div className="min-w-0">
+                            <div className="font-bold text-slate-800 text-[13px] truncate">{idea.title}</div>
+                            <div className="text-[11px] text-slate-500">{idea.category} • Seeking: {idea.seeking}</div>
+                          </div>
+                          <span className="px-2 py-1 rounded-full bg-slate-100 border border-slate-200 text-[10px] text-slate-600 font-medium whitespace-nowrap">{idea.status}</span>
+                        </div>
+                      ))}
+                    </div>
+                    <p className="text-[11px] text-slate-400 mt-2">Ideas appear in Ideas Board after approval.</p>
                   </div>
                 )}
               </div>
