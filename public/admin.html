@@ -48,9 +48,24 @@ async function fsDel(col, id){
 async function syncFromFirestore(){
   if (!FSDB) return;
   try {
-    const [ideas, profiles, requests, messages, builders, funders, events] = await Promise.all([
-      fsGet("ideas"), fsGet("profiles", 500), fsGet("requests"), fsGet("messages"), fsGet("builders"), fsGet("funders"), fsGet("events", 100)
+    const [ideas, profiles, requests, messages, builders, funders, events, admins] = await Promise.all([
+      fsGet("ideas"), fsGet("profiles", 500), fsGet("requests"), fsGet("messages"), fsGet("builders"), fsGet("funders"), fsGet("events", 100), fsGet("admins", 50)
     ]);
+    // Master admin stays in sync with Firestore: merge remote admin docs into local cache (remote wins by email)
+    if (admins.length) {
+      try{
+        const local = getAdmins();
+        const map = new Map();
+        local.forEach(a=> { if(a && a.email) map.set(a.email.toLowerCase(), a); });
+        admins.forEach(r=> {
+          if(!r) return;
+          const em = (r.email || r.id || "").toLowerCase();
+          if(!em || !em.includes("@")) return;
+          map.set(em, { email: em, passHash: r.passHash, role: r.role || "master", name: r.name || "Master Admin", createdAt: r.createdAt || new Date().toISOString(), fromFirestore: true });
+        });
+        localStorage.setItem(ADMINS_KEY, JSON.stringify(Array.from(map.values())));
+      }catch(e){ console.warn("Admin sync merge failed", e); }
+    }
     if (ideas.length) {
       const cur = load(LS_KEYS.ideas, []);
       const map = new Map(); [...cur, ...ideas].forEach(x=> { if(x && x.id && !x.deleted) map.set(x.id, x); });
@@ -188,67 +203,47 @@ function requireMaster(){
 }
 function deleteUserByEmail(email, id, role){
   if(!requireMaster()){ alert("Only master admin can delete. Sub-admins have view-only access."); return; }
-  const roleLabel = role || "account";
-  if(email.toLowerCase()==="admin@startify.net"){
+  const em = email.toLowerCase();
+  if(em===ADMIN_EMAIL.toLowerCase()){
     if(!confirm(`⚠️ Delete ADMIN ${email} ? This will lock admin login!`)) return;
     if(!confirm(`Confirm again — delete admin? You can restore via 'Restore Admin' button on login.`)) return;
   } else {
-    if(!confirm(`Delete ${roleLabel} ${email} ? Only this role will be removed (other roles with same email kept).`)) return;
+    if(!confirm(`Delete user ${email} ? Removes ALL roles/records for this email.`)) return;
   }
-  // Demo tombstone: only if this is the last role for that email
-  const isDemo = DEMO_USERS.some(d=> d.email.toLowerCase()===email.toLowerCase() && d.role===role);
-  // Check if other roles with same email remain after deletion
-  const allUsers = getAllData().uniqUsers;
-  const otherRolesSameEmail = allUsers.some(u=> u.email.toLowerCase()===email.toLowerCase() && u.role!==role && u.id!==id);
-  if(isDemo && !otherRolesSameEmail){
+  // Demo tombstone by email (one row per email now)
+  const isDemo = DEMO_USERS.some(d=> d.email.toLowerCase()===em);
+  if(isDemo){
     const deleted = load("startify_deleted_demos", []);
-    if(!deleted.includes(email.toLowerCase())){ deleted.push(email.toLowerCase()); save("startify_deleted_demos", deleted); }
-  } else if(isDemo && otherRolesSameEmail){
-    // Don't tombstone demo if other role still exists — just remove this role entry
+    if(!deleted.includes(em)){ deleted.push(em); save("startify_deleted_demos", deleted); }
   }
+  // Remove every local record for this email across all roles/stores
   let regs=load(LS_KEYS.regs, []);
-  // regs role mapping: talent<->builder, backer<->funder
-  const regRoleMap = {founder:"founder", talent:"builder", backer:"funder", admin:"admin"};
-  const targetRegRole = regRoleMap[role] || role;
-  regs=regs.filter(r=> !(r.email.toLowerCase()===email.toLowerCase() && (r.role===targetRegRole || r.role===role)));
-  // If no role provided, fallback to email only (legacy)
-  if(!role) regs=regs.filter(r=> r.email.toLowerCase()!==email.toLowerCase());
+  regs=regs.filter(r=> (r.email||"").toLowerCase()!==em);
   save(LS_KEYS.regs, regs);
   let builders=load(LS_KEYS.builders, []);
-  builders=builders.filter(b=> !(b.id===id || ((b.email||"").toLowerCase()===email.toLowerCase() && role==="talent")));
+  builders=builders.filter(b=> !(b.id===id || ((b.email||"").toLowerCase()===em)));
   save(LS_KEYS.builders, builders);
   let funders=load(LS_KEYS.funders, []);
-  funders=funders.filter(f=> !(f.id===id || ((f.email||"").toLowerCase()===email.toLowerCase() && role==="backer")));
+  funders=funders.filter(f=> !(f.id===id || ((f.email||"").toLowerCase()===em)));
   save(LS_KEYS.funders, funders);
   let pending=load(LS_KEYS.pendingBackers, []);
-  pending=pending.filter(p=> !(p.id===id || (p.email.toLowerCase()===email.toLowerCase() && role==="backer")));
+  pending=pending.filter(p=> !(p.id===id || (p.email||"").toLowerCase()===em));
   save(LS_KEYS.pendingBackers, pending);
   try{
     const profs=JSON.parse(localStorage.getItem("startify_user_profiles")||"[]");
-    // Only remove this role, keep other roles with same email
-    const filtered = profs.filter(p=> !(p.email.toLowerCase()===email.toLowerCase() && p.role===role && p.id===id) && !(p.email.toLowerCase()===email.toLowerCase() && p.role===role && !id));
-    // If role not provided, fallback
-    const finalFiltered = role ? profs.filter(p=> !(p.email.toLowerCase()===email.toLowerCase() && p.role===role)) : profs.filter(p=> p.email.toLowerCase()!==email.toLowerCase() && p.id!==id);
-    // Use role-aware filter
-    const toSave = profs.filter(p=> !(p.email.toLowerCase()===email.toLowerCase() && p.role===role));
-    localStorage.setItem("startify_user_profiles", JSON.stringify(role ? toSave : filtered));
+    localStorage.setItem("startify_user_profiles", JSON.stringify(profs.filter(p=> (p.email||"").toLowerCase()!==em)));
   }catch{}
   try{
     const creds=load(LS_KEYS.credentials, {});
-    // Only delete credential if no other role with same email remains
-    const remainingProfiles = (()=>{ try{ return JSON.parse(localStorage.getItem("startify_user_profiles")||"[]"); }catch{return [];} })();
-    const stillHasEmail = remainingProfiles.some(p=> p.email.toLowerCase()===email.toLowerCase()) || load(LS_KEYS.regs, []).some(r=> r.email.toLowerCase()===email.toLowerCase());
-    if(!stillHasEmail){
-      delete creds[email.toLowerCase()];
-      save(LS_KEYS.credentials, creds);
-    }
+    delete creds[em];
+    save(LS_KEYS.credentials, creds);
   }catch{}
   try{
     const profiles=load(LS_KEYS.profiles, []);
-    save(LS_KEYS.profiles, profiles.filter(p=> p.email.toLowerCase()!==email.toLowerCase() && p.role===role));
+    save(LS_KEYS.profiles, profiles.filter(p=> (p.email||"").toLowerCase()!==em));
   }catch{}
-  try { fsDel("profiles", email.toLowerCase()+"_"+role); } catch {}
-  alert("Deleted: "+email+" ("+roleLabel+")" + (isDemo && !otherRolesSameEmail ? " (demo hidden)" : ""));
+  try { fsDel("profiles", em+"_founder"); fsDel("profiles", em+"_talent"); fsDel("profiles", em+"_backer"); } catch {}
+  alert("Deleted: "+email+" (all roles removed)" + (isDemo ? " (demo hidden)" : ""));
   render();
 }
 function restoreAdminAccount(){
@@ -424,11 +419,47 @@ function getAllData(){
     const r = regs.find(x=> x.email.toLowerCase()===email.toLowerCase());
     return {id: p?.id || r?.id || email, name: p?.name || r?.name || email.split("@")[0], email, role: p?.role || r?.role || "founder", createdAt: p?.createdAt || r?.registeredAt || "—", source:"credential"};
   });
-  const allUsers = [...filteredDemos.map(u=>({...u, source:"demo"})), ...regs.map(r=>({id:r.email, name:r.name, email:r.email, role: r.role==="builder"?"talent":r.role==="funder"?"backer":r.role, createdAt:r.registeredAt, source:"registration"})), ...profiles.map(p=>({id:p.id, name:p.name, email:p.email, role:p.role, createdAt:p.createdAt, source:"profile"})), ...credUsers.map(c=>({...c, source:"credential"})), ...[...builders, ...filteredSeedBuilders].map(b=>({id:b.id, name:b.name, email:b.email||b.id+"@uohyd.ac.in", role:"talent", source:"builder"})), ...[...funders, ...filteredSeedFunders].map(f=>({id:f.id, name:f.name, email:f.email||f.id+"@startify.net", role:"backer", source:"funder"})), ...pendingBackers.map(p=>({id:p.id, name:p.name, email:p.email, role:"backer", createdAt:p.createdAt, pending:true, source:"pending"}))];
-  // de-dupe by email+role so same email with different roles shows separately, then group same email together
-  const seen=new Set(); const uniqUsers=[];
-  for(const u of allUsers){ const key=u.email.toLowerCase()+"|"+u.role; if(!seen.has(key)){ seen.add(key); uniqUsers.push(u); } }
-  uniqUsers.sort((a,b)=> a.email.toLowerCase().localeCompare(b.email.toLowerCase()) || a.role.localeCompare(b.role));
+  // One row per email only: skip fabricated ids (user_<ts>@…) and the master admin account,
+  // and merge every source (registration/profile/builder/funder/pending) into a single record.
+  const isRealUserEmail = (em)=> {
+    if(!em || typeof em !== "string") return false;
+    const e = em.toLowerCase().trim();
+    if(!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(e)) return false;
+    if(e === ADMIN_EMAIL.toLowerCase()) return false;
+    if(/^user_\d+@/i.test(e)) return false;
+    return true;
+  };
+  const normRole = (r)=> r==="builder" ? "talent" : r==="funder" ? "backer" : (r || "founder");
+  const rawUsers = [
+    ...profiles.map(p=>({id:p.id, name:p.name, email:p.email, role:normRole(p.role), createdAt:p.createdAt, source:"profile"})),
+    ...regs.map(r=>({id:r.email, name:r.name, email:r.email, role:normRole(r.role), createdAt:r.registeredAt, source:"registration"})),
+    ...load(LS_KEYS.builders, []).map(b=>({id:b.id, name:b.name, email:b.email, role:"talent", source:"builder"})),
+    ...funders.map(f=>({id:f.id, name:f.name, email:f.email, role:"backer", source:"funder"})),
+    ...pendingBackers.map(p=>({id:p.id, name:p.name, email:p.email, role:"backer", createdAt:p.createdAt, pending:true, source:"pending"})),
+    ...credUsers.map(c=>({...c, role:normRole(c.role), source:"credential"})),
+    ...filteredDemos.filter(d=> d.email.toLowerCase()!==ADMIN_EMAIL.toLowerCase()).map(u=>({...u, role:normRole(u.role), source:"demo"})),
+  ];
+  const byEmail = new Map();
+  for(const u of rawUsers){
+    if(!u || !isRealUserEmail(u.email)) continue;
+    const key = u.email.toLowerCase();
+    const role = normRole(u.role);
+    if(!byEmail.has(key)){
+      byEmail.set(key, {...u, email: u.email, role, roles: [role]});
+    } else {
+      const cur = byEmail.get(key);
+      if(!cur.roles.includes(role)) cur.roles.push(role);
+      // Prefer the richest record: profile > registration > builder/funder > credential > demo
+      const rank = (s)=> s==="profile"?0 : s==="registration"?1 : s==="builder"||s==="funder"?2 : s==="pending"?3 : s==="credential"?4 : 5;
+      if(rank(u.source) < rank(cur.source)){
+        byEmail.set(key, {...u, email: cur.email, role, roles: cur.roles});
+      } else if((cur.name||"").includes("@") && u.name && !u.name.includes("@")){
+        cur.name = u.name;
+      }
+    }
+  }
+  const uniqUsers = Array.from(byEmail.values()).map(u=> ({...u, role: u.roles.includes("founder") ? "founder" : u.roles[0], allRoles: u.roles.join("/")}));
+  uniqUsers.sort((a,b)=> a.email.toLowerCase().localeCompare(b.email.toLowerCase()));
   // For overview counts, also compute deduped by email only for total
   return {ideas, regs, builders, funders, requests, messages, events, pendingBackers, credentials, profiles, uniqUsers};
 }
@@ -451,7 +482,7 @@ function render(){
           <form id="loginForm" class="mt-6 space-y-4">
             <div>
               <label class="block text-xs font-semibold text-slate-600 mb-1">Admin Email</label>
-              <input id="loginEmail" required type="email" value="" class="w-full h-11 rounded-full bg-slate-50 border border-slate-200 px-4 text-sm outline-none focus:border-slate-300 text-slate-900" placeholder="admin@startify.net">
+              <input id="loginEmail" required type="email" value="" class="w-full h-11 rounded-full bg-slate-50 border border-slate-200 px-4 text-sm outline-none focus:border-slate-300 text-slate-900" placeholder="Enter admin email">
             </div>
             <div>
               <label class="block text-xs font-semibold text-slate-600 mb-1">Password</label>
@@ -460,7 +491,6 @@ function render(){
             <button type="submit" class="w-full h-11 rounded-full bg-slate-900 text-white font-bold text-sm hover:bg-slate-800 transition">Enter Admin →</button>
             <a href="/" class="block text-center text-xs text-slate-500 hover:text-slate-700 underline">← Back to Startify</a>
           </form>
-          <div class="mt-6 rounded-2xl bg-amber-50 border border-amber-200 p-3 text-[11px] leading-4 text-amber-800">Master admin: <strong>admin@startify.net</strong> — create sub-admins inside after login.</div>
         </div>
       </div>`;
     document.getElementById("loginForm").addEventListener("submit", async (e)=>{
@@ -677,7 +707,7 @@ function render(){
   } else if(currentTab==="users"){
     content.innerHTML = `
       <div class="rounded-[24px] border border-slate-200 bg-white p-6">
-        <div class="flex items-center justify-between"><h3 class="font-heading font-extrabold text-xl">All Users (${totalUsers})</h3><span class="text-xs text-slate-500">Grouped by email • ${isMaster ? '<span class="text-amber-600 font-semibold">Master can delete</span>' : '<span class="text-slate-400">View only (master can delete)</span>'}</span></div>
+        <div class="flex items-center justify-between"><h3 class="font-heading font-extrabold text-xl">All Users (${totalUsers})</h3><span class="text-xs text-slate-500">One row per email • ${isMaster ? '<span class="text-amber-600 font-semibold">Master can delete</span>' : '<span class="text-slate-400">View only (master can delete)</span>'}</span></div>
         <div class="mt-4 overflow-x-auto">
           <table class="w-full text-sm">
             <thead><tr class="text-xs text-slate-500 text-left border-b"><th class="pb-2">Name</th><th class="pb-2">Email</th><th class="pb-2">Role</th><th class="pb-2">Source</th>${isMaster ? '<th class="pb-2">Action</th>' : ''}</tr></thead>
@@ -687,15 +717,16 @@ function render(){
                 const escId = (u.id||"").toString().replace(/'/g, "\\'");
                 const escRole = (u.role||"").toString().replace(/'/g, "\\'");
                 const demoNote = DEMO_USERS.some(d=> d.email.toLowerCase()===u.email.toLowerCase()) ? ' • demo' : '';
+                const roleLabel = u.allRoles && u.allRoles!==u.role ? u.role+" ("+u.allRoles+")" : u.role;
                 const delBtn = isMaster ? `<button onclick="deleteUserByEmail('${escEmail}','${escId}','${escRole}')" class="h-7 px-3 rounded-full bg-white border border-red-200 text-red-600 text-xs font-bold hover:bg-red-50">Delete</button>` : `<span class="text-[11px] text-slate-400">—</span>`;
-                return `<tr><td class="py-3 font-semibold">${u.name||'<span class="text-slate-400 italic">no name</span>'}</td><td class="py-3 text-slate-600">${u.email}</td><td class="py-3"><span class="px-2 py-1 rounded-full text-xs font-bold border ${u.role==="founder"?"bg-indigo-50 border-indigo-200 text-indigo-700": u.role==="talent"?"bg-sky-50 border-sky-200 text-sky-700": u.role==="backer"?"bg-violet-50 border-violet-200 text-violet-700":"bg-slate-100 border-slate-200"}">${u.role}</span></td><td class="py-3 text-xs text-slate-500">${(u.source||u.registeredAt||u.createdAt||"demo")+demoNote}</td>${isMaster ? `<td class="py-3">${delBtn}</td>` : ''}`;
+                return `<tr><td class="py-3 font-semibold">${u.name||'<span class="text-slate-400 italic">no name</span>'}</td><td class="py-3 text-slate-600">${u.email}</td><td class="py-3"><span class="px-2 py-1 rounded-full text-xs font-bold border ${u.role==="founder"?"bg-indigo-50 border-indigo-200 text-indigo-700": u.role==="talent"?"bg-sky-50 border-sky-200 text-sky-700": u.role==="backer"?"bg-violet-50 border-violet-200 text-violet-700":"bg-slate-100 border-slate-200"}">${roleLabel}</span></td><td class="py-3 text-xs text-slate-500">${(u.source||u.registeredAt||u.createdAt||"demo")+demoNote}</td>${isMaster ? `<td class="py-3">${delBtn}</td>` : ''}`;
               }).join("")}
             </tbody>
           </table>
         </div>
-        <p class="mt-3 text-[11px] text-slate-500">Delete removes only the selected role (other roles with same email are kept). Use Delete per row.</p>
+        <p class="mt-3 text-[11px] text-slate-500">One row per email — Delete removes all roles/records for that email.</p>
         <div class="mt-3 flex gap-2">
-          <button onclick="restoreAdminAccount()" class="h-8 px-4 rounded-full bg-slate-900 text-white text-xs font-bold">Restore Admin (admin@startify.net)</button>
+          <button onclick="restoreAdminAccount()" class="h-8 px-4 rounded-full bg-slate-900 text-white text-xs font-bold">Restore Admin account</button>
           <span class="text-xs text-slate-500 py-2">If you deleted admin by mistake</span>
         </div>
       </div>
@@ -816,7 +847,7 @@ function render(){
       const target=pending.find(p=>p.id===id);
       if(target){
         const funders=load(LS_KEYS.funders, []);
-        const nf={id:target.id, name:target.name, role:target.roleTitle||"Angel Backer", focus:target.focus||"Tech & AI", bio:target.bio||"Approved backer.", ticketSize:"Pre-Seed & Seed"};
+        const nf={id:target.id, name:target.name, email:target.email, role:target.roleTitle||"Angel Backer", focus:target.focus||"Tech & AI", bio:target.bio||"Approved backer.", ticketSize:"Pre-Seed & Seed"};
         save(LS_KEYS.funders, [nf, ...funders]);
         try { fsSet("funders", nf.id, nf); } catch {}
         save(LS_KEYS.pendingBackers, pending.filter(p=>p.id!==id));
