@@ -108,6 +108,17 @@ const defaultServicesList = [
   { id: "fundraise", title: "Fundraising Prep", price: "₹1,999", amount: 1999, sub: "Deck & Investor Intros", time: "10 days", desc: "Pitch deck refinement, financial modeling, and intros to angel mentors in our network.", outcome: "Investor Ready Deck" },
 ];
 
+const sanitizeForFirestore = (obj) => {
+  if (!obj || typeof obj !== 'object') return obj;
+  const clean = {};
+  for (const [key, val] of Object.entries(obj)) {
+    if (val !== undefined) {
+      clean[key] = val;
+    }
+  }
+  return clean;
+};
+
 export const dbService = {
   async getSiteContent() {
     const local = localStorage.getItem("startify_site_content");
@@ -149,12 +160,12 @@ export const dbService = {
     localStorage.setItem("startify_submitted_ideas", JSON.stringify([idea, ...existing]));
     if (isFirebaseConfigured && db) {
       try {
-        await setDoc(doc(db, "ideas", idea.id), {
+        await setDoc(doc(db, "ideas", idea.id), sanitizeForFirestore({
           id: idea.id,
           title: idea.title, category: idea.category, founder: idea.founder, email: idea.email || "", founderId: idea.founderId || "",
           desc: idea.desc, seeking: idea.seeking, status: idea.status || "Pending Review",
           created_at: serverTimestamp(), createdDate: idea.createdDate || new Date().toISOString(),
-        }, { merge: true });
+        }), { merge: true });
       } catch (err) { console.warn("Firestore idea save error", err); }
     }
     try { await fetch("/api/ideas", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(idea) }); } catch {}
@@ -174,7 +185,7 @@ export const dbService = {
     const existing = JSON.parse(localStorage.getItem("startify_registrations") || "[]");
     localStorage.setItem("startify_registrations", JSON.stringify([reg, ...existing]));
     try { await fetch("/api/bookings", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(reg) }); } catch (e) { console.warn("Cloudflare API ping", e); }
-    if (isFirebaseConfigured && db) { try { await addDoc(collection(db, "registrations"), { ...reg, created_at: serverTimestamp() }); } catch (err) { console.warn("Firestore registration save error", err); } }
+    if (isFirebaseConfigured && db) { try { await addDoc(collection(db, "registrations"), sanitizeForFirestore({ ...reg, created_at: serverTimestamp() })); } catch (err) { console.warn("Firestore registration save error", err); } }
     return true;
   },
   async getPayments() {
@@ -190,7 +201,7 @@ export const dbService = {
   async savePayment(payment) {
     const existing = JSON.parse(localStorage.getItem("startify_payments") || "[]");
     localStorage.setItem("startify_payments", JSON.stringify([payment, ...existing]));
-    if (isFirebaseConfigured && db) { try { await addDoc(collection(db, "payments"), { ...payment, created_at: serverTimestamp() }); } catch (err) { console.warn("Firestore payment save error", err); } }
+    if (isFirebaseConfigured && db) { try { await addDoc(collection(db, "payments"), sanitizeForFirestore({ ...payment, created_at: serverTimestamp() })); } catch (err) { console.warn("Firestore payment save error", err); } }
     return true;
   },
 
@@ -205,6 +216,7 @@ export const dbService = {
     try { return JSON.parse(localStorage.getItem("startify_user_profiles") || "[]"); } catch { return []; }
   },
   async saveProfile(profile) {
+    if (!profile || !profile.email || !profile.role) return false;
     try {
       const arr = JSON.parse(localStorage.getItem("startify_user_profiles") || "[]");
       const idx = arr.findIndex(p => p.email.toLowerCase() === profile.email.toLowerCase() && p.role === profile.role);
@@ -215,7 +227,11 @@ export const dbService = {
     if (isFirebaseConfigured && db) {
       try {
         const docId = `${profile.email.toLowerCase()}_${profile.role}`;
-        await setDoc(doc(db, "profiles", docId), { ...profile, updated_at: serverTimestamp() }, { merge: true });
+        const cleanData = sanitizeForFirestore({
+          ...profile,
+          updated_at: serverTimestamp()
+        });
+        await setDoc(doc(db, "profiles", docId), cleanData, { merge: true });
       } catch (e) { console.warn("Firestore profile save error", e); }
     }
     return true;
@@ -229,6 +245,14 @@ export const dbService = {
       try { await deleteDoc(doc(db, "profiles", `${email.toLowerCase()}_${role}`)); } catch (e) { console.warn("Firestore profile delete error", e); }
     }
     return true;
+  },
+  subscribeProfiles(callback) {
+    if (!isFirebaseConfigured || !db) return () => {};
+    try {
+      return onSnapshot(collection(db, "profiles"), (snap) => {
+        callback(snap.docs.map(d => ({ id: d.id, ...d.data() })));
+      }, (err) => console.warn("Profiles snapshot error:", err));
+    } catch { return () => {}; }
   },
 
   // ---- Connection requests (chats) ----
@@ -309,7 +333,7 @@ export const dbService = {
       localStorage.setItem("startify_admin_builders", JSON.stringify(arr));
     } catch {}
     if (isFirebaseConfigured && db) {
-      try { await setDoc(doc(db, "builders", b.id), { ...b, updated_at: serverTimestamp() }, { merge: true }); } catch (e) { console.warn("Firestore builder save error", e); }
+      try { await setDoc(doc(db, "builders", b.id), sanitizeForFirestore({ ...b, updated_at: serverTimestamp() }), { merge: true }); } catch (e) { console.warn("Firestore builder save error", e); }
     }
     return true;
   },
@@ -340,7 +364,7 @@ export const dbService = {
       localStorage.setItem("startify_admin_funders", JSON.stringify(arr));
     } catch {}
     if (isFirebaseConfigured && db) {
-      try { await setDoc(doc(db, "funders", f.id), { ...f, updated_at: serverTimestamp() }, { merge: true }); } catch (e) { console.warn("Firestore funder save error", e); }
+      try { await setDoc(doc(db, "funders", f.id), sanitizeForFirestore({ ...f, updated_at: serverTimestamp() }), { merge: true }); } catch (e) { console.warn("Firestore funder save error", e); }
     }
     return true;
   },

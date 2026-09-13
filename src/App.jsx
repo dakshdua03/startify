@@ -2282,11 +2282,14 @@ export default function App() {
                         reader.onload=()=>{
                           try{
                             localStorage.setItem(getProfileImageKey(currentUser.email), reader.result);
+                            let updatedProfile = null;
                             try{
                               const arr=JSON.parse(localStorage.getItem("startify_user_profiles")||"[]");
-                              const idx=arr.findIndex(p=> p.email.toLowerCase()===currentUser.email.toLowerCase() && p.role===currentUser.role);
-                              if(idx>=0){ arr[idx].profileImage=reader.result; localStorage.setItem("startify_user_profiles", JSON.stringify(arr)); }
+                              const idx=arr.findIndex(p=>p.email.toLowerCase()===currentUser.email.toLowerCase() && p.role===currentUser.role);
+                              if(idx>=0){ arr[idx].profileImage=reader.result; localStorage.setItem("startify_user_profiles", JSON.stringify(arr)); updatedProfile=arr[idx]; }
+                              else { updatedProfile = { id: currentUser.id||currentUser.email, name: currentUser.name, email: currentUser.email.toLowerCase(), role: currentUser.role, bio: currentUser.bio||"", profileImage: reader.result, createdAt: new Date().toISOString() }; }
                             }catch{}
+                            if(updatedProfile) dbService.saveProfile(updatedProfile);
                             showToast("✓ Photo updated");
                             setProfileSwitcherOpen(v=>v);
                           }catch{ showToast("Failed to save"); }
@@ -2364,7 +2367,10 @@ export default function App() {
                     try{
                       const arr=JSON.parse(localStorage.getItem("startify_user_profiles")||"[]");
                       const idx=arr.findIndex(p=> p.email.toLowerCase()===currentUser.email.toLowerCase() && p.role===currentUser.role);
-                      if(idx>=0){ arr[idx].name=t; localStorage.setItem("startify_user_profiles", JSON.stringify(arr)); }
+                      let profileToSave = null;
+                      if(idx>=0){ arr[idx].name=t; localStorage.setItem("startify_user_profiles", JSON.stringify(arr)); profileToSave=arr[idx]; }
+                      else { profileToSave={ id: currentUser.id||currentUser.email, name: t, email: currentUser.email.toLowerCase(), role: currentUser.role, bio: currentUser.bio||"", createdAt: new Date().toISOString() }; }
+                      if(profileToSave) dbService.saveProfile({ ...profileToSave, name: t });
                       try{
                         const regs=JSON.parse(localStorage.getItem("startify_registrations")||"[]");
                         const rIdx=regs.findIndex(r=> r.email.toLowerCase()===currentUser.email.toLowerCase());
@@ -2389,7 +2395,10 @@ export default function App() {
                       localStorage.setItem(getProfileAboutKey(currentUser.email), profileAboutDraft);
                       const arr=JSON.parse(localStorage.getItem("startify_user_profiles")||"[]");
                       const idx=arr.findIndex(p=> p.email.toLowerCase()===currentUser.email.toLowerCase() && p.role===currentUser.role);
-                      if(idx>=0){ arr[idx].bio=profileAboutDraft; localStorage.setItem("startify_user_profiles", JSON.stringify(arr)); }
+                      let profileToSave = null;
+                      if(idx>=0){ arr[idx].bio=profileAboutDraft; localStorage.setItem("startify_user_profiles", JSON.stringify(arr)); profileToSave=arr[idx]; }
+                      else { profileToSave={ id: currentUser.id||currentUser.email, name: currentUser.name, email: currentUser.email.toLowerCase(), role: currentUser.role, bio: profileAboutDraft, createdAt: new Date().toISOString() }; }
+                      if(profileToSave) dbService.saveProfile({ ...profileToSave, bio: profileAboutDraft });
                       setCurrentUser({...currentUser, bio: profileAboutDraft});
                       setProfileEditOpen(false);
                       showToast("✓ About updated");
@@ -2413,12 +2422,15 @@ export default function App() {
                           setBuilders(prev=> prev.map(b=> (b.id===currentUser.id || (b.email && b.email.toLowerCase()===emailLower)) ? {...b, role: profileRoleTitleDraft.trim()||b.role, skills: profileSkillsDraft.trim()||b.skills } : b));
                           try{
                             const buildersLS=JSON.parse(localStorage.getItem("startify_admin_builders")||"[]");
-                            const idx=buildersLS.findIndex(b=> b.id===currentUser.id || (b.email && b.email.toLowerCase()===emailLower));
-                            if(idx>=0){ buildersLS[idx].role=profileRoleTitleDraft.trim()||buildersLS[idx].role; buildersLS[idx].skills=profileSkillsDraft.trim()||buildersLS[idx].skills; localStorage.setItem("startify_admin_builders", JSON.stringify(buildersLS)); }
+                            const bIdx=buildersLS.findIndex(b=> b.id===currentUser.id || (b.email && b.email.toLowerCase()===emailLower));
+                            if(bIdx>=0){ buildersLS[bIdx].role=profileRoleTitleDraft.trim()||buildersLS[bIdx].role; buildersLS[bIdx].skills=profileSkillsDraft.trim()||buildersLS[bIdx].skills; localStorage.setItem("startify_admin_builders", JSON.stringify(buildersLS)); dbService.saveBuilder(buildersLS[bIdx]); }
                           }catch{}
                           const arr=JSON.parse(localStorage.getItem("startify_user_profiles")||"[]");
                           const pIdx=arr.findIndex(p=> p.email.toLowerCase()===emailLower && p.role===currentUser.role);
-                          if(pIdx>=0){ arr[pIdx].roleTitle=profileRoleTitleDraft.trim(); arr[pIdx].skills=profileSkillsDraft.trim(); localStorage.setItem("startify_user_profiles", JSON.stringify(arr)); }
+                          let profileToSave = null;
+                          if(pIdx>=0){ arr[pIdx].roleTitle=profileRoleTitleDraft.trim(); arr[pIdx].skills=profileSkillsDraft.trim(); localStorage.setItem("startify_user_profiles", JSON.stringify(arr)); profileToSave=arr[pIdx]; }
+                          else { profileToSave={ id: currentUser.id||currentUser.email, name: currentUser.name, email: emailLower, role: currentUser.role, roleTitle: profileRoleTitleDraft.trim(), skills: profileSkillsDraft.trim(), bio: currentUser.bio||"", createdAt: new Date().toISOString() }; }
+                          if(profileToSave) dbService.saveProfile({ ...profileToSave, roleTitle: profileRoleTitleDraft.trim(), skills: profileSkillsDraft.trim() });
                           setCurrentUser({...currentUser, roleTitle: profileRoleTitleDraft.trim(), skills: profileSkillsDraft.trim()});
                           setProfileSkillsEditOpen(false);
                           showToast("✓ Skills updated");
@@ -2436,7 +2448,10 @@ export default function App() {
                         try{
                           const arr=JSON.parse(localStorage.getItem("startify_user_profiles")||"[]");
                           const idx=arr.findIndex(p=> p.email.toLowerCase()===currentUser.email.toLowerCase() && p.role===currentUser.role);
-                          if(idx>=0){ arr[idx].focus=profileFocusDraft.trim(); localStorage.setItem("startify_user_profiles", JSON.stringify(arr)); }
+                          let profileToSave = null;
+                          if(idx>=0){ arr[idx].focus=profileFocusDraft.trim(); localStorage.setItem("startify_user_profiles", JSON.stringify(arr)); profileToSave=arr[idx]; }
+                          else { profileToSave={ id: currentUser.id||currentUser.email, name: currentUser.name, email: currentUser.email.toLowerCase(), role: currentUser.role, focus: profileFocusDraft.trim(), bio: currentUser.bio||"", createdAt: new Date().toISOString() }; }
+                          if(profileToSave) dbService.saveProfile({ ...profileToSave, focus: profileFocusDraft.trim() });
                           setCurrentUser({...currentUser, focus: profileFocusDraft.trim()});
                           setProfileSkillsEditOpen(false);
                           showToast("✓ Focus updated");
