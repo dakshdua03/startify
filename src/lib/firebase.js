@@ -2,6 +2,7 @@
 import { initializeApp, getApps } from 'firebase/app';
 import { getFirestore, collection, addDoc, getDocs, query, orderBy, limit, serverTimestamp, doc, setDoc, deleteDoc, onSnapshot } from 'firebase/firestore';
 import { getAuth, createUserWithEmailAndPassword, signInWithEmailAndPassword, sendEmailVerification, sendPasswordResetEmail, signOut, onAuthStateChanged } from 'firebase/auth';
+import { getStorage, ref, uploadString, uploadBytes, getDownloadURL } from 'firebase/storage';
 
 const firebaseConfig = {
   apiKey: import.meta.env.VITE_FIREBASE_API_KEY || "AIzaSyDa2GrOS9xmrZGI-0W8BLE_vLu9XJr3i0A",
@@ -17,11 +18,13 @@ export const isFirebaseConfigured = !!firebaseConfig.apiKey && !!firebaseConfig.
 let app = null;
 let db = null;
 let auth = null;
+let storage = null;
 
 if (isFirebaseConfigured) {
   app = getApps().length ? getApps()[0] : initializeApp(firebaseConfig);
   try { db = getFirestore(app); } catch (e) { console.warn("Firestore init failed", e); }
   try { auth = getAuth(app); } catch (e) { console.warn("Auth init failed", e); }
+  try { storage = getStorage(app); } catch (e) { console.warn("Storage init failed", e); }
 }
 // Debug: log config status once
 if (typeof window !== "undefined") {
@@ -29,8 +32,24 @@ if (typeof window !== "undefined") {
   if (!isFirebaseConfigured) console.warn("Firebase NOT configured — set VITE_FIREBASE_* in .env and Cloudflare Pages vars");
 }
 
-export { app, db, auth };
+export { app, db, auth, storage };
 export const isSupabaseConfigured = isFirebaseConfigured; // alias for App.jsx
+
+// Upload an image (File/Blob or data_url string) to Firebase Storage, return download URL.
+// Falls back to the original data_url when Storage is unavailable so UI never breaks.
+export async function uploadImage(storagePath, fileOrDataUrl) {
+  if (!isFirebaseConfigured || !storage) {
+    if (typeof fileOrDataUrl === "string") return fileOrDataUrl;
+    throw new Error("Storage not configured");
+  }
+  const storageRef = ref(storage, storagePath);
+  if (typeof fileOrDataUrl === "string" && fileOrDataUrl.startsWith("data:")) {
+    await uploadString(storageRef, fileOrDataUrl, "data_url");
+  } else {
+    await uploadBytes(storageRef, fileOrDataUrl);
+  }
+  return await getDownloadURL(storageRef);
+}
 
 export const authService = {
   async signUp(email, password) {
@@ -410,5 +429,37 @@ export const dbService = {
       try { await deleteDoc(doc(db, "events", id)); } catch (e) { console.warn("Firestore event delete error", e); }
     }
     return true;
+  },
+
+  // ---- Event RSVPs (doc id = eventId + email so one RSVP per user per event) ----
+  async getRsvps() {
+    if (isFirebaseConfigured && db) {
+      try {
+        const snap = await getDocs(collection(db, "rsvps"));
+        const data = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+        if (data.length) return data;
+      } catch (e) { console.warn("Firestore rsvps fetch error", e); }
+    }
+    try { return JSON.parse(localStorage.getItem("startify_rsvps") || "[]"); } catch { return []; }
+  },
+  async saveRsvp(rsvp) {
+    try {
+      const arr = JSON.parse(localStorage.getItem("startify_rsvps") || "[]");
+      const idx = arr.findIndex(x => x.id === rsvp.id);
+      if (idx >= 0) arr[idx] = rsvp; else arr.unshift(rsvp);
+      localStorage.setItem("startify_rsvps", JSON.stringify(arr));
+    } catch {}
+    if (isFirebaseConfigured && db) {
+      try { await setDoc(doc(db, "rsvps", rsvp.id), { ...rsvp, created_at: serverTimestamp() }, { merge: true }); } catch (e) { console.warn("Firestore rsvp save error", e); }
+    }
+    return true;
+  },
+  subscribeRsvps(callback) {
+    if (!isFirebaseConfigured || !db) return () => {};
+    try {
+      return onSnapshot(collection(db, "rsvps"), (snap) => {
+        callback(snap.docs.map(d => ({ id: d.id, ...d.data() })));
+      });
+    } catch { return () => {}; }
   }
 };

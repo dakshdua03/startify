@@ -48,9 +48,21 @@ service cloud.firestore {
     match /builders/{doc} { allow read, write: if true; }
     match /funders/{doc} { allow read, write: if true; }
     match /events/{doc} { allow read, write: if true; }
+    match /rsvps/{doc} { allow read, write: if true; }
   }
 }
 ```
+Photos/thumbnails now upload to Firebase Storage (URLs stored in docs, not base64). Enable it once:
+`Build → Storage → Get started → Test mode`, then Rules:
+```js
+service firebase.storage {
+  match /b/{bucket}/o {
+    match /profiles/{email}/{file} { allow read: if true; allow write: if true; }
+    match /events/{file} { allow read: if true; allow write: if true; }
+  }
+}
+```
+If Storage rules aren't published, uploads fall back to local base64 automatically.
 Collections auto-create on first write (`saveProfile/saveRequest/saveMessage/saveBuilder/saveFunder/saveEventStore`). Passwords stay in Firebase Auth only — never in Firestore.
 
 ### 2. Env Vars (local + Cloudflare Pages)
