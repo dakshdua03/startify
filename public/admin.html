@@ -6,6 +6,7 @@
 <title>Startify Admin — University of Hyderabad</title>
 <script src="https://cdn.tailwindcss.com"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-auth-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js"></script>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Outfit:wght@600;700;800&display=swap" rel="stylesheet">
 <style>body{font-family:Inter,sans-serif} .font-heading{font-family:Outfit,sans-serif}</style>
@@ -43,6 +44,31 @@ async function fsSet(col, id, data){
 async function fsDel(col, id){
   if (!FSDB || !id) return;
   try { await FSDB.collection(col).doc(id).delete(); } catch (e) { console.warn("Admin Firestore delete failed", col, e); }
+}
+// Secondary Firebase Auth instance: creates real login accounts for new users
+// WITHOUT signing the admin out of the main app. Login on the main site requires
+// a Firebase Auth user + verified email, so admin-created accounts must go through this.
+function getSecondaryAuth(){
+  try{
+    if(!window.firebase || !firebase.auth) return null;
+    let app2 = null;
+    try { app2 = firebase.app("startify-admin-secondary"); }
+    catch { app2 = firebase.initializeApp(FIREBASE_CONFIG, "startify-admin-secondary"); }
+    return app2.auth();
+  }catch(e){ console.warn("Secondary auth init failed", e); return null; }
+}
+async function createFirebaseLogin(email, password){
+  const sec = getSecondaryAuth();
+  if(!sec) return { ok:false, code:"no-auth", message:"Firebase Auth unavailable on admin page." };
+  try{
+    const cred = await sec.createUserWithEmailAndPassword(email.toLowerCase(), password);
+    try { await cred.user.sendEmailVerification(); } catch(e){ console.warn("Verification email failed", e); }
+    try { await sec.signOut(); } catch {}
+    return { ok:true };
+  }catch(e){
+    try { await sec.signOut(); } catch {}
+    return { ok:false, code:(e && e.code) || "", message:(e && e.message) || String(e) };
+  }
 }
 // Pull cloud collections into localStorage mirror so existing render() logic works cross-device
 async function syncFromFirestore(){
@@ -1039,6 +1065,11 @@ function render(){
               <p class="mt-1 text-[11px] text-slate-500">Founder/Builder blocked if not @uohyd.ac.in</p>
             </div>
             <div>
+              <label class="block text-xs font-semibold text-slate-600 mb-1">Temporary Password * (min 6 chars)</label>
+              <input required id="cPass" type="text" value="startify123" minlength="6" class="w-full h-11 rounded-full bg-slate-50 border border-slate-200 px-4 text-sm outline-none">
+              <p class="mt-1 text-[11px] text-slate-500">User signs in on the main site with this + verifies the email link. They can change it later via Forgot password.</p>
+            </div>
+            <div>
               <label class="block text-xs font-semibold text-slate-600 mb-1">Student ID (auto from email)</label>
               <input id="cSid" placeholder="Auto: prefix before @" class="w-full h-11 rounded-full bg-slate-50 border border-slate-200 px-4 text-sm outline-none bg-slate-100" readonly>
               <p class="mt-1 text-[11px] text-slate-500">Auto-filled from email — no need to type</p>
@@ -1053,7 +1084,8 @@ function render(){
         <div class="rounded-[24px] border border-slate-200 bg-white p-6">
           <h4 class="font-bold">What happens?</h4>
           <ul class="mt-3 space-y-2 text-sm text-slate-600 list-disc pl-5">
-            <li>Account saved to <code class="text-xs bg-slate-100 px-1 py-0.5 rounded">localStorage</code> (<code>startify_registrations</code> + role stores).</li>
+            <li>Account saved to <code class="text-xs bg-slate-100 px-1 py-0.5 rounded">localStorage</code> (<code>startify_registrations</code> + role stores) and Firestore (<code>registrations</code>, <code>profiles</code>, <code>builders</code>).</li>
+            <li>Real Firebase login created + verification link emailed — user clicks the link, then Signs In on the main site with the temporary password.</li>
             <li>Student roles validated to @uohyd.ac.in — matches main site gate.</li>
             <li>New founders appear in Ideas flow after they post; builders/backers appear in directories.</li>
             <li>For production DB (Firebase Firestore), connect <code>VITE_FIREBASE_PROJECT_ID</code> — admin will also POST to /api/bookings.</li>
@@ -1065,47 +1097,69 @@ function render(){
         </div>
       </div>
     `;
-    document.getElementById("createForm").addEventListener("submit", (e)=>{
+    document.getElementById("createForm").addEventListener("submit", async (e)=>{
       e.preventDefault();
+      const btn = e.target.querySelector("button[type=submit]");
       const name=document.getElementById("cName").value.trim();
       const role=document.getElementById("cRole").value;
       const email=document.getElementById("cEmail").value.trim();
       const sid=email.split("@")[0].toUpperCase();
       document.getElementById("cSid").value = sid;
       const skills=document.getElementById("cSkills").value.trim();
+      const tempPass=(document.getElementById("cPass").value || "startify123").trim();
       if(!name || !email){ alert("Name & email required"); return; }
+      if(tempPass.length<6){ alert("Temporary password must be 6+ characters."); return; }
       const isUoH=email.toLowerCase().endsWith("@uohyd.ac.in");
       if((role==="founder"||role==="talent") && !isUoH){ alert("Founder/Builder must use @uohyd.ac.in"); return; }
-      const reg={name, email, role: role==="talent"?"builder": role==="backer"?"funder":role, year:sid, ideaOrSkills:skills, contact:"", registeredAt: new Date().toISOString().slice(0,10)};
-      const regs=load(LS_KEYS.regs, []);
-      save(LS_KEYS.regs, [reg, ...regs]);
-      if(role==="talent"){
-        const builders=load(LS_KEYS.builders, []);
-        const nb={id:"user_"+Date.now(), name, email, role: "Builder", roleTitle: skills||"Builder", skills: skills||"General", year:"Campus Builder", verifiedStudent:true };
-        save(LS_KEYS.builders, [nb, ...builders]);
-        try { fsSet("builders", nb.id, nb); } catch {}
-      }
-      const creds=load(LS_KEYS.credentials, {});
-      // admin creates with default password; user can change later
-      if(!creds[email.toLowerCase()]){ creds[email.toLowerCase()]="startify123"; save(LS_KEYS.credentials, creds); }
+      if(btn){ btn.disabled=true; btn.textContent="Creating login…"; }
       try{
-        const profs=load(LS_KEYS.profiles, []);
-        const derivedSid2=email.split("@")[0].toUpperCase();
-        const normalized={id: role==="talent" ? "user_"+Date.now() : email, name, email: email.toLowerCase(), role: role==="talent"?"talent":role, studentId:derivedSid2, roleTitle: skills||"", skills: role==="talent"?skills:"", focus: role==="backer"?skills:"", bio:"", createdAt: new Date().toISOString()};
-        const filtered=profs.filter(p=> !(p.email.toLowerCase()===normalized.email.toLowerCase() && p.role===normalized.role));
-        save(LS_KEYS.profiles, [normalized, ...filtered]);
-        try { fsSet("profiles", normalized.email.toLowerCase()+"_"+normalized.role, normalized); } catch {}
-      }catch{}
-      if(role==="backer"){
-        const pending=load(LS_KEYS.pendingBackers, []);
-        const entry={id:"user_"+Date.now(), name, email, role:"backer", roleTitle: skills||"Angel Backer", focus:skills, bio:"", status:"pending_admin_approval", createdAt: new Date().toISOString()};
-        save(LS_KEYS.pendingBackers, [entry, ...pending]);
-        alert("Created: "+name+" (backer) — password: startify123 — pending your approval in 'Backer Approvals' tab");
-      } else {
-        alert("Created: "+name+" ("+role+") — password: startify123");
+        const reg={name, email, role: role==="talent"?"builder": role==="backer"?"funder":role, year:sid, ideaOrSkills:skills, contact:"", registeredAt: new Date().toISOString().slice(0,10)};
+        const regs=load(LS_KEYS.regs, []);
+        save(LS_KEYS.regs, [reg, ...regs.filter(r=> (r.email||"").toLowerCase()!==email.toLowerCase())]);
+        try { fsSet("registrations", email.toLowerCase()+"_"+reg.role, reg); } catch {}
+        if(role==="talent"){
+          const builders=load(LS_KEYS.builders, []);
+          const nb={id:"user_"+Date.now(), name, email, role: "Builder", roleTitle: skills||"Builder", skills: skills||"General", year:"Campus Builder", verifiedStudent:true };
+          save(LS_KEYS.builders, [nb, ...builders]);
+          try { fsSet("builders", nb.id, nb); } catch {}
+        }
+        const creds=load(LS_KEYS.credentials, {});
+        // admin creates with default password; user can change later
+        if(!creds[email.toLowerCase()]){ creds[email.toLowerCase()]=tempPass; save(LS_KEYS.credentials, creds); }
+        try{
+          const profs=load(LS_KEYS.profiles, []);
+          const derivedSid2=email.split("@")[0].toUpperCase();
+          const normalized={id: role==="talent" ? "user_"+Date.now() : email, name, email: email.toLowerCase(), role: role==="talent"?"talent":role, studentId:derivedSid2, roleTitle: skills||"", skills: role==="talent"?skills:"", focus: role==="backer"?skills:"", bio:"", createdAt: new Date().toISOString()};
+          const filtered=profs.filter(p=> !(p.email.toLowerCase()===normalized.email.toLowerCase() && p.role===normalized.role));
+          save(LS_KEYS.profiles, [normalized, ...filtered]);
+          try { fsSet("profiles", normalized.email.toLowerCase()+"_"+normalized.role, normalized); } catch {}
+        }catch{}
+        // Real login: Firebase Auth account + verification email (required to Sign In on main site)
+        let loginNote = "";
+        try{
+          const res = await createFirebaseLogin(email, tempPass);
+          if(res.ok){
+            loginNote = "Firebase login created + verification link sent to " + email + ".";
+          } else if(res.code && res.code.includes("email-already-in-use")){
+            loginNote = "Firebase login already exists for " + email + " — user should Sign In (or Forgot password); profile linked.";
+          } else {
+            loginNote = "WARNING: Firebase login NOT created (" + (res.message||"unknown error") + "). User can't Sign In until this succeeds — retry creating.";
+          }
+        }catch(err){ loginNote = "WARNING: Firebase login NOT created. User can't Sign In until this succeeds — retry creating."; }
+        if(role==="backer"){
+          const pending=load(LS_KEYS.pendingBackers, []);
+          const entry={id:"user_"+Date.now(), name, email, role:"backer", roleTitle: skills||"Angel Backer", focus:skills, bio:"", status:"pending_admin_approval", createdAt: new Date().toISOString()};
+          save(LS_KEYS.pendingBackers, [entry, ...pending]);
+          alert("Created: "+name+" (backer) — temp password: "+tempPass+" — pending your approval in 'Backer Approvals' tab.\n"+loginNote);
+        } else {
+          alert("Created: "+name+" ("+role+") — temp password: "+tempPass+".\n"+loginNote);
+        }
+        document.getElementById("createForm").reset();
+        document.getElementById("cPass").value = "startify123";
+        render();
+      } finally {
+        if(btn){ btn.disabled=false; btn.textContent="Create Account →"; }
       }
-      document.getElementById("createForm").reset();
-      render();
     });
   } else if(currentTab==="admins"){
     if(!isMaster){
