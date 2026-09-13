@@ -20,7 +20,7 @@ Share this link — anyone at UoH can join as Founder (@uohyd.ac.in), Builder (@
 - **Events** — Demo Day, speed networking
 - **Chats & Requests** — connect → accept → message
 - **Dashboard** — your ideas, incoming/outgoing requests
-- **Admin** — `/admin.html` → Ideas/Talent/Registrations/Payments (default password `startifyUoH2025`, change via `localStorage.setItem("startify_admin_pass","newpass")` or edit `public/admin.html` before deploy)
+- **Admin** — `/admin.html` → Ideas/Talent/Registrations/Payments (master password stored in Firestore `admins` + `ADMIN_CREDENTIALS.local.md` — never in repo; first-run setup creates it if empty)
 
 ## Tech Stack
 - **Frontend:** React 18 + Vite + Tailwind, deployed on **Cloudflare Pages** (free, commercial allowed, unlimited bandwidth)
@@ -57,8 +57,10 @@ rules_version='2'; service cloud.firestore { match /databases/{database}/documen
   match /ideas/{d} { allow read, write: if true; }
   match /registrations/{d} { allow read, write: if true; }
   match /payments/{d} { allow read, write: if true; }
+  match /admins/{d} { allow read: if true; allow write: if false; }
 }}
 ```
+> Master admin lives in Firestore `admins/admin@startify.net` as `{ email, passHash (SHA-256), role: "master" }`. Create it from Firebase Console (see `ADMIN_CREDENTIALS.local.md` — gitignored, never commit password/hash). Login verifies hash client-side; no secret in GitHub.
 2. `Authentication → Sign-in method → Email/Password → Enable`
 3. `Authentication → Templates → Email address verification` → Subject `Verify your email for Startify` → Body with `%LINK%` → Save, set `Public-facing name: Startify`
 4. `Authentication → Settings → Authorized domains → Add` `startify1.pages.dev`, `startify2.pages.dev`, `localhost`

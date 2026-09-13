@@ -103,21 +103,60 @@ const LS_KEYS = {
   adminSession: "startify_admin_session"
 };
 const ADMIN_EMAIL = "admin@startify.net";
-const ADMIN_PASS = localStorage.getItem("startify_admin_pass") || "Startify2026!Admin";
 const ADMINS_KEY = "startify_admins";
+// NOTE: No password lives in this repo (GitHub-safe). Master password is stored
+// only in ADMIN_CREDENTIALS.local.md (gitignored) + Firestore `admins` collection
+// as a SHA-256 hash. Login compares hashes at runtime.
+async function sha256Hex(s){
+  try{
+    const buf = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(s));
+    return Array.from(new Uint8Array(buf)).map(b=> b.toString(16).padStart(2,"0")).join("");
+  }catch{ return "hash-unavailable:" + s.length; }
+}
 function getAdmins(){
   try{
     const stored = JSON.parse(localStorage.getItem(ADMINS_KEY) || "null");
-    if(stored && Array.isArray(stored) && stored.length) return stored;
+    if(stored && Array.isArray(stored)) return stored;
   }catch{}
-  const master = [{email: ADMIN_EMAIL.toLowerCase(), password: ADMIN_PASS, role:"master", name:"Master Admin", createdAt: new Date().toISOString()}];
-  localStorage.setItem(ADMINS_KEY, JSON.stringify(master));
-  return master;
+  return [];
+}
+async function getFirestoreAdminDoc(email){
+  if (!FSDB) return null;
+  try {
+    const doc = await FSDB.collection("admins").doc(email.toLowerCase()).get();
+    return doc.exists ? { id: doc.id, ...doc.data() } : null;
+  } catch(e){ console.warn("Admin Firestore lookup failed", e); return null; }
+}
+async function verifyAdmin(email, pass){
+  const em = email.toLowerCase();
+  // 1) Local admins (sub-admins created on this device + cached master)
+  try{
+    const admins = getAdmins();
+    const local = admins.find(a=> a.email.toLowerCase()===em && (a.password===pass || a.passHash));
+    if(local){
+      if(local.passHash){
+        const h = await sha256Hex(pass);
+        if(h === local.passHash) return local;
+      } else if(local.password===pass){
+        return local;
+      }
+    }
+  }catch{}
+  // 2) Firestore `admins/<email>` with { passHash, role, name } — no secret in repo
+  const remote = await getFirestoreAdminDoc(em);
+  if(remote && remote.passHash){
+    const h = await sha256Hex(pass);
+    if(h === remote.passHash) return { email: em, role: remote.role || "master", name: remote.name || "Master Admin", fromFirestore: true };
+  }
+  return null;
 }
 function isMasterAdmin(email){
-  const admins=getAdmins();
-  const found=admins.find(a=> a.email.toLowerCase()===email.toLowerCase());
-  return found && found.role==="master";
+  try{
+    const admins=getAdmins();
+    const found=admins.find(a=> a.email.toLowerCase()===email.toLowerCase());
+    if(found) return found.role==="master";
+  }catch{}
+  return email.toLowerCase()===ADMIN_EMAIL.toLowerCase();
 }
 function getCurrentAdminEmail(){ return localStorage.getItem("startify_admin_email") || ADMIN_EMAIL; }
 
@@ -234,17 +273,13 @@ function restoreAdminAccount(){
   const deleted = load("startify_deleted_demos", []);
   const filtered = deleted.filter(e=> e !== "admin@startify.net");
   save("startify_deleted_demos", filtered);
-  // Ensure admin credential exists
-  const creds = load(LS_KEYS.credentials, {});
-  creds["admin@startify.net"] = "Startify2026!Admin";
-  save(LS_KEYS.credentials, creds);
-  // Ensure admin profile exists
+  // Ensure admin profile exists (password lives only in Firestore `admins` + local setup — never here)
   const profs = load(LS_KEYS.profiles, []);
   if(!profs.some(p=> p.email.toLowerCase()==="admin@startify.net")){
     profs.push({id:"user_admin", name:"Startify Admin", email:"admin@startify.net", role:"admin", createdAt: new Date().toISOString()});
     save(LS_KEYS.profiles, profs);
   }
-  alert("Admin restored: admin@startify.net / Startify2026!Admin");
+  alert("Admin profile restored for admin@startify.net. Sign in with the master password from ADMIN_CREDENTIALS.local.md (Firestore `admins` record).");
   render();
 }
 function deleteBuilderById(id){
@@ -450,25 +485,57 @@ function render(){
           <div class="mt-6 rounded-2xl bg-amber-50 border border-amber-200 p-3 text-[11px] leading-4 text-amber-800">Master admin: <strong>admin@startify.net</strong> — create sub-admins inside after login.</div>
         </div>
       </div>`;
-    document.getElementById("loginForm").addEventListener("submit", (e)=>{
+    document.getElementById("loginForm").addEventListener("submit", async (e)=>{
       e.preventDefault();
+      const btn = e.target.querySelector("button[type=submit]");
       const email=document.getElementById("loginEmail").value.trim().toLowerCase();
       const pass=document.getElementById("loginPass").value;
-      const admins=getAdmins();
-      const found=admins.find(a=> a.email.toLowerCase()===email && a.password===pass);
-      // Fallback to hardcoded master if admins list empty
-      const isMasterHardcoded = email===ADMIN_EMAIL.toLowerCase() && pass===ADMIN_PASS;
-      if(found || isMasterHardcoded){
-        localStorage.setItem(LS_KEYS.adminSession,"true");
-        localStorage.setItem("startify_admin_email", email);
-        // Ensure master exists in list
-        if(isMasterHardcoded && !admins.some(a=> a.email.toLowerCase()===email)){
-          admins.push({email, password:pass, role:"master", name:"Master Admin", createdAt: new Date().toISOString()});
-          localStorage.setItem(ADMINS_KEY, JSON.stringify(admins));
+      if(btn){ btn.disabled = true; btn.textContent = "Verifying…"; }
+      try{
+        const match = await verifyAdmin(email, pass);
+        if(match){
+          localStorage.setItem(LS_KEYS.adminSession,"true");
+          localStorage.setItem("startify_admin_email", email);
+          // Cache verified admin locally (store hash, never plaintext for master)
+          try{
+            const admins = getAdmins();
+            if(!admins.some(a=> a.email.toLowerCase()===email)){
+              const h = await sha256Hex(pass);
+              admins.push({email, passHash: h, role: match.role || "master", name: match.name || "Master Admin", createdAt: new Date().toISOString()});
+              localStorage.setItem(ADMINS_KEY, JSON.stringify(admins));
+            }
+          }catch{}
+          render();
+        } else {
+          // First-run: no local admins and no Firestore admin doc → offer setup
+          let showSetup = false;
+          try{
+            const localEmpty = getAdmins().length === 0;
+            if(localEmpty){
+              const remote = await getFirestoreAdminDoc(email);
+              if(!remote) showSetup = true;
+            }
+          }catch{}
+          if(showSetup){
+            if(confirm("No master admin found in Firestore. Create master admin '" + email + "' with this password on this device + Firestore?")){
+              try{
+                const h = await sha256Hex(pass);
+                const admins = getAdmins();
+                admins.push({email, passHash: h, role:"master", name:"Master Admin", createdAt: new Date().toISOString()});
+                localStorage.setItem(ADMINS_KEY, JSON.stringify(admins));
+                if(FSDB){ await FSDB.collection("admins").doc(email).set({ email, passHash: h, role:"master", name:"Master Admin", createdAt: new Date().toISOString() }, { merge: true }); }
+                localStorage.setItem(LS_KEYS.adminSession,"true");
+                localStorage.setItem("startify_admin_email", email);
+                render();
+                return;
+              }catch(err){ console.warn("Setup failed", err); alert("Setup failed — check Firestore connection/rules."); }
+            }
+          } else {
+            alert("Invalid admin credentials.");
+          }
         }
-        render();
-      } else {
-        alert("Invalid admin credentials.");
+      } finally {
+        if(btn){ btn.disabled = false; btn.textContent = "Enter Admin →"; }
       }
     });
     return;
@@ -1077,7 +1144,7 @@ function render(){
         </div>
       </div>
     `;
-    document.getElementById("adminForm").addEventListener("submit", (e)=>{
+    document.getElementById("adminForm").addEventListener("submit", async (e)=>{
       e.preventDefault();
       const name=document.getElementById("aName").value.trim();
       const email=document.getElementById("aEmail").value.trim().toLowerCase();
@@ -1086,7 +1153,8 @@ function render(){
       if(pass.length<6){ alert("Password min 6 chars"); return; }
       const admins=getAdmins();
       if(admins.some(a=> a.email.toLowerCase()===email)){ alert("Admin with this email already exists"); return; }
-      admins.push({email, password:pass, role:"admin", name, createdAt: new Date().toISOString()});
+      const h = await sha256Hex(pass);
+      admins.push({email, password:pass, passHash:h, role:"admin", name, createdAt: new Date().toISOString()});
       localStorage.setItem(ADMINS_KEY, JSON.stringify(admins));
       // also ensure credential exists so Passwords tab stays consistent
       const creds=load(LS_KEYS.credentials, {});

@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from "react";
 import logoImg from "./assets/startify-wordmark-full.png";
-import { dbService, isFirebaseConfigured as isSupabaseConfigured, authService, uploadImage } from "./lib/firebase";
+import { dbService, isFirebaseConfigured as isSupabaseConfigured, authService } from "./lib/firebase";
 
 /* ==========================================================================
    PRE-CREATED TEST ACCOUNTS & DEMO DATA FOR EASY TESTING
@@ -1004,7 +1004,7 @@ export default function App() {
         const bFake = buildersLocal.find(b => b.id === fakeId);
         if (bFake && bFake.email) {
           const realEmail = bFake.email.toLowerCase();
-          profiles.filter(p => p.email.toLowerCase() === realEmail).forEach(p=> ids.push(p.id));
+          profiles.filter(p => (p.email||"").toLowerCase() === realEmail).forEach(p=> ids.push(p.id));
           buildersLocal.filter(b=> (b.email||"").toLowerCase()===realEmail).forEach(b=> ids.push(b.id));
         }
       }
@@ -1043,16 +1043,20 @@ export default function App() {
   };
 
   // Filtered Ideas — also hide own ideas from the public board (you see them in Dashboard)
+  // Null-safe: cloud docs may miss fields, and one bad doc must not crash the whole board
   const filteredIdeas = ideas.filter((idea) => {
+    if (!idea) return false;
     if (idea.status === "Pending Review" || idea.status === "Rejected") return false;
     if (isOwnIdea(idea)) return false;
+    const cat = (idea.category || "").toLowerCase();
     const matchesCategory =
-      ideaCategoryFilter === "All" || idea.category.toLowerCase().includes(ideaCategoryFilter.toLowerCase());
+      ideaCategoryFilter === "All" || cat.includes(ideaCategoryFilter.toLowerCase());
+    const q = searchQuery.toLowerCase();
     const matchesSearch =
-      idea.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      idea.desc.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      idea.seeking.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      idea.founder.toLowerCase().includes(searchQuery.toLowerCase());
+      (idea.title || "").toLowerCase().includes(q) ||
+      (idea.desc || "").toLowerCase().includes(q) ||
+      (idea.seeking || "").toLowerCase().includes(q) ||
+      (idea.founder || "").toLowerCase().includes(q);
     return matchesCategory && matchesSearch;
   });
 
@@ -1087,15 +1091,13 @@ export default function App() {
   const showEventsTab = !!currentUser;
 
   // User Dashboard Filtered Data (match by id + email so cross-device + admin-created ids still route)
-  const myIncomingRequests = requests.filter((r) => r.receiverId === currentUser?.id || sameEmailIds.has(r.receiverId) || (currentEmail && (r.receiverEmail||"").toLowerCase() === currentEmail));
-  const myOutgoingRequests = requests.filter((r) => r.senderId === currentUser?.id || sameEmailIds.has(r.senderId) || (currentEmail && (r.senderEmail||"").toLowerCase() === currentEmail));
+  // Chats are strictly per profile: only the exact profile (id) that sent/received them.
+  // Same-email other roles never see each other's chats.
+  const myIncomingRequests = requests.filter((r) => currentUser && r.receiverId === currentUser.id);
+  const myOutgoingRequests = requests.filter((r) => currentUser && r.senderId === currentUser.id);
   const myAcceptedConnections = requests.filter(
     (r) =>
-      (sameEmailIds.has(r.senderId) ||
-        sameEmailIds.has(r.receiverId) ||
-        r.senderId === currentUser?.id ||
-        r.receiverId === currentUser?.id ||
-        (currentEmail && ((r.senderEmail || "").toLowerCase() === currentEmail || (r.receiverEmail || "").toLowerCase() === currentEmail))) &&
+      currentUser && (r.senderId === currentUser.id || r.receiverId === currentUser.id) &&
       r.status === "accepted"
   );
   const myIdeas = ideas.filter((i) => isOwnIdea(i));
@@ -2294,37 +2296,27 @@ export default function App() {
                     )}
                     <label className="absolute -bottom-1 -right-1 h-7 w-7 rounded-full bg-white border border-slate-200 shadow-sm grid place-items-center text-[10px] font-bold text-slate-600 cursor-pointer hover:bg-slate-50" title="Upload photo">
                       Edit
-                      <input type="file" accept="image/*" className="hidden" onChange={async (e)=>{
+                      <input type="file" accept="image/*" className="hidden" onChange={(e)=>{
                         const file=e.target.files[0];
                         if(!file) return;
                         if(file.size > 2*1024*1024){ showToast("Image max 2MB"); return; }
-                        showToast("Uploading photo...");
-                        // Upload to Firebase Storage; fall back to local base64 if Storage unavailable
-                        let imgUrl = null;
-                        try {
-                          imgUrl = await uploadImage(`profiles/${currentUser.email.toLowerCase()}/avatar_${Date.now()}.jpg`, file);
-                        } catch (err) { console.warn("Storage upload failed, using local", err); }
-                        if (!imgUrl) {
-                          imgUrl = await new Promise((resolve) => {
-                            const reader=new FileReader();
-                            reader.onload=()=>resolve(reader.result);
-                            reader.onerror=()=>resolve(null);
-                            reader.readAsDataURL(file);
-                          });
-                        }
-                        if (!imgUrl) { showToast("Failed to save"); return; }
-                        try{
-                          localStorage.setItem(getProfileImageKey(currentUser.email), imgUrl);
-                          let updatedProfile = null;
+                        const reader=new FileReader();
+                        reader.onload=()=>{
                           try{
-                            const arr=JSON.parse(localStorage.getItem("startify_user_profiles")||"[]");
-                            const idx=arr.findIndex(p=>p.email.toLowerCase()===currentUser.email.toLowerCase() && p.role===currentUser.role);
-                            if(idx>=0){ arr[idx].profileImage=imgUrl; localStorage.setItem("startify_user_profiles", JSON.stringify(arr)); updatedProfile=arr[idx]; }
-                            else { updatedProfile = { id: currentUser.id||currentUser.email, name: currentUser.name, email: currentUser.email.toLowerCase(), role: currentUser.role, bio: currentUser.bio||"", profileImage: imgUrl, createdAt: new Date().toISOString() }; }
-                          }catch{}
-                          if(updatedProfile) dbService.saveProfile(updatedProfile);
-                          showToast("✓ Photo updated");
-                        }catch{ showToast("Failed to save"); }
+                            const imgUrl = reader.result;
+                            localStorage.setItem(getProfileImageKey(currentUser.email), imgUrl);
+                            let updatedProfile = null;
+                            try{
+                              const arr=JSON.parse(localStorage.getItem("startify_user_profiles")||"[]");
+                              const idx=arr.findIndex(p=>p.email.toLowerCase()===currentUser.email.toLowerCase() && p.role===currentUser.role);
+                              if(idx>=0){ arr[idx].profileImage=imgUrl; localStorage.setItem("startify_user_profiles", JSON.stringify(arr)); updatedProfile=arr[idx]; }
+                              else { updatedProfile = { id: currentUser.id||currentUser.email, name: currentUser.name, email: currentUser.email.toLowerCase(), role: currentUser.role, bio: currentUser.bio||"", profileImage: imgUrl, createdAt: new Date().toISOString() }; }
+                            }catch{}
+                            if(updatedProfile) dbService.saveProfile(updatedProfile);
+                            showToast("✓ Photo updated");
+                          }catch{ showToast("Failed to save"); }
+                        };
+                        reader.readAsDataURL(file);
                       }}/>
                     </label>
                   </div>
@@ -3138,20 +3130,12 @@ export default function App() {
               </div>
               <div>
                 <label className="block text-[12px] font-semibold text-slate-600 mb-1">Thumbnail Image</label>
-                <input type="file" accept="image/*" onChange={async (e)=>{
+                <input type="file" accept="image/*" onChange={(e)=>{
                   const file=e.target.files[0]; if(!file) return;
                   if(file.size>2*1024*1024){ showToast("Image max 2MB"); return; }
-                  showToast("Uploading thumbnail...");
-                  try {
-                    const url = await uploadImage(`events/ev_${Date.now()}.jpg`, file);
-                    setEventForm({...eventForm, thumbnail:url});
-                    showToast("✓ Thumbnail ready");
-                  } catch (err) {
-                    console.warn("Storage upload failed, using local", err);
-                    const r=new FileReader(); r.onload=()=>setEventForm({...eventForm, thumbnail:r.result}); r.readAsDataURL(file);
-                  }
+                  const r=new FileReader(); r.onload=()=>setEventForm({...eventForm, thumbnail:r.result}); r.readAsDataURL(file);
                 }} className="w-full h-11 rounded-full bg-slate-50 border border-slate-200 px-4 text-[13px] text-slate-800 outline-none file:mr-2 file:rounded-full file:border-0 file:bg-slate-900 file:text-white file:px-3 file:py-1 file:text-xs" />
-                {eventForm.thumbnail && <><img src={eventForm.thumbnail} alt="preview" className="mt-2 h-24 w-full object-cover rounded-xl border border-slate-200" />{!eventForm.thumbnail.startsWith("data:") && <div className="mt-1 text-[11px] text-emerald-600 font-semibold">✓ Stored in Firebase Storage</div>}</>}
+                {eventForm.thumbnail && <img src={eventForm.thumbnail} alt="preview" className="mt-2 h-24 w-full object-cover rounded-xl border border-slate-200" />}
               </div>
               <button type="submit" className="w-full h-12 rounded-full bg-slate-900 text-white font-bold text-[14px] hover:bg-slate-800 transition">Publish Event →</button>
             </form>
