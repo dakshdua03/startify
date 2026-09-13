@@ -2,7 +2,6 @@
 import { initializeApp, getApps } from 'firebase/app';
 import { getFirestore, collection, addDoc, getDocs, query, orderBy, limit, serverTimestamp, doc, setDoc, deleteDoc, onSnapshot } from 'firebase/firestore';
 import { getAuth, createUserWithEmailAndPassword, signInWithEmailAndPassword, sendEmailVerification, sendPasswordResetEmail, signOut, onAuthStateChanged } from 'firebase/auth';
-import { getStorage, ref, uploadString, uploadBytes, getDownloadURL } from 'firebase/storage';
 
 const firebaseConfig = {
   apiKey: import.meta.env.VITE_FIREBASE_API_KEY || "AIzaSyDa2GrOS9xmrZGI-0W8BLE_vLu9XJr3i0A",
@@ -18,13 +17,11 @@ export const isFirebaseConfigured = !!firebaseConfig.apiKey && !!firebaseConfig.
 let app = null;
 let db = null;
 let auth = null;
-let storage = null;
 
 if (isFirebaseConfigured) {
   app = getApps().length ? getApps()[0] : initializeApp(firebaseConfig);
   try { db = getFirestore(app); } catch (e) { console.warn("Firestore init failed", e); }
   try { auth = getAuth(app); } catch (e) { console.warn("Auth init failed", e); }
-  try { storage = getStorage(app); } catch (e) { console.warn("Storage init failed", e); }
 }
 // Debug: log config status once
 if (typeof window !== "undefined") {
