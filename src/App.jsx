@@ -54,156 +54,20 @@ export const DEMO_USERS = [
   }
 ];
 
-export const INITIAL_IDEAS = [
-  {
-    id: "idea_1",
-    title: "CampusKart",
-    category: "E-Commerce / Logistics",
-    founderId: "user_priya",
-    founder: "Priya Sharma",
-    verifiedStudent: true,
-    studentId: "UOH-2023-CS042",
-    desc: "Peer-to-peer campus marketplace for buying, selling, and renting hostel essentials and textbooks effortlessly.",
-    seeking: "Tech Co-Founder (React & Node.js)",
-    status: "Validation Phase",
-    createdDate: "2 days ago"
-  },
-  {
-    id: "idea_2",
-    title: "HostelX Food Tech",
-    category: "Food & Services",
-    founderId: "user_aarav",
-    founder: "Aarav Patel",
-    verifiedStudent: true,
-    studentId: "UOH-2022-EC118",
-    desc: "Late-night campus food delivery network delivering directly to hostel rooms within 15 minutes.",
-    seeking: "Growth & Operations Lead",
-    status: "MVP Live",
-    createdDate: "3 days ago"
-  },
-  {
-    id: "idea_3",
-    title: "StudyBuddy AI",
-    category: "EdTech / AI",
-    founderId: "user_rohan",
-    founder: "Rohan Verma",
-    verifiedStudent: true,
-    studentId: "UOH-2024-AI009",
-    desc: "AI agent that synthesizes course lecture notes into personalized revision guides and interactive practice tests.",
-    seeking: "UI/UX Product Designer",
-    status: "Prototype Ready",
-    createdDate: "Just now"
-  }
-];
+// All content lives in Firestore — no local demo seeds.
+// (Old demo ideas/investors/builders/requests/messages/events removed;
+// thumbnails + profile photos remain local-only by design.)
+export const INITIAL_IDEAS = [];
 
-export const INITIAL_FUNDERS = [
-  {
-    id: "user_backer",
-    name: "Campus Angel Network",
-    role: "Early-Stage Micro Angel Syndicate",
-    focus: "EdTech, AI & Consumer SaaS",
-    bio: "Alumni-backed micro syndicate funding pre-seed student ideas from concept to MVP stage.",
-    ticketSize: "Pre-Seed & Seed Focus"
-  },
-  {
-    id: "backer_2",
-    name: "Venture Catalyst Circle",
-    role: "Pre-Seed & Seed Backer",
-    focus: "B2B SaaS, Logistics & E-Commerce",
-    bio: "Supporting student founders with initial micro-capital, pilot launch credits, and industry mentorship.",
-    ticketSize: "Idea & Prototype Funding"
-  }
-];
+export const INITIAL_FUNDERS = [];
 
-export const INITIAL_BUILDERS = [
-  {
-    id: "user_vikram",
-    name: "Vikram Singh",
-    role: "Full-Stack Engineer",
-    skills: "React, Node.js, Python, PostgreSQL",
-    year: "4th Year Computer Science",
-    verifiedStudent: true,
-    status: "Looking for AI / SaaS Co-Founder"
-  },
-  {
-    id: "builder_2",
-    name: "Sneha Reddy",
-    role: "UI/UX Product Designer",
-    skills: "Figma, Framer, Prototyping, User Research",
-    year: "3rd Year Design & Arts",
-    verifiedStudent: true,
-    status: "Available for MVP Collaborations"
-  }
-];
+export const INITIAL_BUILDERS = [];
 
-export const INITIAL_EVENTS = [
-  {
-    id: "e1",
-    title: "Campus Demo Day & Idea Showcase",
-    date: "Saturday, Sep 12",
-    time: "5:00 PM - 7:30 PM",
-    venue: "Main Innovation Auditorium & Online Stage",
-    category: "Pitch Night",
-    desc: "Student founders pitch their raw startup ideas to angel backers, mentors, and fellow student builders looking for co-founders."
-  },
-  {
-    id: "e2",
-    title: "Co-Founder & Builder Speed Networking",
-    date: "Wednesday, Sep 16",
-    time: "6:30 PM - 8:00 PM",
-    venue: "Student Hub Lounge",
-    category: "Networking",
-    desc: "Interactive speed-matching session connecting idea creators with top developers, UI/UX designers, and growth marketers."
-  }
-];
+export const INITIAL_EVENTS = [];
 
-// Initial Requests connecting Vikram & Campus Angel to Priya's CampusKart
-export const INITIAL_REQUESTS = [
-  {
-    id: "req_1",
-    senderId: "user_vikram",
-    senderName: "Vikram Singh",
-    senderRole: "talent",
-    receiverId: "user_priya",
-    receiverName: "Priya Sharma",
-    targetTitle: "CampusKart",
-    message: "Hi Priya! I am a full-stack dev experienced with React & Node. I'd love to join CampusKart as a tech co-founder.",
-    status: "accepted", // Accepted connection ready for messaging!
-    createdAt: "Yesterday"
-  },
-  {
-    id: "req_2",
-    senderId: "user_backer",
-    senderName: "Campus Angel Network",
-    senderRole: "backer",
-    receiverId: "user_priya",
-    receiverName: "Priya Sharma",
-    targetTitle: "CampusKart",
-    message: "Greetings Priya! We like the peer-to-peer campus marketplace model of CampusKart. We would like to discuss micro-funding.",
-    status: "pending", // Pending request for testing accept/reject!
-    createdAt: "2 hours ago"
-  }
-];
+export const INITIAL_REQUESTS = [];
 
-// Initial Messages between Vikram & Priya
-export const INITIAL_MESSAGES = [
-  {
-    id: "msg_1",
-    requestId: "req_1",
-    senderId: "user_vikram",
-    senderName: "Vikram Singh",
-    text: "Hey Priya, thanks for accepting my connection request! Have you already setup the database schema for CampusKart?",
-    createdAt: "10:30 AM"
-  },
-  {
-    id: "msg_2",
-    requestId: "req_1",
-    senderId: "user_priya",
-    senderName: "Priya Sharma",
-    text: "Hi Vikram! Great to connect. Yes, we have a basic mockup ready. Let's discuss building the React frontend & API this weekend!",
-    createdAt: "10:35 AM"
-  }
-];
+export const INITIAL_MESSAGES = [];
 
 export const MAIN_WHATSAPP_LINK = "https://chat.whatsapp.com/BOgivVivG5ZLQ1OqoIl3wi?s=cl&p=a&mlu=4";
 
@@ -1338,7 +1202,7 @@ export default function App() {
         <main className="mx-auto max-w-[1200px] px-5 py-10 md:px-8 md:py-12">
           <div className="rounded-[30px] border border-slate-200 bg-gradient-to-br from-white via-slate-50 to-slate-200 p-7 shadow-sm md:p-10">
             <div className="grid gap-8 lg:grid-cols-[1.3fr_.7fr] lg:items-end"><div><div className="inline-flex items-center gap-1.5 rounded-full bg-indigo-50 border border-indigo-200 px-2.5 py-1 text-[10px] font-bold uppercase tracking-widest text-indigo-700">University of Hyderabad • An initiative for UoH students</div><h1 className="font-heading home-calligraphy mt-3 text-[34px] font-extrabold tracking-tight text-slate-800 md:text-[46px]">Good to see you, {currentUser.name.split(" ")[0]}.</h1><p className="mt-3 max-w-[650px] text-[15px] leading-6 text-slate-600">Your UoH community is actively connecting ideas, talent and support. Explore your dashboard for role-specific matches, or open Chats to continue a conversation.</p></div><div className="rounded-2xl border border-white/80 bg-white/70 p-5 shadow-sm"><div className="text-[11px] font-bold uppercase tracking-widest text-slate-500">MOTIVATION OF THE DAY</div><blockquote className="font-heading mt-3 text-[22px] font-bold leading-tight text-slate-800">“{dailyQuote.text}”</blockquote><div className="mt-2 text-[11px] text-slate-500 italic">— {dailyQuote.author}</div><div className="mt-3 h-1 w-12 rounded-full bg-slate-700" /></div></div>
-            <div className="mt-8 grid gap-4 sm:grid-cols-2 lg:grid-cols-4"><div className="rounded-2xl border border-slate-200 bg-white/80 p-5"><div className="text-[11px] font-bold uppercase tracking-wide text-slate-500">Live ideas</div><div className="font-heading mt-2 text-3xl font-extrabold text-slate-800">{ideas.length}</div><p className="mt-1 text-[11px] text-slate-500">Projects looking for momentum</p></div><div className="rounded-2xl border border-slate-200 bg-white/80 p-5"><div className="text-[11px] font-bold uppercase tracking-wide text-slate-500">Active people</div><div className="font-heading mt-2 text-3xl font-extrabold text-slate-800">{builders.length + funders.length + ideas.length}</div><p className="mt-1 text-[11px] text-slate-500">Founders, talent, and funders</p></div><div className="rounded-2xl border border-slate-200 bg-white/80 p-5"><div className="text-[11px] font-bold uppercase tracking-wide text-slate-500">Connections made</div><div className="font-heading mt-2 text-3xl font-extrabold text-slate-800">{requests.filter((request) => request.status === "accepted").length}</div><p className="mt-1 text-[11px] text-slate-500">Conversations unlocked</p></div><div className="rounded-2xl border border-slate-200 bg-white/80 p-5"><div className="text-[11px] font-bold uppercase tracking-wide text-slate-500">Upcoming events</div><div className="font-heading mt-2 text-3xl font-extrabold text-slate-800">{events.length}</div><p className="mt-1 text-[11px] text-slate-500">Ways to meet the community</p></div></div>
+            <div className="mt-8 grid gap-4 sm:grid-cols-2 lg:grid-cols-4"><div className="rounded-2xl border border-slate-200 bg-white/80 p-5"><div className="text-[11px] font-bold uppercase tracking-wide text-slate-500">Live ideas</div><div className="font-heading mt-2 text-3xl font-extrabold text-slate-800">{ideas.length}</div><p className="mt-1 text-[11px] text-slate-500">Projects looking for momentum</p></div><div className="rounded-2xl border border-slate-200 bg-white/80 p-5"><div className="text-[11px] font-bold uppercase tracking-wide text-slate-500">Active people</div><div className="font-heading mt-2 text-3xl font-extrabold text-slate-800">{(() => { const emails = new Set(); builders.forEach(b => { if (b.email) emails.add(b.email.toLowerCase()); }); funders.forEach(f => { if (f.email) emails.add(f.email.toLowerCase()); }); ideas.forEach(i => { if (i.email) emails.add(i.email.toLowerCase()); }); return emails.size; })()}</div><p className="mt-1 text-[11px] text-slate-500">Unique people by email</p></div><div className="rounded-2xl border border-slate-200 bg-white/80 p-5"><div className="text-[11px] font-bold uppercase tracking-wide text-slate-500">Connections made</div><div className="font-heading mt-2 text-3xl font-extrabold text-slate-800">{requests.filter((request) => request.status === "accepted").length}</div><p className="mt-1 text-[11px] text-slate-500">Conversations unlocked</p></div><div className="rounded-2xl border border-slate-200 bg-white/80 p-5"><div className="text-[11px] font-bold uppercase tracking-wide text-slate-500">Upcoming events</div><div className="font-heading mt-2 text-3xl font-extrabold text-slate-800">{events.length}</div><p className="mt-1 text-[11px] text-slate-500">Ways to meet the community</p></div></div>
           </div>
           <section className="mt-8"><div className="mb-4 flex items-end justify-between"><div><div className="text-[11px] font-bold uppercase tracking-widest text-slate-500">MARK YOUR CALENDAR</div><h2 className="font-heading mt-1 text-[25px] font-extrabold text-slate-800" style={{color: '#0f172a'}}>Upcoming community events</h2></div><button onClick={() => setActiveTab("home")} className="text-xs font-bold text-slate-700 hover:underline">Go to Chats →</button></div><div className="grid gap-5 md:grid-cols-2">{events.map((event) => <article key={event.id} className="rounded-[24px] border border-slate-200 bg-white p-6 shadow-sm" style={{background: 'rgba(255,255,255,0.92)'}}><div className="flex items-center justify-between gap-3"><span className="rounded-full bg-slate-100 px-3 py-1 text-[10px] font-bold uppercase tracking-wide text-slate-600">{event.category}</span><span className="text-xs font-semibold text-slate-500">{event.date}</span></div><h3 className="font-heading mt-4 text-[19px] font-extrabold" style={{color: '#0f172a'}}>{event.title}</h3><p className="mt-2 text-[13px]" style={{color: '#475569'}}>{event.time} · {event.venue}</p><p className="mt-3 text-[13px] leading-5" style={{color: '#334155'}}>{event.desc}</p></article>)}</div></section>
           <section className="mt-10">

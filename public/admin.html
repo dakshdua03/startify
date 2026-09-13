@@ -167,31 +167,13 @@ const DEMO_USERS = [
   {id:"user_backer", name:"Campus Angel Network", email:"angels@startify.net", role:"backer"},
   {id:"user_admin", name:"Startify Admin", email:"admin@startify.net", role:"admin"},
 ];
-const SEED_IDEAS = [
-  {id:"idea_1", title:"CampusKart", category:"E-Commerce / Logistics", founder:"Priya Sharma", founderId:"user_priya", status:"Approved & Live", createdDate:"2 days ago"},
-  {id:"idea_2", title:"HostelX Food Tech", category:"Food & Services", founder:"Aarav Patel", founderId:"user_aarav", status:"MVP Live", createdDate:"3 days ago"},
-  {id:"idea_3", title:"StudyBuddy AI", category:"EdTech / AI", founder:"Rohan Verma", founderId:"user_rohan", status:"Prototype Ready", createdDate:"Just now"},
-];
-const SEED_BUILDERS = [
-  {id:"user_vikram", name:"Vikram Singh", role:"Full-Stack Engineer", skills:"React, Node.js, Python, PostgreSQL"},
-  {id:"builder_2", name:"Sneha Reddy", role:"UI/UX Product Designer", skills:"Figma, Framer"},
-];
-const SEED_FUNDERS = [
-  {id:"user_backer", name:"Campus Angel Network", role:"Early-Stage Micro Angel Syndicate", focus:"EdTech, AI & Consumer SaaS", ticketSize:"Pre-Seed & Seed Focus"},
-  {id:"backer_2", name:"Venture Catalyst Circle", role:"Pre-Seed & Seed Backer", focus:"B2B SaaS, Logistics", ticketSize:"Idea & Prototype Funding"},
-];
-const SEED_REQUESTS = [
-  {id:"req_1", senderName:"Vikram Singh", senderRole:"talent", receiverName:"Priya Sharma", targetTitle:"CampusKart", status:"accepted", createdAt:"Yesterday"},
-  {id:"req_2", senderName:"Campus Angel Network", senderRole:"backer", receiverName:"Priya Sharma", targetTitle:"CampusKart", status:"pending", createdAt:"2 hours ago"},
-];
-const SEED_MESSAGES = [
-  {id:"msg_1", requestId:"req_1", senderName:"Vikram Singh", text:"Hey Priya, thanks for accepting! Have you setup the DB schema?"},
-  {id:"msg_2", requestId:"req_1", senderName:"Priya Sharma", text:"Hi Vikram! Yes, basic mockup ready."},
-];
-const SEED_EVENTS = [
-  {id:"e1", title:"Campus Demo Day & Idea Showcase", date:"Saturday, Sep 12", category:"Pitch Night", venue:"Main Innovation Auditorium & Online Stage"},
-  {id:"e2", title:"Co-Founder & Builder Speed Networking", date:"Wednesday, Sep 16", category:"Networking", venue:"Student Hub Lounge"},
-];
+// All content lives in Firestore — no local demo seeds (thumbnails stay local-only by design).
+const SEED_IDEAS = [];
+const SEED_BUILDERS = [];
+const SEED_FUNDERS = [];
+const SEED_REQUESTS = [];
+const SEED_MESSAGES = [];
+const SEED_EVENTS = [];
 
 function load(key, fallback){ try{ const v=localStorage.getItem(key); return v? JSON.parse(v): fallback; }catch(e){return fallback;} }
 function save(key, val){ localStorage.setItem(key, JSON.stringify(val)); }
@@ -419,11 +401,7 @@ function getAllData(){
   SEED_IDEAS.forEach(i=> { if(!deletedIds.has(i.id)) ideaMap.set(i.id, i); });
   storedIdeas.forEach(i=> { if(i.deleted) ideaMap.delete(i.id); else ideaMap.set(i.id, i); });
   const ideas = Array.from(ideaMap.values());
-  const regs = load(LS_KEYS.regs, null) || [
-    {name:"Rahul Sharma", email:"rahul@uohyd.ac.in", role:"founder", registeredAt:"2026-08-23"},
-    {name:"Aditi Rao", email:"aditi@uohyd.ac.in", role:"builder", registeredAt:"2026-08-22"},
-    {name:"Karan Patel", email:"karan@angelnet.in", role:"funder", registeredAt:"2026-08-21"},
-  ];
+  const regs = load(LS_KEYS.regs, null) || [];
   const builders = [...load(LS_KEYS.builders, []), ...SEED_BUILDERS];
   const funders = [...load(LS_KEYS.funders, []), ...SEED_FUNDERS];
   const storedEvents = load(LS_KEYS.events, []);
