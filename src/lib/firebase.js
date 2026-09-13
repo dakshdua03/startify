@@ -29,24 +29,8 @@ if (typeof window !== "undefined") {
   if (!isFirebaseConfigured) console.warn("Firebase NOT configured — set VITE_FIREBASE_* in .env and Cloudflare Pages vars");
 }
 
-export { app, db, auth, storage };
+export { app, db, auth };
 export const isSupabaseConfigured = isFirebaseConfigured; // alias for App.jsx
-
-// Upload an image (File/Blob or data_url string) to Firebase Storage, return download URL.
-// Falls back to the original data_url when Storage is unavailable so UI never breaks.
-export async function uploadImage(storagePath, fileOrDataUrl) {
-  if (!isFirebaseConfigured || !storage) {
-    if (typeof fileOrDataUrl === "string") return fileOrDataUrl;
-    throw new Error("Storage not configured");
-  }
-  const storageRef = ref(storage, storagePath);
-  if (typeof fileOrDataUrl === "string" && fileOrDataUrl.startsWith("data:")) {
-    await uploadString(storageRef, fileOrDataUrl, "data_url");
-  } else {
-    await uploadBytes(storageRef, fileOrDataUrl);
-  }
-  return await getDownloadURL(storageRef);
-}
 
 export const authService = {
   async signUp(email, password) {
