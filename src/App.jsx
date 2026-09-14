@@ -82,6 +82,32 @@ export const dropRemovedRequests = (arr) =>
 
 export const MAIN_WHATSAPP_LINK = "https://chat.whatsapp.com/BOgivVivG5ZLQ1OqoIl3wi?s=cl&p=a&mlu=4";
 
+// Vast category list for posting ideas — from startups to content creators
+// with a big vision of building something on their own.
+export const IDEA_CATEGORIES = [
+  "Tech / AI",
+  "E-Commerce / D2C",
+  "Food & Services",
+  "EdTech",
+  "Content Creation",
+  "Social Media",
+  "Music & Audio",
+  "Film & Video",
+  "Art & Design",
+  "Gaming & Esports",
+  "Health & Fitness",
+  "Environment",
+  "Social Impact",
+  "Travel & Hospitality",
+  "Fashion & Lifestyle",
+  "Sports",
+  "Fintech",
+  "AgriTech",
+  "Real Estate",
+  "Events",
+  "Other",
+];
+
 // ---- Fundraising helpers ----
 export const isFundingIdea = (idea) => (idea?.lookingFor || "team") === "funding";
 export const fmtINR = (n) => `₹${(Number(n) || 0).toLocaleString("en-IN")}`;
@@ -144,6 +170,78 @@ export function LookingForPill({ idea }) {
     <span className="rounded-full bg-sky-50 border border-sky-200 px-3 py-1 text-[10px] font-bold text-sky-700 whitespace-nowrap">
       👥 Seeking team
     </span>
+  );
+}
+
+// Dedicated fundraising rail — funding ideas never merge with team-seeking ones.
+// signedIn=false renders a Join CTA instead of Donate (logged-out visitors).
+export function FundingSection({ ideas, signedIn, onDonate, onJoin, raisedFor, donorCountFor }) {
+  const scrollRef = useRef(null);
+  const list = [...(ideas || [])].filter((i) => i && i.status !== "Rejected").sort((a, b) => {
+    const getTime = (x) => x.created_at?.seconds ? x.created_at.seconds * 1000 : (x.created_at?.toMillis ? x.created_at.toMillis() : Date.parse(x.createdDate || 0) || Number((x.id || "").split("_")[1] || 0));
+    return getTime(b) - getTime(a);
+  }).slice(0, 12);
+  if (!list.length) return null;
+  return (
+    <section className="mt-8 min-w-0 max-w-full">
+      <div className="mb-4 flex items-end justify-between gap-4">
+        <div className="min-w-0">
+          <div className="text-[11px] font-bold uppercase tracking-widest text-emerald-700">FUNDRAISING</div>
+          <h2 className="font-heading mt-1 text-[22px] sm:text-[25px] font-extrabold text-slate-900">Ideas looking for funding</h2>
+          <p className="text-[13px] text-slate-600 mt-1">Back a vision directly — every rupee goes to the founder.</p>
+        </div>
+        <div className="hidden sm:flex items-center gap-2 shrink-0">
+          <button onClick={() => scrollRef.current?.scrollBy({ left: -320, behavior: "smooth" })} className="h-9 w-9 rounded-full bg-white border border-slate-200 grid place-items-center text-slate-700 hover:bg-slate-900 hover:text-white transition" aria-label="Previous">‹</button>
+          <button onClick={() => scrollRef.current?.scrollBy({ left: 320, behavior: "smooth" })} className="h-9 w-9 rounded-full bg-slate-900 text-white grid place-items-center hover:bg-black transition" aria-label="Next">›</button>
+        </div>
+      </div>
+      <div className="flex items-center justify-between sm:hidden mb-3 gap-2">
+        <div className="flex gap-2">
+          <button onClick={() => scrollRef.current?.scrollBy({ left: -320, behavior: "smooth" })} className="h-8 w-8 rounded-full bg-white border border-slate-200 grid place-items-center text-slate-700">‹</button>
+          <button onClick={() => scrollRef.current?.scrollBy({ left: 320, behavior: "smooth" })} className="h-8 w-8 rounded-full bg-slate-900 text-white grid place-items-center">›</button>
+        </div>
+        <span className="text-[11px] text-slate-500">Swipe →</span>
+      </div>
+      <div ref={scrollRef} className="flex gap-5 min-w-0 w-full max-w-full overflow-x-auto snap-x snap-mandatory pb-2 scrollbar-hide scroll-smooth" style={{ scrollbarWidth: "none" }}>
+        {list.map((idea) => (
+          <article key={idea.id} className="snap-start shrink-0 w-[82vw] max-w-[320px] sm:w-[320px] md:w-[380px] rounded-[24px] border border-emerald-100 bg-white p-6 shadow-sm flex flex-col">
+            <div className="flex items-center gap-2 flex-wrap">
+              <span className="rounded-full bg-slate-100 px-3 py-1 text-[10px] font-bold text-slate-600">{idea.category}</span>
+              <LookingForPill idea={idea} />
+            </div>
+            <h3 className="font-heading mt-3 text-[18px] font-extrabold text-slate-800">{idea.title}</h3>
+            <p className="mt-1 text-[12px] font-medium text-slate-500">By {idea.founder}</p>
+            <p className="mt-3 text-[13px] leading-5 text-slate-600 line-clamp-2">{idea.desc}</p>
+            <div className="mt-4">
+              <FundingBar idea={idea} raised={raisedFor(idea)} donorCount={donorCountFor(idea.id)} />
+            </div>
+            <div className="mt-4 flex gap-2">
+              {signedIn ? (
+                <button
+                  onClick={() => onDonate && onDonate(idea)}
+                  className="flex-1 h-10 rounded-full bg-slate-900 text-white text-[12.5px] font-bold hover:bg-black transition"
+                >
+                  Donate →
+                </button>
+              ) : (
+                <button
+                  onClick={() => onJoin && onJoin()}
+                  className="flex-1 h-10 rounded-full bg-slate-900 text-white text-[12.5px] font-bold hover:bg-black transition"
+                >
+                  Join to donate →
+                </button>
+              )}
+              {idea.demoUrl ? (
+                <DemoLink
+                  url={idea.demoUrl}
+                  className="h-10 px-4 grid place-items-center rounded-full bg-white border border-slate-200 text-[12px] font-bold text-indigo-600 hover:bg-slate-50 whitespace-nowrap"
+                />
+              ) : null}
+            </div>
+          </article>
+        ))}
+      </div>
+    </section>
   );
 }
 
@@ -1227,10 +1325,11 @@ export default function App() {
     return false;
   };
 
-  // Filtered Ideas — also hide own ideas from the public board (you see them in Dashboard)
+  // Filtered Ideas — TEAM-SEEKING ONLY (funding ideas live in their own section)
   // Null-safe: cloud docs may miss fields, and one bad doc must not crash the whole board
   const filteredIdeas = ideas.filter((idea) => {
     if (!idea) return false;
+    if (isFundingIdea(idea)) return false;
     if (idea.status === "Pending Review" || idea.status === "Rejected") return false;
     if (isOwnIdea(idea)) return false;
     const cat = (idea.category || "").toLowerCase();
@@ -1244,6 +1343,9 @@ export default function App() {
       (idea.founder || "").toLowerCase().includes(q);
     return matchesCategory && matchesSearch;
   });
+
+  // Funding ideas live in their own section (never merged with team-seeking ideas)
+  const fundingIdeas = ideas.filter((idea) => idea && isFundingIdea(idea) && idea.status !== "Rejected");
 
   // Self-filtered directories — deduped and never show own profile (same email across roles hidden)
   const dedupeByEmail = (arr) => {
@@ -1350,9 +1452,9 @@ export default function App() {
   const dashboardGroups = currentUser?.role === "founder"
     ? [{ title: "Skilled talent", subtitle: "People ready to build alongside you", items: visibleBuilders, kind: "builder" }, { title: "Backers & mentors", subtitle: "People who can fund and guide you", items: visibleFunders, kind: "backer" }]
     : currentUser?.role === "backer"
-      ? [{ title: "Founders & ideas", subtitle: "Early-stage opportunities to explore", items: ideas.filter((i) => !isOwnIdea(i)), kind: "idea" }, { title: "Talent & skills", subtitle: "People with capabilities behind strong teams", items: visibleBuilders, kind: "builder" }]
+      ? [{ title: "Founders & ideas", subtitle: "Early-stage opportunities to explore", items: ideas.filter((i) => !isOwnIdea(i) && !isFundingIdea(i)), kind: "idea" }, { title: "Talent & skills", subtitle: "People with capabilities behind strong teams", items: visibleBuilders, kind: "builder" }]
       : currentUser?.role === "talent"
-        ? [{ title: "Founders & ideas", subtitle: "Teams looking for a builder like you", items: ideas.filter((i) => !isOwnIdea(i)), kind: "idea" }]
+        ? [{ title: "Founders & ideas", subtitle: "Teams looking for a builder like you", items: ideas.filter((i) => !isOwnIdea(i) && !isFundingIdea(i)), kind: "idea" }]
         : currentUser?.role === "admin"
           ? [{ title: "Founders & ideas", subtitle: "All live ideas", items: ideas, kind: "idea" }, { title: "Talent & skills", subtitle: "All builders", items: builders, kind: "builder" }]
           : [{ title: "Founders & ideas", subtitle: "Teams looking for collaborators", items: ideas, kind: "idea" }, { title: "Backers", subtitle: "Backers and mentors in the network", items: funders, kind: "backer" }];
@@ -1528,7 +1630,7 @@ export default function App() {
               <span className="text-[11px] text-slate-500">Swipe →</span>
             </div>
             <div ref={ideasScrollRef} className="flex gap-5 min-w-0 w-full max-w-full overflow-x-auto snap-x snap-mandatory pb-2 scrollbar-hide scroll-smooth" style={{scrollbarWidth:'none'}}>
-              {[...ideas].filter(i=> i.status !== "Rejected").sort((a,b)=> {
+              {[...ideas].filter(i=> i && i.status !== "Rejected" && !isFundingIdea(i)).sort((a,b)=> {
                 const getTime = (x)=> x.created_at?.seconds ? x.created_at.seconds*1000 : (x.created_at?.toMillis ? x.created_at.toMillis() : Date.parse(x.createdDate||0) || Number((x.id||'').split('_')[1]||0));
                 return getTime(b) - getTime(a);
               }).slice(0,12).map((idea) => (
@@ -1550,6 +1652,13 @@ export default function App() {
             </div>
             {ideas.length === 0 && <div className="mt-4 rounded-2xl border border-dashed border-slate-200 bg-white py-8 text-center text-sm text-slate-500">No ideas yet — be the first to post!</div>}
           </section>
+          <FundingSection
+            ideas={fundingIdeas}
+            signedIn={false}
+            onJoin={() => { setAuthMode("register"); setAuthModalOpen(true); }}
+            raisedFor={raisedForIdea}
+            donorCountFor={(id) => donorsForIdea(id).length}
+          />
         </main>
       )}
 
@@ -1580,7 +1689,7 @@ export default function App() {
               <span className="text-[11px] text-slate-500">Swipe →</span>
             </div>
             <div ref={ideasScrollRefSignedIn} className="flex gap-5 min-w-0 w-full max-w-full overflow-x-auto snap-x snap-mandatory pb-2 scroll-smooth" style={{scrollbarWidth:'none'}}>
-              {[...ideas].filter(i=> i.status !== "Rejected").sort((a,b)=> {
+              {[...ideas].filter(i=> i && i.status !== "Rejected" && !isFundingIdea(i)).sort((a,b)=> {
                 const getTime = (x)=> x.created_at?.seconds ? x.created_at.seconds*1000 : (x.created_at?.toMillis ? x.created_at.toMillis() : Date.parse(x.createdDate||0) || Number((x.id||'').split('_')[1]||0));
                 return getTime(b) - getTime(a);
               }).slice(0,12).map((idea) => (
@@ -1599,6 +1708,13 @@ export default function App() {
               ))}
             </div>
           </section>
+          <FundingSection
+            ideas={fundingIdeas}
+            signedIn={true}
+            onDonate={(idea) => { setTargetDonateIdea(idea); setDonateAmount(""); setDonateModalOpen(true); }}
+            raisedFor={raisedForIdea}
+            donorCountFor={(id) => donorsForIdea(id).length}
+          />
         </main>
       )}
 
@@ -1616,7 +1732,7 @@ export default function App() {
                 Campus Ideas Board
               </h2>
               <p className="text-[13.5px] text-zinc-400 mt-1 max-w-[600px]">
-                Browse raw and active startup ideas. Sign in to send connection requests and collaborate.
+                Browse startup ideas looking for co-founders and collaborators.
               </p>
             </div>
 
@@ -3148,10 +3264,9 @@ export default function App() {
                     onChange={(e) => setNewIdeaForm({ ...newIdeaForm, category: e.target.value })}
                     className="w-full h-11 rounded-full bg-slate-50 border border-slate-200 px-4 text-[13px] text-slate-800 outline-none focus:border-slate-400"
                   >
-                    <option>Tech / AI</option>
-                    <option>E-Commerce / D2C</option>
-                    <option>Food & Services</option>
-                    <option>EdTech</option>
+                    {IDEA_CATEGORIES.map((c) => (
+                      <option key={c}>{c}</option>
+                    ))}
                   </select>
                 </div>
 
