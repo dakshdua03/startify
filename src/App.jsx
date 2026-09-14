@@ -205,10 +205,9 @@ export function FundingSection({ ideas, signedIn, onDonate, onJoin, raisedFor, d
       <div ref={scrollRef} className="grid grid-cols-2 gap-5 min-w-0 w-full max-w-full overflow-x-auto snap-x snap-mandatory pb-2 scrollbar-hide scroll-smooth" style={{ scrollbarWidth: "none" }}>
         {list.map((idea) => (
            <article key={idea.id} className="snap-start rounded-[24px] border border-emerald-100 bg-white p-6 shadow-sm flex flex-col h-[340px] overflow-hidden">
-            <div className="flex items-center gap-2 flex-wrap">
-              <span className="rounded-full bg-slate-100 px-3 py-1 text-[10px] font-bold text-slate-600">{idea.category}</span>
-              <LookingForPill idea={idea} />
-            </div>
+             <div className="flex items-center gap-2 flex-wrap">
+               <span className="rounded-full bg-slate-100 px-3 py-1 text-[10px] font-bold text-slate-600">{idea.category}</span>
+             </div>
             <h3 className="font-heading mt-3 text-[18px] font-extrabold text-slate-800">{idea.title}</h3>
             <p className="mt-1 text-[12px] font-medium text-slate-500">By {idea.founder}</p>
             <p className="mt-3 text-[13px] leading-5 text-slate-600 line-clamp-2">{idea.desc}</p>
@@ -1641,18 +1640,13 @@ export default function App() {
                   <h3 className="font-heading mt-3 text-[18px] font-extrabold text-slate-800">{idea.title}</h3>
                   <p className="mt-1 text-[12px] font-medium text-slate-500">By {idea.founder}</p>
                   <p className="mt-3 text-[13px] leading-5 text-slate-600 line-clamp-3">{idea.desc}</p>
-                  {isFundingIdea(idea) ? (
-                    <div className="mt-3 text-[11px] font-semibold text-slate-600">💰 {fmtINR(raisedForIdea(idea))} raised <span className="font-normal text-slate-500">of {fmtINR(idea.goalAmount)}</span></div>
-                  ) : (
-                    <div className="mt-3 text-[11px] font-semibold text-slate-600">Seeking: {idea.seeking}</div>
-                  )}
-                  {idea.demoUrl ? <div className="mt-2"><DemoLink url={idea.demoUrl} /></div> : null}
-                </article>
-              ))}
-            </div>
-            {ideas.length === 0 && <div className="mt-4 rounded-2xl border border-dashed border-slate-200 bg-white py-8 text-center text-sm text-slate-500">No ideas yet — be the first to post!</div>}
-          </section>
-          <FundingSection
+                   {idea.demoUrl ? <div className="mt-2"><DemoLink url={idea.demoUrl} /></div> : null}
+                 </article>
+               ))}
+             </div>
+             {ideas.length === 0 && <div className="mt-4 rounded-2xl border border-dashed border-slate-200 bg-white py-8 text-center text-sm text-slate-500">No ideas yet — be the first to post!</div>}
+           </section>
+           <FundingSection
             ideas={fundingIdeas}
             signedIn={false}
             showJoin={false}
@@ -1709,19 +1703,14 @@ export default function App() {
                   <h3 className="font-heading mt-4 text-[20px] font-extrabold text-slate-800">{idea.title}</h3>
                   <p className="mt-1 text-[12px] font-medium text-slate-500">By {idea.founder}</p>
                   <p className="mt-3 text-[13px] leading-5 text-slate-600 line-clamp-3">{idea.desc}</p>
-                  {isFundingIdea(idea) ? (
-                    <div className="mt-4 border-t border-slate-200 pt-3 text-[11px] font-semibold text-slate-600">💰 {fmtINR(raisedForIdea(idea))} raised <span className="font-normal text-slate-500">of {fmtINR(idea.goalAmount)}</span></div>
-                  ) : (
-                    <div className="mt-4 border-t border-slate-200 pt-3 text-[11px] font-semibold text-slate-600">Seeking: {idea.seeking}</div>
-                  )}
-                  {idea.demoUrl ? <div className="mt-2"><DemoLink url={idea.demoUrl} /></div> : null}
-                </article>
-              ))}
-            </div>
-          </section>
-          <FundingSection
-            ideas={fundingIdeas}
-            signedIn={true}
+                   {idea.demoUrl ? <div className="mt-2"><DemoLink url={idea.demoUrl} /></div> : null}
+                 </article>
+               ))}
+             </div>
+           </section>
+           <FundingSection
+             ideas={fundingIdeas}
+             signedIn={true}
             noTopMargin
             onDonate={(idea) => { setTargetDonateIdea(idea); setDonateAmount(""); setDonateModalOpen(true); }}
             raisedFor={raisedForIdea}
