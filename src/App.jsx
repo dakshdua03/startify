@@ -202,9 +202,9 @@ export function FundingSection({ ideas, signedIn, onDonate, onJoin, raisedFor, d
         </div>
         <span className="text-[11px] text-slate-500">Swipe →</span>
       </div>
-      <div ref={scrollRef} className="flex gap-5 min-w-0 w-full max-w-full overflow-x-auto snap-x snap-mandatory pb-2 scrollbar-hide scroll-smooth" style={{ scrollbarWidth: "none" }}>
+      <div ref={scrollRef} className="grid grid-cols-2 gap-5 min-w-0 w-full max-w-full overflow-x-auto snap-x snap-mandatory pb-2 scrollbar-hide scroll-smooth" style={{ scrollbarWidth: "none" }}>
         {list.map((idea) => (
-          <article key={idea.id} className="snap-start shrink-0 w-[82vw] max-w-[320px] sm:w-[320px] md:w-[380px] rounded-[24px] border border-emerald-100 bg-white p-6 shadow-sm flex flex-col">
+           <article key={idea.id} className="snap-start rounded-[24px] border border-emerald-100 bg-white p-6 shadow-sm flex flex-col h-[340px] overflow-hidden">
             <div className="flex items-center gap-2 flex-wrap">
               <span className="rounded-full bg-slate-100 px-3 py-1 text-[10px] font-bold text-slate-600">{idea.category}</span>
               <LookingForPill idea={idea} />
@@ -1629,12 +1629,12 @@ export default function App() {
               </div>
               <span className="text-[11px] text-slate-500">Swipe →</span>
             </div>
-            <div ref={ideasScrollRef} className="flex gap-5 min-w-0 w-full max-w-full overflow-x-auto snap-x snap-mandatory pb-2 scrollbar-hide scroll-smooth" style={{scrollbarWidth:'none'}}>
-              {[...ideas].filter(i=> i && i.status !== "Rejected" && !isFundingIdea(i)).sort((a,b)=> {
-                const getTime = (x)=> x.created_at?.seconds ? x.created_at.seconds*1000 : (x.created_at?.toMillis ? x.created_at.toMillis() : Date.parse(x.createdDate||0) || Number((x.id||'').split('_')[1]||0));
-                return getTime(b) - getTime(a);
-              }).slice(0,12).map((idea) => (
-                <article key={idea.id} className="snap-start shrink-0 w-[78vw] max-w-[300px] sm:w-[300px] md:w-[360px] rounded-[24px] border border-slate-200 bg-white p-6 shadow-sm flex flex-col">
+             <div ref={ideasScrollRef} className="grid grid-cols-2 gap-5 min-w-0 w-full max-w-full overflow-x-auto snap-x snap-mandatory pb-2 scrollbar-hide scroll-smooth" style={{scrollbarWidth:'none'}}>
+               {[...ideas].filter(i=> i && i.status !== "Rejected" && !isFundingIdea(i)).sort((a,b)=> {
+                 const getTime = (x)=> x.created_at?.seconds ? x.created_at.seconds*1000 : (x.created_at?.toMillis ? x.created_at.toMillis() : Date.parse(x.createdDate||0) || Number((x.id||'').split('_')[1]||0));
+                 return getTime(b) - getTime(a);
+               }).slice(0,12).map((idea) => (
+                  <article key={idea.id} className="snap-start rounded-[24px] border border-slate-200 bg-white p-6 shadow-sm flex flex-col h-[340px] overflow-hidden">
                   <div className="flex items-center gap-3">
                     <span className="rounded-full bg-slate-100 px-3 py-1 text-[10px] font-bold text-slate-600">{idea.category}</span>
                   </div>
@@ -1699,12 +1699,12 @@ export default function App() {
               <button onClick={()=> ideasScrollRefSignedIn.current?.scrollBy({left:320, behavior:'smooth'})} className="h-8 w-8 rounded-full bg-slate-900 text-white grid place-items-center">›</button>
               <span className="text-[11px] text-slate-500">Swipe →</span>
             </div>
-            <div ref={ideasScrollRefSignedIn} className="flex gap-5 min-w-0 w-full max-w-full overflow-x-auto snap-x snap-mandatory pb-2 scroll-smooth" style={{scrollbarWidth:'none'}}>
-              {[...ideas].filter(i=> i && i.status !== "Rejected" && !isFundingIdea(i)).sort((a,b)=> {
-                const getTime = (x)=> x.created_at?.seconds ? x.created_at.seconds*1000 : (x.created_at?.toMillis ? x.created_at.toMillis() : Date.parse(x.createdDate||0) || Number((x.id||'').split('_')[1]||0));
-                return getTime(b) - getTime(a);
-              }).slice(0,12).map((idea) => (
-                <article key={idea.id} className="snap-start shrink-0 w-[78vw] max-w-[300px] sm:w-[300px] md:w-[360px] rounded-[24px] border border-slate-200 bg-white/85 p-6 shadow-sm flex flex-col">
+             <div ref={ideasScrollRefSignedIn} className="grid grid-cols-2 gap-5 min-w-0 w-full max-w-full overflow-x-auto snap-x snap-mandatory pb-2 scroll-smooth" style={{scrollbarWidth:'none'}}>
+               {[...ideas].filter(i=> i && i.status !== "Rejected" && !isFundingIdea(i)).sort((a,b)=> {
+                 const getTime = (x)=> x.created_at?.seconds ? x.created_at.seconds*1000 : (x.created_at?.toMillis ? x.created_at.toMillis() : Date.parse(x.createdDate||0) || Number((x.id||'').split('_')[1]||0));
+                 return getTime(b) - getTime(a);
+               }).slice(0,12).map((idea) => (
+                 <article key={idea.id} className="snap-start rounded-[24px] border border-slate-200 bg-white/85 p-6 shadow-sm flex flex-col h-[340px] overflow-hidden">
                   <div className="flex items-center gap-3"><span className="rounded-full bg-slate-100 px-3 py-1 text-[10px] font-bold text-slate-600">{idea.category}</span></div>
                   <h3 className="font-heading mt-4 text-[20px] font-extrabold text-slate-800">{idea.title}</h3>
                   <p className="mt-1 text-[12px] font-medium text-slate-500">By {idea.founder}</p>
