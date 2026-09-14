@@ -873,7 +873,7 @@ function render(){
       const target=pending.find(p=>p.id===id);
       if(target){
         const funders=load(LS_KEYS.funders, []);
-        const nf={id:target.id, name:target.name, email:target.email, role:target.roleTitle||"Angel Backer", focus:target.focus||"Tech & AI", bio:target.bio||"Approved backer.", ticketSize:"Pre-Seed & Seed"};
+        const nf={id:target.id, name:target.name, email:target.email, role:"Backer", focus:target.focus||"Tech & AI", bio:target.bio||"Approved backer.", ticketSize:"Pre-Seed & Seed"};
         save(LS_KEYS.funders, [nf, ...funders]);
         try { fsSet("funders", nf.id, nf); } catch {}
         save(LS_KEYS.pendingBackers, pending.filter(p=>p.id!==id));
@@ -1148,7 +1148,7 @@ function render(){
         }catch(err){ loginNote = "WARNING: Firebase login NOT created. User can't Sign In until this succeeds — retry creating."; }
         if(role==="backer"){
           const pending=load(LS_KEYS.pendingBackers, []);
-          const entry={id:"user_"+Date.now(), name, email, role:"backer", roleTitle: skills||"Angel Backer", focus:skills, bio:"", status:"pending_admin_approval", createdAt: new Date().toISOString()};
+          const entry={id:"user_"+Date.now(), name, email, role:"backer", roleTitle: "", focus:skills, bio:"", status:"pending_admin_approval", createdAt: new Date().toISOString()};
           save(LS_KEYS.pendingBackers, [entry, ...pending]);
           alert("Created: "+name+" (backer) — temp password: "+tempPass+" — pending your approval in 'Backer Approvals' tab.\n"+loginNote);
         } else {

@@ -69,6 +69,16 @@ export const INITIAL_REQUESTS = [];
 
 export const INITIAL_MESSAGES = [];
 
+// Connection requests removed as fake/test data (never show again on any
+// device, even if a copy still sits in that device's localStorage).
+export const REMOVED_REQUEST_IDS = new Set([
+  "req_1", // headless test artifact, not a real conversation
+  "req_1789297517145", // fake: to non-existent "Vikram Singh" entry
+  "req_1789297526017", // fake: to non-existent "Campus Angel Network" entry
+]);
+export const dropRemovedRequests = (arr) =>
+  (arr || []).filter((r) => r && !REMOVED_REQUEST_IDS.has(r.id));
+
 export const MAIN_WHATSAPP_LINK = "https://chat.whatsapp.com/BOgivVivG5ZLQ1OqoIl3wi?s=cl&p=a&mlu=4";
 
 export default function App() {
@@ -428,7 +438,7 @@ export default function App() {
         setEvents((prev) => [...filtered, ...prev.filter(p=>!deletedIds.has(p.id))]);
       }
       const req = JSON.parse(localStorage.getItem("startify_requests") || "null");
-      if (req && Array.isArray(req) && req.length) setRequests((prev) => [...req, ...prev]);
+      if (req && Array.isArray(req) && req.length) setRequests((prev) => dropRemovedRequests([...req, ...prev]));
       const msgs = JSON.parse(localStorage.getItem("startify_messages") || "null");
       if (msgs && Array.isArray(msgs) && msgs.length) setMessages((prev) => [...msgs, ...prev]);
       const pb = JSON.parse(localStorage.getItem("startify_pending_backers") || "null");
@@ -455,7 +465,7 @@ export default function App() {
       const map = new Map(); [...prev, ...ce.filter(x=>!x.deleted)].forEach(x=> map.set(x.id, x)); return Array.from(map.values());
     }); });
     dbService.getRequests().then((cr) => { if (cr && Array.isArray(cr)) setRequests((prev) => {
-      const map = new Map(); [...prev, ...cr].forEach(x=> map.set(x.id, x)); return Array.from(map.values());
+      const map = new Map(); [...prev, ...dropRemovedRequests(cr)].forEach(x=> map.set(x.id, x)); return Array.from(map.values());
     }); });
     dbService.getMessages().then((cm) => { if (cm && Array.isArray(cm)) setMessages((prev) => {
       const map = new Map(); [...prev, ...cm].forEach(x=> map.set(x.id, x)); return Array.from(map.values());
@@ -464,7 +474,7 @@ export default function App() {
     // Realtime: Firestore onSnapshot for chats so two devices sync without reload
     const unsubReq = dbService.subscribeRequests ? dbService.subscribeRequests((cloudReqs) => {
       if (cloudReqs && Array.isArray(cloudReqs)) setRequests((prev) => {
-        const map = new Map(); [...prev, ...cloudReqs].forEach(x=> map.set(x.id, x)); return Array.from(map.values());
+        const map = new Map(); [...prev, ...dropRemovedRequests(cloudReqs)].forEach(x=> map.set(x.id, x)); return Array.from(map.values());
       });
     }) : () => {};
     const unsubMsg = dbService.subscribeMessages ? dbService.subscribeMessages((cloudMsgs) => {
@@ -481,7 +491,7 @@ export default function App() {
         try {
           const req = JSON.parse(localStorage.getItem("startify_requests") || "null");
           if (req && Array.isArray(req)) {
-            setRequests(() => [...req, ...INITIAL_REQUESTS.filter(s => !req.some(r => r.id === s.id))]);
+            setRequests(() => dropRemovedRequests([...req, ...INITIAL_REQUESTS.filter(s => !req.some(r => r.id === s.id))]));
           }
         } catch {}
       }
@@ -2042,7 +2052,7 @@ export default function App() {
                       </div>
                       <div className="flex gap-2">
                         <button onClick={() => {
-                          setFunders([{ id: b.id, name: b.name, email: b.email.toLowerCase(), role: b.roleTitle || "Angel Backer", focus: b.focus || "Tech & AI", bio: b.bio || "Approved backer.", ticketSize: "Pre-Seed & Seed" }, ...funders]);
+                          setFunders([{ id: b.id, name: b.name, email: b.email.toLowerCase(), role: "Backer", focus: b.focus || "Tech & AI", bio: b.bio || "Approved backer.", ticketSize: "Pre-Seed & Seed" }, ...funders]);
                           setPendingBackers(pendingBackers.filter(x=>x.id!==b.id));
                           showToast(`✓ Approved backer: ${b.name}`);
                         }} className="h-9 rounded-full bg-slate-900 text-white px-4 text-[11px] font-bold hover:bg-slate-800">Approve →</button>
