@@ -1298,7 +1298,7 @@ export default function App() {
             </div>
           </div>
           {/* Ideas on home — why Startify started — swipeable, placed high */}
-          <section className="mt-8">
+          <section className="mt-8 min-w-0 max-w-full">
             <div className="mb-4 flex items-end justify-between gap-4">
               <div>
                 <h2 className="font-heading mt-1 text-[22px] sm:text-[25px] font-extrabold text-slate-900">Ideas gaining momentum</h2>
@@ -1317,7 +1317,7 @@ export default function App() {
               </div>
               <span className="text-[11px] text-slate-500">Swipe →</span>
             </div>
-            <div ref={ideasScrollRef} className="flex gap-5 overflow-x-auto snap-x snap-mandatory pb-2 scrollbar-hide scroll-smooth" style={{scrollbarWidth:'none'}}>
+            <div ref={ideasScrollRef} className="flex gap-5 min-w-0 w-full max-w-full overflow-x-auto snap-x snap-mandatory pb-2 scrollbar-hide scroll-smooth" style={{scrollbarWidth:'none'}}>
               {[...ideas].filter(i=> i.status !== "Rejected").sort((a,b)=> {
                 const getTime = (x)=> x.created_at?.seconds ? x.created_at.seconds*1000 : (x.created_at?.toMillis ? x.created_at.toMillis() : Date.parse(x.createdDate||0) || Number((x.id||'').split('_')[1]||0));
                 return getTime(b) - getTime(a);
@@ -1346,7 +1346,7 @@ export default function App() {
             <div className="mt-8 grid gap-4 sm:grid-cols-2 lg:grid-cols-4"><div className="rounded-2xl border border-slate-200 bg-white/80 p-5"><div className="text-[11px] font-bold uppercase tracking-wide text-slate-500">Live ideas</div><div className="font-heading mt-2 text-3xl font-extrabold text-slate-800">{ideas.length}</div><p className="mt-1 text-[11px] text-slate-500">Projects looking for momentum</p></div><div className="rounded-2xl border border-slate-200 bg-white/80 p-5"><div className="text-[11px] font-bold uppercase tracking-wide text-slate-500">Active people</div><div className="font-heading mt-2 text-3xl font-extrabold text-slate-800">{(() => { const emails = new Set(); builders.forEach(b => { if (b.email) emails.add(b.email.toLowerCase()); }); funders.forEach(f => { if (f.email) emails.add(f.email.toLowerCase()); }); ideas.forEach(i => { if (i.email) emails.add(i.email.toLowerCase()); }); return emails.size; })()}</div><p className="mt-1 text-[11px] text-slate-500">Unique people by email</p></div><div className="rounded-2xl border border-slate-200 bg-white/80 p-5"><div className="text-[11px] font-bold uppercase tracking-wide text-slate-500">Connections made</div><div className="font-heading mt-2 text-3xl font-extrabold text-slate-800">{requests.filter((request) => request.status === "accepted").length}</div><p className="mt-1 text-[11px] text-slate-500">Conversations unlocked</p></div><div className="rounded-2xl border border-slate-200 bg-white/80 p-5"><div className="text-[11px] font-bold uppercase tracking-wide text-slate-500">Upcoming events</div><div className="font-heading mt-2 text-3xl font-extrabold text-slate-800">{events.length}</div><p className="mt-1 text-[11px] text-slate-500">Ways to meet the community</p></div></div>
           </div>
           <section className="mt-8"><div className="mb-4 flex items-end justify-between"><div><div className="text-[11px] font-bold uppercase tracking-widest text-slate-500">MARK YOUR CALENDAR</div><h2 className="font-heading mt-1 text-[22px] sm:text-[25px] font-extrabold text-slate-800" style={{color: '#0f172a'}}>Upcoming community events</h2></div><button onClick={() => setActiveTab("home")} className="text-xs font-bold text-slate-700 hover:underline">Go to Chats →</button></div><div className="grid gap-5 md:grid-cols-2">{events.map((event) => <article key={event.id} className="rounded-[24px] border border-slate-200 bg-white p-6 shadow-sm" style={{background: 'rgba(255,255,255,0.92)'}}><div className="flex items-center justify-between gap-3"><span className="rounded-full bg-slate-100 px-3 py-1 text-[10px] font-bold uppercase tracking-wide text-slate-600">{event.category}</span><span className="text-xs font-semibold text-slate-500">{event.date}</span></div><h3 className="font-heading mt-4 text-[19px] font-extrabold" style={{color: '#0f172a'}}>{event.title}</h3><p className="mt-2 text-[13px]" style={{color: '#475569'}}>{event.time} · {event.venue}</p><p className="mt-3 text-[13px] leading-5" style={{color: '#334155'}}>{event.desc}</p></article>)}</div></section>
-          <section className="mt-10">
+          <section className="mt-10 min-w-0 max-w-full">
             <div className="mb-4 flex items-end justify-between gap-4">
               <div>
                 <div className="text-[11px] font-bold uppercase tracking-widest text-slate-500">IDEAS GAINING MOMENTUM</div>
@@ -1364,7 +1364,7 @@ export default function App() {
               <button onClick={()=> ideasScrollRefSignedIn.current?.scrollBy({left:320, behavior:'smooth'})} className="h-8 w-8 rounded-full bg-slate-900 text-white grid place-items-center">›</button>
               <span className="text-[11px] text-slate-500">Swipe →</span>
             </div>
-            <div ref={ideasScrollRefSignedIn} className="flex gap-5 overflow-x-auto snap-x snap-mandatory pb-2 scroll-smooth" style={{scrollbarWidth:'none'}}>
+            <div ref={ideasScrollRefSignedIn} className="flex gap-5 min-w-0 w-full max-w-full overflow-x-auto snap-x snap-mandatory pb-2 scroll-smooth" style={{scrollbarWidth:'none'}}>
               {[...ideas].filter(i=> i.status !== "Rejected").sort((a,b)=> {
                 const getTime = (x)=> x.created_at?.seconds ? x.created_at.seconds*1000 : (x.created_at?.toMillis ? x.created_at.toMillis() : Date.parse(x.createdDate||0) || Number((x.id||'').split('_')[1]||0));
                 return getTime(b) - getTime(a);
@@ -2565,35 +2565,35 @@ export default function App() {
           Phone: every tab fits on one row, no swipe (flex-1 equal slices). */}
       {currentUser && (
         <nav className="fixed bottom-0 left-0 right-0 z-40 bg-white/95 backdrop-blur border-t border-slate-200 shadow-[0_-4px_12px_rgba(0,0,0,0.05)] pb-[env(safe-area-inset-bottom)]">
-          <div className="mx-auto max-w-[1200px] px-1.5 min-[380px]:px-2 sm:px-6 h-[58px] sm:h-[60px] flex items-center justify-between sm:justify-center gap-1 sm:gap-2 overflow-hidden">
-            <button onClick={() => setActiveTab("home")} className={`min-w-0 flex-1 sm:flex-none truncate text-center px-1 min-[380px]:px-2 sm:px-4 py-2 rounded-full text-[10px] min-[380px]:text-[11px] sm:text-[12px] font-bold whitespace-nowrap transition ${activeTab === "home" ? "bg-slate-900 text-white shadow" : "text-slate-600 hover:text-slate-900 hover:bg-slate-100"}`}>
+          <div className="mx-auto max-w-[1200px] px-1 min-[380px]:px-2 sm:px-6 h-[58px] sm:h-[60px] flex items-center justify-between sm:justify-center gap-0.5 min-[380px]:gap-1 sm:gap-2 overflow-hidden">
+            <button onClick={() => setActiveTab("home")} className={`min-w-0 flex-1 sm:flex-none truncate text-center px-0.5 min-[380px]:px-2 sm:px-4 py-2 rounded-full text-[9px] min-[380px]:text-[11px] sm:text-[12px] font-bold whitespace-nowrap transition ${activeTab === "home" ? "bg-slate-900 text-white shadow" : "text-slate-600 hover:text-slate-900 hover:bg-slate-100"}`}>
               Home
             </button>
             {showIdeasTab && (
-              <button onClick={() => setActiveTab("ideas")} className={`min-w-0 flex-1 sm:flex-none truncate text-center px-1 min-[380px]:px-2 sm:px-4 py-2 rounded-full text-[10px] min-[380px]:text-[11px] sm:text-[12px] font-bold whitespace-nowrap transition ${activeTab === "ideas" ? "bg-slate-900 text-white shadow" : "text-slate-600 hover:text-slate-900 hover:bg-slate-100"}`}>
+              <button onClick={() => setActiveTab("ideas")} className={`min-w-0 flex-1 sm:flex-none truncate text-center px-0.5 min-[380px]:px-2 sm:px-4 py-2 rounded-full text-[9px] min-[380px]:text-[11px] sm:text-[12px] font-bold whitespace-nowrap transition ${activeTab === "ideas" ? "bg-slate-900 text-white shadow" : "text-slate-600 hover:text-slate-900 hover:bg-slate-100"}`}>
                 Ideas
               </button>
             )}
             {showTalentTab && (
-              <button onClick={() => setActiveTab("talent")} className={`min-w-0 flex-1 sm:flex-none truncate text-center px-1 min-[380px]:px-2 sm:px-4 py-2 rounded-full text-[10px] min-[380px]:text-[11px] sm:text-[12px] font-bold whitespace-nowrap transition ${activeTab === "talent" ? "bg-slate-900 text-white shadow" : "text-slate-600 hover:text-slate-900 hover:bg-slate-100"}`}>
+              <button onClick={() => setActiveTab("talent")} className={`min-w-0 flex-1 sm:flex-none truncate text-center px-0.5 min-[380px]:px-2 sm:px-4 py-2 rounded-full text-[9px] min-[380px]:text-[11px] sm:text-[12px] font-bold whitespace-nowrap transition ${activeTab === "talent" ? "bg-slate-900 text-white shadow" : "text-slate-600 hover:text-slate-900 hover:bg-slate-100"}`}>
                 Talent
               </button>
             )}
             {showBackersTab && (
-              <button onClick={() => setActiveTab("backers")} className={`min-w-0 flex-1 sm:flex-none truncate text-center px-1 min-[380px]:px-2 sm:px-4 py-2 rounded-full text-[10px] min-[380px]:text-[11px] sm:text-[12px] font-bold whitespace-nowrap transition ${activeTab === "backers" ? "bg-slate-900 text-white shadow" : "text-slate-600 hover:text-slate-900 hover:bg-slate-100"}`}>
+              <button onClick={() => setActiveTab("backers")} className={`min-w-0 flex-1 sm:flex-none truncate text-center px-0.5 min-[380px]:px-2 sm:px-4 py-2 rounded-full text-[9px] min-[380px]:text-[11px] sm:text-[12px] font-bold whitespace-nowrap transition ${activeTab === "backers" ? "bg-slate-900 text-white shadow" : "text-slate-600 hover:text-slate-900 hover:bg-slate-100"}`}>
                 Backers
               </button>
             )}
             {showEventsTab && (
-              <button onClick={() => setActiveTab("events")} className={`min-w-0 flex-1 sm:flex-none truncate text-center px-1 min-[380px]:px-2 sm:px-4 py-2 rounded-full text-[10px] min-[380px]:text-[11px] sm:text-[12px] font-bold whitespace-nowrap transition ${activeTab === "events" ? "bg-slate-900 text-white shadow" : "text-slate-600 hover:text-slate-900 hover:bg-slate-100"}`}>
+              <button onClick={() => setActiveTab("events")} className={`min-w-0 flex-1 sm:flex-none truncate text-center px-0.5 min-[380px]:px-2 sm:px-4 py-2 rounded-full text-[9px] min-[380px]:text-[11px] sm:text-[12px] font-bold whitespace-nowrap transition ${activeTab === "events" ? "bg-slate-900 text-white shadow" : "text-slate-600 hover:text-slate-900 hover:bg-slate-100"}`}>
                 Events
               </button>
             )}
-            <button onClick={() => setActiveTab("chats")} className={`min-w-0 flex-1 sm:flex-none truncate text-center px-1 min-[380px]:px-2 sm:px-4 py-2 rounded-full text-[10px] min-[380px]:text-[11px] sm:text-[12px] font-bold whitespace-nowrap transition relative ${activeTab === "chats" ? "bg-slate-900 text-white shadow" : "text-slate-600 hover:text-slate-900 hover:bg-slate-100"}`}>
+            <button onClick={() => setActiveTab("chats")} className={`min-w-0 flex-1 sm:flex-none truncate text-center px-0.5 min-[380px]:px-2 sm:px-4 py-2 rounded-full text-[9px] min-[380px]:text-[11px] sm:text-[12px] font-bold whitespace-nowrap transition relative ${activeTab === "chats" ? "bg-slate-900 text-white shadow" : "text-slate-600 hover:text-slate-900 hover:bg-slate-100"}`}>
               Chats
               {myIncomingRequests.filter(r=>r.status==="pending").length>0 && <span className="absolute top-1 right-2 h-2 w-2 rounded-full bg-emerald-500 border border-white"></span>}
             </button>
-            <button onClick={() => setActiveTab("profile")} className={`min-w-0 flex-1 sm:flex-none truncate text-center px-1 min-[380px]:px-2 sm:px-4 py-2 rounded-full text-[10px] min-[380px]:text-[11px] sm:text-[12px] font-bold whitespace-nowrap transition ${activeTab === "profile" ? "bg-slate-900 text-white shadow" : "text-slate-600 hover:text-slate-900 hover:bg-slate-100"}`}>
+            <button onClick={() => setActiveTab("profile")} className={`min-w-0 flex-1 sm:flex-none truncate text-center px-0.5 min-[380px]:px-2 sm:px-4 py-2 rounded-full text-[9px] min-[380px]:text-[11px] sm:text-[12px] font-bold whitespace-nowrap transition ${activeTab === "profile" ? "bg-slate-900 text-white shadow" : "text-slate-600 hover:text-slate-900 hover:bg-slate-100"}`}>
               Profile
             </button>
           </div>
