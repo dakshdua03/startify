@@ -592,10 +592,11 @@ nav .scrollbar-hide::-webkit-scrollbar { display: none !important; }
 .bg-slate-900 .text-white\/70,
 .bg-slate-900 .text-white\/80,
 .bg-slate-900 .text-white\/90,
-/* Chat modal: user messages on dark bg */
+/* Chat modal: own messages on dark bg stay white (specificity beats the
+   global .text-white -> black rule). NOTE: never add plain .text-slate-800
+   here — that is dark text for light bubbles/headers and must stay dark. */
 .fixed .bg-white .bg-slate-900.text-white,
 .fixed .bg-slate-50 .bg-slate-900.text-white,
-.fixed .bg-white .text-slate-800,
 /* Override global min-h-screen for chat bubbles */
 .min-h-screen .bg-slate-900.text-white,
 .min-h-screen .bg-slate-900 .text-white {
