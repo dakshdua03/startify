@@ -69,6 +69,16 @@ export const INITIAL_REQUESTS = [];
 
 export const INITIAL_MESSAGES = [];
 
+// Connection requests removed as fake/test data (never show again on any
+// device, even if a copy still sits in that device's localStorage).
+export const REMOVED_REQUEST_IDS = new Set([
+  "req_1", // headless test artifact, not a real conversation
+  "req_1789297517145", // fake: to non-existent "Vikram Singh" entry
+  "req_1789297526017", // fake: to non-existent "Campus Angel Network" entry
+]);
+export const dropRemovedRequests = (arr) =>
+  (arr || []).filter((r) => r && !REMOVED_REQUEST_IDS.has(r.id));
+
 export const MAIN_WHATSAPP_LINK = "https://chat.whatsapp.com/BOgivVivG5ZLQ1OqoIl3wi?s=cl&p=a&mlu=4";
 
 export default function App() {
@@ -216,7 +226,7 @@ export default function App() {
   };
   // Rename propagation: requests/ideas/messages/directory store names as snapshots,
   // so a rename must update every row belonging to this human (by id or email).
-  const propagateNameChange = (profile, newName) => {
+  const propagateNameChange = (profile, newName, silent = false) => {
     const emailLower = (profile.email || "").toLowerCase();
     const pid = profile.id;
     const matchHuman = (id, em) =>
@@ -270,7 +280,87 @@ export default function App() {
       });
       return touched ? next : prev;
     });
-    showToast("✓ Name updated everywhere");
+    if (!silent) showToast("✓ Name updated everywhere");
+  };
+  // One-time backfill: rows written before the rename fix still carry old names.
+  // Reconcile every row against the latest profile name per email (runs once on mount).
+  const backfillNamesFromProfiles = async () => {
+    try {
+      const local = JSON.parse(localStorage.getItem("startify_user_profiles") || "[]");
+      let cloud = [];
+      try { cloud = await dbService.getProfiles(); } catch {}
+      const map = new Map();
+      [...(Array.isArray(local) ? local : []), ...(Array.isArray(cloud) ? cloud : [])].forEach(p => {
+        if (p && p.email && p.role) map.set(`${p.email.toLowerCase()}_${p.role}`, p);
+      });
+      const byEmail = new Map();
+      Array.from(map.values()).forEach(p => {
+        if (!p.name) return;
+        const k = (p.email || "").toLowerCase();
+        const cur = byEmail.get(k);
+        if (!cur || new Date(p.createdAt || 0) > new Date(cur.createdAt || 0)) byEmail.set(k, p);
+      });
+      byEmail.forEach((p) => {
+        const emailLower = (p.email || "").toLowerCase();
+        const nm = p.name;
+        const fixReq = (prev) => prev.map(r => {
+          const c = { ...r };
+          if (((r.senderId && r.senderId === p.id) || (emailLower && (r.senderEmail || "").toLowerCase() === emailLower)) && c.senderName !== nm) c.senderName = nm;
+          if (((r.receiverId && r.receiverId === p.id) || (emailLower && (r.receiverEmail || "").toLowerCase() === emailLower)) && c.receiverName !== nm) c.receiverName = nm;
+          return c;
+        });
+        const fixIdea = (prev) => prev.map(i => {
+          if ((p.id && i.founderId === p.id) || (emailLower && (i.email || "").toLowerCase() === emailLower)) {
+            if (i.founder !== nm) return { ...i, founder: nm };
+          }
+          return i;
+        });
+        const fixMsg = (prev) => prev.map(m => {
+          if (p.id && m.senderId === p.id && m.senderName !== nm) return { ...m, senderName: nm };
+          return m;
+        });
+        setRequests(prev => {
+          const next = fixReq(prev);
+          const changed = next.filter((c, idx) => c !== prev[idx]);
+          if (changed.length) { changed.forEach(c => dbService.saveRequest(c)); return next; }
+          return prev;
+        });
+        setIdeas(prev => {
+          const next = fixIdea(prev);
+          const changed = next.filter((c, idx) => c !== prev[idx]);
+          if (changed.length) { changed.forEach(c => dbService.saveIdea(c)); return next; }
+          return prev;
+        });
+        setMessages(prev => {
+          const next = fixMsg(prev);
+          const changed = next.filter((c, idx) => c !== prev[idx]);
+          if (changed.length) { changed.forEach(c => dbService.saveMessage(c)); return next; }
+          return prev;
+        });
+        setBuilders(prev => {
+          const next = prev.map(b => {
+            if (((b.email || "").toLowerCase() === emailLower && emailLower) || (p.id && b.id === p.id)) {
+              if (b.name !== nm) return { ...b, name: nm };
+            }
+            return b;
+          });
+          const changed = next.filter((c, idx) => c !== prev[idx]);
+          if (changed.length) { changed.forEach(c => dbService.saveBuilder(c)); return next; }
+          return prev;
+        });
+        setFunders(prev => {
+          const next = prev.map(f => {
+            if (((f.email || "").toLowerCase() === emailLower && emailLower) || (p.id && f.id === p.id)) {
+              if (f.name !== nm) return { ...f, name: nm };
+            }
+            return f;
+          });
+          const changed = next.filter((c, idx) => c !== prev[idx]);
+          if (changed.length) { changed.forEach(c => dbService.saveFunder(c)); return next; }
+          return prev;
+        });
+      });
+    } catch (e) { console.warn("Name backfill failed", e); }
   };
   const getProfileImageKey = (email) => `startify_profile_img_${email.toLowerCase()}`;
   const getProfileAboutKey = (email) => `startify_profile_about_${email.toLowerCase()}`;
@@ -348,7 +438,7 @@ export default function App() {
         setEvents((prev) => [...filtered, ...prev.filter(p=>!deletedIds.has(p.id))]);
       }
       const req = JSON.parse(localStorage.getItem("startify_requests") || "null");
-      if (req && Array.isArray(req) && req.length) setRequests((prev) => [...req, ...prev]);
+      if (req && Array.isArray(req) && req.length) setRequests((prev) => dropRemovedRequests([...req, ...prev]));
       const msgs = JSON.parse(localStorage.getItem("startify_messages") || "null");
       if (msgs && Array.isArray(msgs) && msgs.length) setMessages((prev) => [...msgs, ...prev]);
       const pb = JSON.parse(localStorage.getItem("startify_pending_backers") || "null");
@@ -375,7 +465,7 @@ export default function App() {
       const map = new Map(); [...prev, ...ce.filter(x=>!x.deleted)].forEach(x=> map.set(x.id, x)); return Array.from(map.values());
     }); });
     dbService.getRequests().then((cr) => { if (cr && Array.isArray(cr)) setRequests((prev) => {
-      const map = new Map(); [...prev, ...cr].forEach(x=> map.set(x.id, x)); return Array.from(map.values());
+      const map = new Map(); [...prev, ...dropRemovedRequests(cr)].forEach(x=> map.set(x.id, x)); return Array.from(map.values());
     }); });
     dbService.getMessages().then((cm) => { if (cm && Array.isArray(cm)) setMessages((prev) => {
       const map = new Map(); [...prev, ...cm].forEach(x=> map.set(x.id, x)); return Array.from(map.values());
@@ -384,7 +474,7 @@ export default function App() {
     // Realtime: Firestore onSnapshot for chats so two devices sync without reload
     const unsubReq = dbService.subscribeRequests ? dbService.subscribeRequests((cloudReqs) => {
       if (cloudReqs && Array.isArray(cloudReqs)) setRequests((prev) => {
-        const map = new Map(); [...prev, ...cloudReqs].forEach(x=> map.set(x.id, x)); return Array.from(map.values());
+        const map = new Map(); [...prev, ...dropRemovedRequests(cloudReqs)].forEach(x=> map.set(x.id, x)); return Array.from(map.values());
       });
     }) : () => {};
     const unsubMsg = dbService.subscribeMessages ? dbService.subscribeMessages((cloudMsgs) => {
@@ -401,7 +491,7 @@ export default function App() {
         try {
           const req = JSON.parse(localStorage.getItem("startify_requests") || "null");
           if (req && Array.isArray(req)) {
-            setRequests(() => [...req, ...INITIAL_REQUESTS.filter(s => !req.some(r => r.id === s.id))]);
+            setRequests(() => dropRemovedRequests([...req, ...INITIAL_REQUESTS.filter(s => !req.some(r => r.id === s.id))]));
           }
         } catch {}
       }
@@ -432,6 +522,8 @@ export default function App() {
     window.addEventListener("storage", onStorage);
     const onVisible = () => { if (!document.hidden) loadIdeas(); };
     document.addEventListener("visibilitychange", onVisible);
+    // Heal rows written before the rename fix (old snapshot names)
+    backfillNamesFromProfiles();
     return () => { window.removeEventListener("storage", onStorage); document.removeEventListener("visibilitychange", onVisible); unsubReq(); unsubMsg(); unsubRsvp(); };
   }, []);
 
@@ -1222,7 +1314,7 @@ export default function App() {
                 <div className="space-y-4">
                   {[
                     ["Founder", "Post and manage ideas", "Meet verified UoH builders and campus backers.", "founder", "bg-white border-slate-200 hover:border-slate-300 hover:shadow-md shadow-sm"],
-                    ["Builder", "Build with ambitious teams", "Discover UoH founder ideas that need your skills.", "talent", "bg-white border-slate-200 hover:border-sky-300 hover:shadow-md shadow-sm"],
+                    ["Talent", "Build with ambitious teams", "Discover UoH founder ideas that need your skills.", "talent", "bg-white border-slate-200 hover:border-sky-300 hover:shadow-md shadow-sm"],
                     ["Backer", "Back promising people", "Browse UoH ideas and the talent behind them.", "backer", "bg-white border-slate-200 hover:border-violet-300 hover:shadow-md shadow-sm"],
                   ].map(([title, label, detail, role, cls]) => (
                     <button key={role} onClick={() => { setSelectedRegisterRole(role); setAuthMode("register"); setAuthModalOpen(true); }} className={`group w-full rounded-2xl border p-4 sm:p-5 text-left transition ${cls}`}>
@@ -1247,7 +1339,7 @@ export default function App() {
             </div>
           </div>
           {/* Ideas on home — why Startify started — swipeable, placed high */}
-          <section className="mt-8">
+          <section className="mt-8 min-w-0 max-w-full">
             <div className="mb-4 flex items-end justify-between gap-4">
               <div>
                 <h2 className="font-heading mt-1 text-[22px] sm:text-[25px] font-extrabold text-slate-900">Ideas gaining momentum</h2>
@@ -1266,7 +1358,7 @@ export default function App() {
               </div>
               <span className="text-[11px] text-slate-500">Swipe →</span>
             </div>
-            <div ref={ideasScrollRef} className="flex gap-5 overflow-x-auto snap-x snap-mandatory pb-2 scrollbar-hide scroll-smooth" style={{scrollbarWidth:'none'}}>
+            <div ref={ideasScrollRef} className="flex gap-5 min-w-0 w-full max-w-full overflow-x-auto snap-x snap-mandatory pb-2 scrollbar-hide scroll-smooth" style={{scrollbarWidth:'none'}}>
               {[...ideas].filter(i=> i.status !== "Rejected").sort((a,b)=> {
                 const getTime = (x)=> x.created_at?.seconds ? x.created_at.seconds*1000 : (x.created_at?.toMillis ? x.created_at.toMillis() : Date.parse(x.createdDate||0) || Number((x.id||'').split('_')[1]||0));
                 return getTime(b) - getTime(a);
@@ -1295,7 +1387,7 @@ export default function App() {
             <div className="mt-8 grid gap-4 sm:grid-cols-2 lg:grid-cols-4"><div className="rounded-2xl border border-slate-200 bg-white/80 p-5"><div className="text-[11px] font-bold uppercase tracking-wide text-slate-500">Live ideas</div><div className="font-heading mt-2 text-3xl font-extrabold text-slate-800">{ideas.length}</div><p className="mt-1 text-[11px] text-slate-500">Projects looking for momentum</p></div><div className="rounded-2xl border border-slate-200 bg-white/80 p-5"><div className="text-[11px] font-bold uppercase tracking-wide text-slate-500">Active people</div><div className="font-heading mt-2 text-3xl font-extrabold text-slate-800">{activePeopleCount}</div><p className="mt-1 text-[11px] text-slate-500">Unique people across the community</p></div><div className="rounded-2xl border border-slate-200 bg-white/80 p-5"><div className="text-[11px] font-bold uppercase tracking-wide text-slate-500">Connections made</div><div className="font-heading mt-2 text-3xl font-extrabold text-slate-800">{requests.filter((request) => request.status === "accepted").length}</div><p className="mt-1 text-[11px] text-slate-500">Conversations unlocked</p></div><div className="rounded-2xl border border-slate-200 bg-white/80 p-5"><div className="text-[11px] font-bold uppercase tracking-wide text-slate-500">Upcoming events</div><div className="font-heading mt-2 text-3xl font-extrabold text-slate-800">{events.length}</div><p className="mt-1 text-[11px] text-slate-500">Ways to meet the community</p></div></div>
           </div>
           <section className="mt-8"><div className="mb-4 flex items-end justify-between"><div><div className="text-[11px] font-bold uppercase tracking-widest text-slate-500">MARK YOUR CALENDAR</div><h2 className="font-heading mt-1 text-[22px] sm:text-[25px] font-extrabold text-slate-800" style={{color: '#0f172a'}}>Upcoming community events</h2></div><button onClick={() => setActiveTab("home")} className="text-xs font-bold text-slate-700 hover:underline">Go to Chats →</button></div><div className="grid gap-5 md:grid-cols-2">{events.map((event) => <article key={event.id} className="rounded-[24px] border border-slate-200 bg-white p-6 shadow-sm" style={{background: 'rgba(255,255,255,0.92)'}}><div className="flex items-center justify-between gap-3"><span className="rounded-full bg-slate-100 px-3 py-1 text-[10px] font-bold uppercase tracking-wide text-slate-600">{event.category}</span><span className="text-xs font-semibold text-slate-500">{event.date}</span></div><h3 className="font-heading mt-4 text-[19px] font-extrabold" style={{color: '#0f172a'}}>{event.title}</h3><p className="mt-2 text-[13px]" style={{color: '#475569'}}>{event.time} · {event.venue}</p><p className="mt-3 text-[13px] leading-5" style={{color: '#334155'}}>{event.desc}</p></article>)}</div></section>
-          <section className="mt-10">
+          <section className="mt-10 min-w-0 max-w-full">
             <div className="mb-4 flex items-end justify-between gap-4">
               <div>
                 <div className="text-[11px] font-bold uppercase tracking-widest text-slate-500">IDEAS GAINING MOMENTUM</div>
@@ -1313,7 +1405,7 @@ export default function App() {
               <button onClick={()=> ideasScrollRefSignedIn.current?.scrollBy({left:320, behavior:'smooth'})} className="h-8 w-8 rounded-full bg-slate-900 text-white grid place-items-center">›</button>
               <span className="text-[11px] text-slate-500">Swipe →</span>
             </div>
-            <div ref={ideasScrollRefSignedIn} className="flex gap-5 overflow-x-auto snap-x snap-mandatory pb-2 scroll-smooth" style={{scrollbarWidth:'none'}}>
+            <div ref={ideasScrollRefSignedIn} className="flex gap-5 min-w-0 w-full max-w-full overflow-x-auto snap-x snap-mandatory pb-2 scroll-smooth" style={{scrollbarWidth:'none'}}>
               {[...ideas].filter(i=> i.status !== "Rejected").sort((a,b)=> {
                 const getTime = (x)=> x.created_at?.seconds ? x.created_at.seconds*1000 : (x.created_at?.toMillis ? x.created_at.toMillis() : Date.parse(x.createdDate||0) || Number((x.id||'').split('_')[1]||0));
                 return getTime(b) - getTime(a);
@@ -1809,7 +1901,7 @@ export default function App() {
           <div className="rounded-[28px] border border-slate-200 bg-white p-6 shadow-sm">
             <div className="mb-7 flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between"><div><div className="inline-flex items-center gap-1.5 rounded-full bg-indigo-50 border border-indigo-200 px-2.5 py-1 text-[10px] font-bold uppercase tracking-widest text-indigo-700">University of Hyderabad • Private</div><h1 className="font-heading mt-3 text-[24px] sm:text-[32px] font-extrabold text-slate-800 text-balance">Your interest-based chats</h1><p className="mt-1 text-[13.5px] text-slate-500">Only accepted connections can start a conversation. Keep it respectful — this is a UoH student community.</p></div><div className="rounded-2xl bg-amber-50 border border-amber-200 p-3 text-[11px] leading-4 text-amber-800 max-w-[320px]"><strong>Community note:</strong> Misuse of chat can lead to removal. Conversations are interest-based and require acceptance.</div></div>
             {currentUser?.role === "backer" && currentUser?._backerPending && (
-              <div className="mb-4 rounded-full border border-amber-200 bg-amber-50 px-4 py-2.5 text-center text-[12px] font-semibold text-amber-800">Backer approval pending — you can chat with anyone after admin approves your account.</div>
+              <div className="mb-4 rounded-full border border-amber-200 bg-amber-50 px-4 py-2.5 text-center text-[12px] font-semibold text-amber-800">Backer approval pending — chat unlocks after admin approval.</div>
             )}
             <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
               {myAcceptedConnections.map((req) => {
@@ -1990,7 +2082,7 @@ export default function App() {
                       </div>
                       <div className="flex gap-2">
                         <button onClick={() => {
-                          setFunders([{ id: b.id, name: b.name, email: b.email.toLowerCase(), role: b.roleTitle || "Angel Backer", focus: b.focus || "Tech & AI", bio: b.bio || "Approved backer.", ticketSize: "Pre-Seed & Seed" }, ...funders]);
+                          setFunders([{ id: b.id, name: b.name, email: b.email.toLowerCase(), role: "Backer", focus: b.focus || "Tech & AI", bio: b.bio || "Approved backer.", ticketSize: "Pre-Seed & Seed" }, ...funders]);
                           setPendingBackers(pendingBackers.filter(x=>x.id!==b.id));
                           showToast(`✓ Approved backer: ${b.name}`);
                         }} className="h-9 rounded-full bg-slate-900 text-white px-4 text-[11px] font-bold hover:bg-slate-800">Approve →</button>
@@ -2517,35 +2609,35 @@ export default function App() {
           Phone: every tab fits on one row, no swipe (flex-1 equal slices). */}
       {currentUser && (
         <nav className="fixed bottom-0 left-0 right-0 z-40 bg-white/95 backdrop-blur border-t border-slate-200 shadow-[0_-4px_12px_rgba(0,0,0,0.05)] pb-[env(safe-area-inset-bottom)]">
-          <div className="mx-auto max-w-[1200px] px-1.5 min-[380px]:px-2 sm:px-6 h-[58px] sm:h-[60px] flex items-center justify-between sm:justify-center gap-1 sm:gap-2 overflow-hidden">
-            <button onClick={() => setActiveTab("home")} className={`min-w-0 flex-1 sm:flex-none truncate text-center px-1 min-[380px]:px-2 sm:px-4 py-2 rounded-full text-[10px] min-[380px]:text-[11px] sm:text-[12px] font-bold whitespace-nowrap transition ${activeTab === "home" ? "bg-slate-900 text-white shadow" : "text-slate-600 hover:text-slate-900 hover:bg-slate-100"}`}>
+          <div className="mx-auto max-w-[1200px] px-1 sm:px-6 h-[58px] sm:h-[60px] flex items-center justify-between sm:justify-center gap-0.5 sm:gap-2 overflow-hidden">
+            <button onClick={() => setActiveTab("home")} className={`min-w-0 flex-1 sm:flex-none truncate text-center px-0.5 min-[380px]:px-1 sm:px-4 py-2 rounded-full text-[9px] min-[380px]:text-[11px] sm:text-[12px] font-bold whitespace-nowrap transition ${activeTab === "home" ? "bg-slate-900 text-white shadow" : "text-slate-600 hover:text-slate-900 hover:bg-slate-100"}`}>
               Home
             </button>
             {showIdeasTab && (
-              <button onClick={() => setActiveTab("ideas")} className={`min-w-0 flex-1 sm:flex-none truncate text-center px-1 min-[380px]:px-2 sm:px-4 py-2 rounded-full text-[10px] min-[380px]:text-[11px] sm:text-[12px] font-bold whitespace-nowrap transition ${activeTab === "ideas" ? "bg-slate-900 text-white shadow" : "text-slate-600 hover:text-slate-900 hover:bg-slate-100"}`}>
+              <button onClick={() => setActiveTab("ideas")} className={`min-w-0 flex-1 sm:flex-none truncate text-center px-0.5 min-[380px]:px-1 sm:px-4 py-2 rounded-full text-[9px] min-[380px]:text-[11px] sm:text-[12px] font-bold whitespace-nowrap transition ${activeTab === "ideas" ? "bg-slate-900 text-white shadow" : "text-slate-600 hover:text-slate-900 hover:bg-slate-100"}`}>
                 Ideas
               </button>
             )}
             {showTalentTab && (
-              <button onClick={() => setActiveTab("talent")} className={`min-w-0 flex-1 sm:flex-none truncate text-center px-1 min-[380px]:px-2 sm:px-4 py-2 rounded-full text-[10px] min-[380px]:text-[11px] sm:text-[12px] font-bold whitespace-nowrap transition ${activeTab === "talent" ? "bg-slate-900 text-white shadow" : "text-slate-600 hover:text-slate-900 hover:bg-slate-100"}`}>
+              <button onClick={() => setActiveTab("talent")} className={`min-w-0 flex-1 sm:flex-none truncate text-center px-0.5 min-[380px]:px-1 sm:px-4 py-2 rounded-full text-[9px] min-[380px]:text-[11px] sm:text-[12px] font-bold whitespace-nowrap transition ${activeTab === "talent" ? "bg-slate-900 text-white shadow" : "text-slate-600 hover:text-slate-900 hover:bg-slate-100"}`}>
                 Talent
               </button>
             )}
             {showBackersTab && (
-              <button onClick={() => setActiveTab("backers")} className={`min-w-0 flex-1 sm:flex-none truncate text-center px-1 min-[380px]:px-2 sm:px-4 py-2 rounded-full text-[10px] min-[380px]:text-[11px] sm:text-[12px] font-bold whitespace-nowrap transition ${activeTab === "backers" ? "bg-slate-900 text-white shadow" : "text-slate-600 hover:text-slate-900 hover:bg-slate-100"}`}>
+              <button onClick={() => setActiveTab("backers")} className={`min-w-0 flex-1 sm:flex-none truncate text-center px-0.5 min-[380px]:px-1 sm:px-4 py-2 rounded-full text-[9px] min-[380px]:text-[11px] sm:text-[12px] font-bold whitespace-nowrap transition ${activeTab === "backers" ? "bg-slate-900 text-white shadow" : "text-slate-600 hover:text-slate-900 hover:bg-slate-100"}`}>
                 Backers
               </button>
             )}
             {showEventsTab && (
-              <button onClick={() => setActiveTab("events")} className={`min-w-0 flex-1 sm:flex-none truncate text-center px-1 min-[380px]:px-2 sm:px-4 py-2 rounded-full text-[10px] min-[380px]:text-[11px] sm:text-[12px] font-bold whitespace-nowrap transition ${activeTab === "events" ? "bg-slate-900 text-white shadow" : "text-slate-600 hover:text-slate-900 hover:bg-slate-100"}`}>
+              <button onClick={() => setActiveTab("events")} className={`min-w-0 flex-1 sm:flex-none truncate text-center px-0.5 min-[380px]:px-1 sm:px-4 py-2 rounded-full text-[9px] min-[380px]:text-[11px] sm:text-[12px] font-bold whitespace-nowrap transition ${activeTab === "events" ? "bg-slate-900 text-white shadow" : "text-slate-600 hover:text-slate-900 hover:bg-slate-100"}`}>
                 Events
               </button>
             )}
-            <button onClick={() => setActiveTab("chats")} className={`min-w-0 flex-1 sm:flex-none truncate text-center px-1 min-[380px]:px-2 sm:px-4 py-2 rounded-full text-[10px] min-[380px]:text-[11px] sm:text-[12px] font-bold whitespace-nowrap transition relative ${activeTab === "chats" ? "bg-slate-900 text-white shadow" : "text-slate-600 hover:text-slate-900 hover:bg-slate-100"}`}>
+            <button onClick={() => setActiveTab("chats")} className={`min-w-0 flex-1 sm:flex-none truncate text-center px-0.5 min-[380px]:px-1 sm:px-4 py-2 rounded-full text-[9px] min-[380px]:text-[11px] sm:text-[12px] font-bold whitespace-nowrap transition relative ${activeTab === "chats" ? "bg-slate-900 text-white shadow" : "text-slate-600 hover:text-slate-900 hover:bg-slate-100"}`}>
               Chats
               {myIncomingRequests.filter(r=>r.status==="pending").length>0 && <span className="absolute top-1 right-2 h-2 w-2 rounded-full bg-emerald-500 border border-white"></span>}
             </button>
-            <button onClick={() => setActiveTab("profile")} className={`min-w-0 flex-1 sm:flex-none truncate text-center px-1 min-[380px]:px-2 sm:px-4 py-2 rounded-full text-[10px] min-[380px]:text-[11px] sm:text-[12px] font-bold whitespace-nowrap transition ${activeTab === "profile" ? "bg-slate-900 text-white shadow" : "text-slate-600 hover:text-slate-900 hover:bg-slate-100"}`}>
+            <button onClick={() => setActiveTab("profile")} className={`min-w-0 flex-1 sm:flex-none truncate text-center px-0.5 min-[380px]:px-1 sm:px-4 py-2 rounded-full text-[9px] min-[380px]:text-[11px] sm:text-[12px] font-bold whitespace-nowrap transition ${activeTab === "profile" ? "bg-slate-900 text-white shadow" : "text-slate-600 hover:text-slate-900 hover:bg-slate-100"}`}>
               Profile
             </button>
           </div>

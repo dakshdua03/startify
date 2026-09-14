@@ -5,13 +5,14 @@
 /* ─── Google Fonts (loaded in index.html) ─── */
 @layer base {
   html { font-size: 17px; }
+  html, body { overflow-x: clip; }
   body {
     background: #e8eaed;
     color: #111111;
     font-family: 'Inter', system-ui, sans-serif;
     font-size: 16.5px;
     line-height: 1.65;
-    overflow-x: hidden;
+    overflow-x: clip;
     -webkit-font-smoothing: antialiased;
   }
 
@@ -518,10 +519,21 @@ section {
   filter: none !important;
 }
 
-/* Make main content expand so footer sticks to viewport bottom with no extra gap */
+/* Make main content expand so footer sticks to viewport bottom with no extra gap.
+   width:100% + min-width:0 are REQUIRED on top of flex: without a definite
+   width, a column-flex item's cross size resolves from max-content, and the
+   horizontal idea rails (~580px of cards) forced the whole page to ~614px
+   on 360px phones. flex-shrink can't fix width in a column container. */
 .min-h-screen.flex.flex-col > main,
 .min-h-screen.flex.flex-col > section {
-  flex: 1 0 auto;
+  flex: 1 1 auto;
+  width: 100%;
+  min-width: 0;
+}
+.min-h-screen.flex.flex-col > nav,
+.min-h-screen.flex.flex-col > footer {
+  width: 100%;
+  min-width: 0;
 }
 .min-h-screen.flex.flex-col > section.mx-auto {
   width: 100%;
@@ -580,10 +592,11 @@ nav .scrollbar-hide::-webkit-scrollbar { display: none !important; }
 .bg-slate-900 .text-white\/70,
 .bg-slate-900 .text-white\/80,
 .bg-slate-900 .text-white\/90,
-/* Chat modal: user messages on dark bg */
+/* Chat modal: own messages on dark bg stay white (specificity beats the
+   global .text-white -> black rule). NOTE: never add plain .text-slate-800
+   here — that is dark text for light bubbles/headers and must stay dark. */
 .fixed .bg-white .bg-slate-900.text-white,
 .fixed .bg-slate-50 .bg-slate-900.text-white,
-.fixed .bg-white .text-slate-800,
 /* Override global min-h-screen for chat bubbles */
 .min-h-screen .bg-slate-900.text-white,
 .min-h-screen .bg-slate-900 .text-white {
@@ -634,7 +647,15 @@ nav .scrollbar-hide::-webkit-scrollbar { display: none !important; }
    ───────────────────────────────────────────── */
 @media (max-width: 640px) {
   html { font-size: 16px; }
+  html, body {
+    overflow-x: clip;
+    overscroll-behavior-x: none;
+  }
   body { font-size: 15px; -webkit-text-size-adjust: 100%; }
+  /* Grid items can never force the page wider (long words wrap instead) */
+  #root .grid > * { min-width: 0; }
+  /* Horizontal rails are capped: scrollable cards must never widen ancestors */
+  .snap-x { max-width: 100%; min-width: 0; }
 
   img, svg, video, canvas { max-width: 100%; }
 
