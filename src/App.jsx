@@ -175,7 +175,7 @@ export function LookingForPill({ idea }) {
 
 // Dedicated fundraising rail — funding ideas never merge with team-seeking ones.
 // signedIn=false renders a Join CTA instead of Donate (logged-out visitors).
-export function FundingSection({ ideas, signedIn, onDonate, onJoin, raisedFor, donorCountFor }) {
+export function FundingSection({ ideas, signedIn, onDonate, onJoin, raisedFor, donorCountFor, showJoin = true, noTopMargin = false }) {
   const scrollRef = useRef(null);
   const list = [...(ideas || [])].filter((i) => i && i.status !== "Rejected").sort((a, b) => {
     const getTime = (x) => x.created_at?.seconds ? x.created_at.seconds * 1000 : (x.created_at?.toMillis ? x.created_at.toMillis() : Date.parse(x.createdDate || 0) || Number((x.id || "").split("_")[1] || 0));
@@ -183,7 +183,7 @@ export function FundingSection({ ideas, signedIn, onDonate, onJoin, raisedFor, d
   }).slice(0, 12);
   if (!list.length) return null;
   return (
-    <section className="mt-8 min-w-0 max-w-full">
+    <section className={`${noTopMargin ? "" : "mt-8 "}min-w-0 max-w-full`}>
       <div className="mb-4 flex items-end justify-between gap-4">
         <div className="min-w-0">
           <div className="text-[11px] font-bold uppercase tracking-widest text-emerald-700">FUNDRAISING</div>
@@ -223,14 +223,14 @@ export function FundingSection({ ideas, signedIn, onDonate, onJoin, raisedFor, d
                 >
                   Donate →
                 </button>
-              ) : (
+              ) : showJoin ? (
                 <button
                   onClick={() => onJoin && onJoin()}
                   className="flex-1 h-10 rounded-full bg-slate-900 text-white text-[12.5px] font-bold hover:bg-black transition"
                 >
                   Join to donate →
                 </button>
-              )}
+              ) : null}
               {idea.demoUrl ? (
                 <DemoLink
                   url={idea.demoUrl}
@@ -1609,17 +1609,17 @@ export default function App() {
               </div>
             </div>
           </div>
-          {/* Ideas on home — why Startify started — swipeable, placed high */}
-          <section className="mt-8 min-w-0 max-w-full">
+          {/* Ideas on home — team-seeking and funding side by side */}
+          <div className="mt-8 grid min-w-0 max-w-full gap-8 lg:grid-cols-2 lg:items-start">
+          <section className="min-w-0 max-w-full">
             <div className="mb-4 flex items-end justify-between gap-4">
               <div>
-                <h2 className="font-heading mt-1 text-[22px] sm:text-[25px] font-extrabold text-slate-900">Ideas gaining momentum</h2>
+                <h2 className="font-heading mt-1 text-[22px] sm:text-[25px] font-extrabold text-slate-900">Ideas looking for teams</h2>
                 <p className="text-[13px] text-slate-600 mt-1">Real UoH student ideas looking for co-founders — swipe to explore, join to connect.</p>
               </div>
               <div className="hidden sm:flex items-center gap-2 shrink-0">
                 <button onClick={()=> ideasScrollRef.current?.scrollBy({left:-320, behavior:'smooth'})} className="h-9 w-9 rounded-full bg-white border border-slate-200 grid place-items-center text-slate-700 hover:bg-slate-900 hover:text-white transition" aria-label="Previous">‹</button>
                 <button onClick={()=> ideasScrollRef.current?.scrollBy({left:320, behavior:'smooth'})} className="h-9 w-9 rounded-full bg-slate-900 text-white grid place-items-center hover:bg-black transition" aria-label="Next">›</button>
-                <button onClick={() => { setAuthMode("register"); setAuthModalOpen(true); }} className="h-9 px-4 rounded-full bg-slate-900 text-white text-xs font-bold hover:bg-black hidden lg:inline-flex items-center">Join to connect →</button>
               </div>
             </div>
             <div className="flex items-center justify-between sm:hidden mb-3 gap-2">
@@ -1655,10 +1655,20 @@ export default function App() {
           <FundingSection
             ideas={fundingIdeas}
             signedIn={false}
-            onJoin={() => { setAuthMode("register"); setAuthModalOpen(true); }}
+            showJoin={false}
+            noTopMargin
             raisedFor={raisedForIdea}
             donorCountFor={(id) => donorsForIdea(id).length}
           />
+          </div>
+          <div className="mt-6">
+            <button
+              onClick={() => { setAuthMode("register"); setAuthModalOpen(true); }}
+              className="w-full h-12 rounded-full bg-slate-900 text-white font-bold text-[14px] hover:bg-black transition shadow"
+            >
+              Join to connect / donate →
+            </button>
+          </div>
         </main>
       )}
 
@@ -1670,11 +1680,12 @@ export default function App() {
             <div className="mt-8 grid gap-4 sm:grid-cols-2 lg:grid-cols-4"><div className="rounded-2xl border border-slate-200 bg-white/80 p-5"><div className="text-[11px] font-bold uppercase tracking-wide text-slate-500">Live ideas</div><div className="font-heading mt-2 text-3xl font-extrabold text-slate-800">{ideas.length}</div><p className="mt-1 text-[11px] text-slate-500">Projects looking for momentum</p></div><div className="rounded-2xl border border-slate-200 bg-white/80 p-5"><div className="text-[11px] font-bold uppercase tracking-wide text-slate-500">Active people</div><div className="font-heading mt-2 text-3xl font-extrabold text-slate-800">{activePeopleCount}</div><p className="mt-1 text-[11px] text-slate-500">Unique people across the community</p></div><div className="rounded-2xl border border-slate-200 bg-white/80 p-5"><div className="text-[11px] font-bold uppercase tracking-wide text-slate-500">Connections made</div><div className="font-heading mt-2 text-3xl font-extrabold text-slate-800">{requests.filter((request) => request.status === "accepted").length}</div><p className="mt-1 text-[11px] text-slate-500">Conversations unlocked</p></div><div className="rounded-2xl border border-slate-200 bg-white/80 p-5"><div className="text-[11px] font-bold uppercase tracking-wide text-slate-500">Upcoming events</div><div className="font-heading mt-2 text-3xl font-extrabold text-slate-800">{events.length}</div><p className="mt-1 text-[11px] text-slate-500">Ways to meet the community</p></div></div>
           </div>
           <section className="mt-8"><div className="mb-4 flex items-end justify-between"><div><div className="text-[11px] font-bold uppercase tracking-widest text-slate-500">MARK YOUR CALENDAR</div><h2 className="font-heading mt-1 text-[22px] sm:text-[25px] font-extrabold text-slate-800" style={{color: '#0f172a'}}>Upcoming community events</h2></div><button onClick={() => setActiveTab("home")} className="text-xs font-bold text-slate-700 hover:underline">Go to Chats →</button></div><div className="grid gap-5 md:grid-cols-2">{events.map((event) => <article key={event.id} className="rounded-[24px] border border-slate-200 bg-white p-6 shadow-sm" style={{background: 'rgba(255,255,255,0.92)'}}><div className="flex items-center justify-between gap-3"><span className="rounded-full bg-slate-100 px-3 py-1 text-[10px] font-bold uppercase tracking-wide text-slate-600">{event.category}</span><span className="text-xs font-semibold text-slate-500">{event.date}</span></div><h3 className="font-heading mt-4 text-[19px] font-extrabold" style={{color: '#0f172a'}}>{event.title}</h3><p className="mt-2 text-[13px]" style={{color: '#475569'}}>{event.time} · {event.venue}</p><p className="mt-3 text-[13px] leading-5" style={{color: '#334155'}}>{event.desc}</p></article>)}</div></section>
-          <section className="mt-10 min-w-0 max-w-full">
+          <div className="mt-10 grid min-w-0 max-w-full gap-8 lg:grid-cols-2 lg:items-start">
+          <section className="min-w-0 max-w-full">
             <div className="mb-4 flex items-end justify-between gap-4">
               <div>
-                <div className="text-[11px] font-bold uppercase tracking-widest text-slate-500">IDEAS GAINING MOMENTUM</div>
-                <h2 className="font-heading mt-1 text-[22px] sm:text-[25px] font-extrabold text-slate-800">What the community is building</h2>
+                <div className="text-[11px] font-bold uppercase tracking-widest text-slate-500">TEAM-SEEKING IDEAS</div>
+                <h2 className="font-heading mt-1 text-[22px] sm:text-[25px] font-extrabold text-slate-800">Ideas looking for teams</h2>
                 <p className="text-[13px] text-slate-600 mt-1">Swipe to explore — founder or not, ideas need eyes.</p>
               </div>
               <div className="hidden sm:flex items-center gap-2 shrink-0">
@@ -1711,10 +1722,12 @@ export default function App() {
           <FundingSection
             ideas={fundingIdeas}
             signedIn={true}
+            noTopMargin
             onDonate={(idea) => { setTargetDonateIdea(idea); setDonateAmount(""); setDonateModalOpen(true); }}
             raisedFor={raisedForIdea}
             donorCountFor={(id) => donorsForIdea(id).length}
           />
+          </div>
         </main>
       )}
 
