@@ -14,23 +14,51 @@
 <body class="bg-[#f1f5f9] text-slate-800">
 <div id="app"></div>
 <script>
-// Firestore backend (same project as site: startify-01) — localStorage remains as fallback/offline mirror
-const FIREBASE_CONFIG = {
-  apiKey: "AIzaSyDa2GrOS9xmrZGI-0W8BLE_vLu9XJr3i0A",
-  authDomain: "startify-01.firebaseapp.com",
-  projectId: "startify-01",
-  storageBucket: "startify-01.firebasestorage.app",
-  messagingSenderId: "451497028667",
-  appId: "1:451497028667:web:356d1693d60a204095c01e"
-};
+// Firestore backend (same project as the main site) — localStorage remains as fallback/offline mirror.
+// NOTE: no API keys live in this file. The Firebase web config is fetched at
+// runtime from /api/firebase-config (Cloudflare Pages env vars VITE_FIREBASE_*,
+// the same variables the main site in src/lib/firebase.js uses).
+let FIREBASE_CONFIG = null;
 let FSDB = null;
-try {
-  if (window.firebase && FIREBASE_CONFIG.apiKey) {
-    firebase.initializeApp(FIREBASE_CONFIG);
+const ADMIN_CFG_KEY = "startify_admin_firebase_config";
+function initFirebaseFromConfig(cfg) {
+  if (!cfg || !cfg.apiKey || !window.firebase) return false;
+  try {
+    try { firebase.app(); }
+    catch { firebase.initializeApp(cfg); }
     FSDB = firebase.firestore();
-  }
-} catch (e) { console.warn("Admin Firestore init failed", e); }
+    FIREBASE_CONFIG = cfg;
+    try { localStorage.setItem(ADMIN_CFG_KEY, JSON.stringify(cfg)); } catch {}
+    return true;
+  } catch (e) { console.warn("Admin Firestore init failed", e); return false; }
+}
+async function loadFirebaseConfig() {
+  try {
+    const res = await fetch("/api/firebase-config", { cache: "no-store" });
+    if (res.ok) {
+      const data = await res.json();
+      if (data && data.config && data.config.apiKey && initFirebaseFromConfig(data.config)) return true;
+      console.warn("Admin Firebase config incomplete from server", data && data.missing);
+    }
+  } catch (e) { console.warn("Admin Firebase config fetch failed", e && e.message); }
+  try {
+    const cached = JSON.parse(localStorage.getItem(ADMIN_CFG_KEY) || "null");
+    if (cached && cached.apiKey && initFirebaseFromConfig(cached)) {
+      console.warn("Admin using cached Firebase config (offline/dev)");
+      return true;
+    }
+  } catch {}
+  console.warn("Admin Firestore unavailable — set VITE_FIREBASE_* in Cloudflare Pages > Settings > Variables");
+  return false;
+}
+// Resolves once the config load above finishes (true = Firestore ready).
+const firebaseReady = loadFirebaseConfig();
+async function waitFirebaseReady(timeoutMs = 8000) {
+  try { await Promise.race([firebaseReady, new Promise((r) => setTimeout(r, timeoutMs))]); } catch {}
+  return !!FSDB;
+}
 async function fsGet(col, max=300){
+  await waitFirebaseReady();
   if (!FSDB) return [];
   try {
     const snap = await FSDB.collection(col).limit(max).get();
@@ -38,17 +66,21 @@ async function fsGet(col, max=300){
   } catch (e) { console.warn("Admin Firestore read failed", col, e); return []; }
 }
 async function fsSet(col, id, data){
+  await waitFirebaseReady();
   if (!FSDB || !id) return;
   try { await FSDB.collection(col).doc(id).set(data, { merge: true }); } catch (e) { console.warn("Admin Firestore write failed", col, e); }
 }
 async function fsDel(col, id){
+  await waitFirebaseReady();
   if (!FSDB || !id) return;
   try { await FSDB.collection(col).doc(id).delete(); } catch (e) { console.warn("Admin Firestore delete failed", col, e); }
 }
 // Secondary Firebase Auth instance: creates real login accounts for new users
 // WITHOUT signing the admin out of the main app. Login on the main site requires
 // a Firebase Auth user + verified email, so admin-created accounts must go through this.
-function getSecondaryAuth(){
+async function getSecondaryAuth(){
+  await waitFirebaseReady();
+  if (!FIREBASE_CONFIG) return null;
   try{
     if(!window.firebase || !firebase.auth) return null;
     let app2 = null;
@@ -58,7 +90,7 @@ function getSecondaryAuth(){
   }catch(e){ console.warn("Secondary auth init failed", e); return null; }
 }
 async function createFirebaseLogin(email, password){
-  const sec = getSecondaryAuth();
+  const sec = await getSecondaryAuth();
   if(!sec) return { ok:false, code:"no-auth", message:"Firebase Auth unavailable on admin page." };
   try{
     const cred = await sec.createUserWithEmailAndPassword(email.toLowerCase(), password);
@@ -72,6 +104,7 @@ async function createFirebaseLogin(email, password){
 }
 // Pull cloud collections into localStorage mirror so existing render() logic works cross-device
 async function syncFromFirestore(){
+  await waitFirebaseReady();
   if (!FSDB) return;
   try {
     const [ideas, profiles, requests, messages, builders, funders, events, admins] = await Promise.all([
@@ -162,6 +195,7 @@ function getAdmins(){
   return [];
 }
 async function getFirestoreAdminDoc(email){
+  await waitFirebaseReady();
   if (!FSDB) return null;
   try {
     const doc = await FSDB.collection("admins").doc(email.toLowerCase()).get();
