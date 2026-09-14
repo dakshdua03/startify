@@ -210,7 +210,66 @@ export default function App() {
       setCurrentUser({ ...currentUser, name, bio: about || currentUser.bio, skills: profile.role==="talent" ? (popupExtraDraft.trim()||currentUser.skills) : currentUser.skills, focus: profile.role==="backer" ? (popupExtraDraft.trim()||currentUser.focus) : currentUser.focus });
     }
     setPopupEditId(null);
-    showToast("✓ Profile updated");
+    if (name !== profile.name) propagateNameChange(profile, name);
+    else showToast("✓ Profile updated");
+  };
+  // Rename propagation: requests/ideas/messages/directory store names as snapshots,
+  // so a rename must update every row belonging to this human (by id or email).
+  const propagateNameChange = (profile, newName) => {
+    const emailLower = (profile.email || "").toLowerCase();
+    const pid = profile.id;
+    const matchHuman = (id, em) =>
+      (pid && id === pid) || (emailLower && (em || "").toLowerCase() === emailLower);
+    setRequests(prev => {
+      let touched = false;
+      const next = prev.map(r => {
+        const copy = { ...r };
+        if (matchHuman(r.senderId, r.senderEmail) && copy.senderName !== newName) { copy.senderName = newName; touched = true; }
+        if (matchHuman(r.receiverId, r.receiverEmail) && copy.receiverName !== newName) { copy.receiverName = newName; touched = true; }
+        if (copy.senderName !== r.senderName || copy.receiverName !== r.receiverName) dbService.saveRequest(copy);
+        return copy;
+      });
+      return touched ? next : prev;
+    });
+    setIdeas(prev => {
+      let touched = false;
+      const next = prev.map(i => {
+        if ((pid && i.founderId === pid) || (emailLower && (i.email || "").toLowerCase() === emailLower)) {
+          if (i.founder !== newName) { touched = true; const copy = { ...i, founder: newName }; dbService.saveIdea(copy); return copy; }
+        }
+        return i;
+      });
+      return touched ? next : prev;
+    });
+    setMessages(prev => {
+      let touched = false;
+      const next = prev.map(m => {
+        if (pid && m.senderId === pid && m.senderName !== newName) { touched = true; const copy = { ...m, senderName: newName }; dbService.saveMessage(copy); return copy; }
+        return m;
+      });
+      return touched ? next : prev;
+    });
+    setBuilders(prev => {
+      let touched = false;
+      const next = prev.map(b => {
+        if (((b.email || "").toLowerCase() === emailLower && emailLower) || (pid && b.id === pid)) {
+          if (b.name !== newName) { touched = true; const copy = { ...b, name: newName }; dbService.saveBuilder(copy); return copy; }
+        }
+        return b;
+      });
+      return touched ? next : prev;
+    });
+    setFunders(prev => {
+      let touched = false;
+      const next = prev.map(f => {
+        if (((f.email || "").toLowerCase() === emailLower && emailLower) || (pid && f.id === pid)) {
+          if (f.name !== newName) { touched = true; const copy = { ...f, name: newName }; dbService.saveFunder(copy); return copy; }
+        }
+        return f;
+      });
+      return touched ? next : prev;
+    });
+    showToast("✓ Name updated everywhere");
   };
   const getProfileImageKey = (email) => `startify_profile_img_${email.toLowerCase()}`;
   const getProfileAboutKey = (email) => `startify_profile_about_${email.toLowerCase()}`;
@@ -1010,7 +1069,7 @@ export default function App() {
     <div className="min-h-screen flex flex-col bg-[#202728] text-zinc-100 selection:bg-white selection:text-black">
       {/* Toast Notification — white on black, high contrast, no blur */}
       {toastMessage && (
-        <div className="fixed bottom-6 right-6 z-[70] bg-black text-white px-5 py-3.5 rounded-2xl shadow-2xl text-sm font-semibold flex items-center gap-3 border border-white/10" style={{backdropFilter:"none", WebkitBackdropFilter:"none"}}>
+        <div className="fixed left-4 right-4 bottom-24 z-[70] bg-black text-white px-5 py-3.5 rounded-2xl shadow-2xl text-sm font-semibold flex items-center gap-3 border border-white/10 sm:left-auto sm:right-6 sm:bottom-6 sm:max-w-sm" style={{backdropFilter:"none", WebkitBackdropFilter:"none"}}>
           <span className="h-2.5 w-2.5 rounded-full bg-emerald-400 shadow-[0_0_8px_rgba(16,185,129,0.6)] shrink-0"></span>
           <span className="leading-5 text-white">{toastMessage}</span>
         </div>
@@ -1018,12 +1077,12 @@ export default function App() {
 
       {/* NAVIGATION HEADER — light glass, not sticky on chats/profile, no overlap */}
       <nav className={`${activeTab==="chats" || activeTab==="profile" ? "relative" : "sticky top-0"} z-40 backdrop-blur-xl bg-white/75 border-b border-slate-200`}>
-        <div className="mx-auto max-w-[1200px] px-5 md:px-8 min-h-[72px] py-3 flex flex-wrap items-center justify-between gap-3">
-          <div className="flex items-center gap-3.5 cursor-pointer" onClick={() => setActiveTab(currentUser ? "dashboard" : "home")}>
+        <div className="mx-auto max-w-[1200px] px-4 sm:px-5 md:px-8 min-h-[64px] sm:min-h-[72px] py-2.5 sm:py-3 flex flex-wrap items-center justify-between gap-2 sm:gap-3">
+          <div className="flex items-center gap-2.5 sm:gap-3.5 cursor-pointer min-w-0" onClick={() => setActiveTab(currentUser ? "dashboard" : "home")}>
             <img
               src={logoImg}
               alt="Startify Logo"
-              className="h-12 w-auto object-contain"
+              className="h-10 sm:h-12 w-auto object-contain"
             />
             <div className="hidden sm:flex items-center gap-2 text-[11px] font-semibold text-slate-500 whitespace-nowrap leading-none">
               <span className="font-bold tracking-widest uppercase">University of Hyderabad</span>
@@ -1098,13 +1157,13 @@ export default function App() {
 
       {/* PUBLIC ENTRY: intentionally no ideas feed until the visitor chooses a role and joins. */}
       {activeTab === "home" && !currentUser && (
-        <main className="mx-auto max-w-[1200px] px-5 md:px-8 py-8 md:py-12 lg:py-16">
+        <main className="mx-auto max-w-[1200px] px-4 sm:px-5 md:px-8 py-8 md:py-12 lg:py-16">
           <div className="grid lg:grid-cols-[1.15fr_.85fr] gap-6 md:gap-10 items-start lg:items-stretch">
             <div>
               <div className="inline-flex items-center gap-2 rounded-full border border-indigo-200 bg-indigo-50 px-3.5 py-1.5 text-xs text-indigo-700 font-bold shadow-sm">
                 <span className="h-2 w-2 rounded-full bg-indigo-600 animate-pulse" /> Connect • Build • Launch
               </div>
-              <h1 className="font-heading mt-5 max-w-[720px] text-[42px] leading-[1.02] font-extrabold tracking-tight md:text-[58px] text-slate-900">
+              <h1 className="font-heading mt-5 max-w-[720px] text-[32px] leading-[1.08] font-extrabold tracking-tight sm:text-[42px] md:text-[58px] text-slate-900 text-balance">
                 Find the people who can <span className="bg-gradient-to-r from-indigo-600 to-violet-600 bg-clip-text text-transparent">move your idea forward.</span>
               </h1>
               <p className="mt-5 max-w-[620px] text-[16px] leading-7 text-slate-600">
@@ -1160,7 +1219,7 @@ export default function App() {
           <section className="mt-8">
             <div className="mb-4 flex items-end justify-between gap-4">
               <div>
-                <h2 className="font-heading mt-1 text-[25px] font-extrabold text-slate-900">Ideas gaining momentum</h2>
+                <h2 className="font-heading mt-1 text-[22px] sm:text-[25px] font-extrabold text-slate-900">Ideas gaining momentum</h2>
                 <p className="text-[13px] text-slate-600 mt-1">Real UoH student ideas looking for co-founders — swipe to explore, join to connect.</p>
               </div>
               <div className="hidden sm:flex items-center gap-2 shrink-0">
@@ -1181,7 +1240,7 @@ export default function App() {
                 const getTime = (x)=> x.created_at?.seconds ? x.created_at.seconds*1000 : (x.created_at?.toMillis ? x.created_at.toMillis() : Date.parse(x.createdDate||0) || Number((x.id||'').split('_')[1]||0));
                 return getTime(b) - getTime(a);
               }).slice(0,12).map((idea) => (
-                <article key={idea.id} className="snap-start shrink-0 w-[300px] md:w-[360px] rounded-[24px] border border-slate-200 bg-white p-6 shadow-sm flex flex-col">
+                <article key={idea.id} className="snap-start shrink-0 w-[78vw] max-w-[300px] sm:w-[300px] md:w-[360px] rounded-[24px] border border-slate-200 bg-white p-6 shadow-sm flex flex-col">
                   <div className="flex items-center gap-3">
                     <span className="rounded-full bg-slate-100 px-3 py-1 text-[10px] font-bold text-slate-600">{idea.category}</span>
                   </div>
@@ -1199,17 +1258,17 @@ export default function App() {
 
       {/* Signed-in Home is the shared community overview for every role. */}
       {activeTab === "home" && currentUser && (
-        <main className="mx-auto max-w-[1200px] px-5 py-10 md:px-8 md:py-12">
-          <div className="rounded-[30px] border border-slate-200 bg-gradient-to-br from-white via-slate-50 to-slate-200 p-7 shadow-sm md:p-10">
-            <div className="grid gap-8 lg:grid-cols-[1.3fr_.7fr] lg:items-end"><div><div className="inline-flex items-center gap-1.5 rounded-full bg-indigo-50 border border-indigo-200 px-2.5 py-1 text-[10px] font-bold uppercase tracking-widest text-indigo-700">University of Hyderabad • An initiative for UoH students</div><h1 className="font-heading home-calligraphy mt-3 text-[34px] font-extrabold tracking-tight text-slate-800 md:text-[46px]">Good to see you, {currentUser.name.split(" ")[0]}.</h1><p className="mt-3 max-w-[650px] text-[15px] leading-6 text-slate-600">Your UoH community is actively connecting ideas, talent and support. Explore your dashboard for role-specific matches, or open Chats to continue a conversation.</p></div><div className="rounded-2xl border border-white/80 bg-white/70 p-5 shadow-sm"><div className="text-[11px] font-bold uppercase tracking-widest text-slate-500">MOTIVATION OF THE DAY</div><blockquote className="font-heading mt-3 text-[22px] font-bold leading-tight text-slate-800">“{dailyQuote.text}”</blockquote><div className="mt-2 text-[11px] text-slate-500 italic">— {dailyQuote.author}</div><div className="mt-3 h-1 w-12 rounded-full bg-slate-700" /></div></div>
+        <main className="mx-auto max-w-[1200px] px-4 sm:px-5 py-8 md:px-8 md:py-12">
+          <div className="rounded-[24px] sm:rounded-[30px] border border-slate-200 bg-gradient-to-br from-white via-slate-50 to-slate-200 p-5 sm:p-7 shadow-sm md:p-10">
+            <div className="grid gap-8 lg:grid-cols-[1.3fr_.7fr] lg:items-end"><div><div className="inline-flex items-center gap-1.5 rounded-full bg-indigo-50 border border-indigo-200 px-2.5 py-1 text-[10px] font-bold uppercase tracking-widest text-indigo-700">University of Hyderabad • An initiative for UoH students</div><h1 className="font-heading home-calligraphy mt-3 text-[28px] leading-[1.1] font-extrabold tracking-tight text-slate-800 sm:text-[34px] md:text-[46px] text-balance">Good to see you, {currentUser.name.split(" ")[0]}.</h1><p className="mt-3 max-w-[650px] text-[15px] leading-6 text-slate-600">Your UoH community is actively connecting ideas, talent and support. Explore your dashboard for role-specific matches, or open Chats to continue a conversation.</p></div><div className="rounded-2xl border border-white/80 bg-white/70 p-5 shadow-sm"><div className="text-[11px] font-bold uppercase tracking-widest text-slate-500">MOTIVATION OF THE DAY</div><blockquote className="font-heading mt-3 text-[22px] font-bold leading-tight text-slate-800">“{dailyQuote.text}”</blockquote><div className="mt-2 text-[11px] text-slate-500 italic">— {dailyQuote.author}</div><div className="mt-3 h-1 w-12 rounded-full bg-slate-700" /></div></div>
             <div className="mt-8 grid gap-4 sm:grid-cols-2 lg:grid-cols-4"><div className="rounded-2xl border border-slate-200 bg-white/80 p-5"><div className="text-[11px] font-bold uppercase tracking-wide text-slate-500">Live ideas</div><div className="font-heading mt-2 text-3xl font-extrabold text-slate-800">{ideas.length}</div><p className="mt-1 text-[11px] text-slate-500">Projects looking for momentum</p></div><div className="rounded-2xl border border-slate-200 bg-white/80 p-5"><div className="text-[11px] font-bold uppercase tracking-wide text-slate-500">Active people</div><div className="font-heading mt-2 text-3xl font-extrabold text-slate-800">{(() => { const emails = new Set(); builders.forEach(b => { if (b.email) emails.add(b.email.toLowerCase()); }); funders.forEach(f => { if (f.email) emails.add(f.email.toLowerCase()); }); ideas.forEach(i => { if (i.email) emails.add(i.email.toLowerCase()); }); return emails.size; })()}</div><p className="mt-1 text-[11px] text-slate-500">Unique people by email</p></div><div className="rounded-2xl border border-slate-200 bg-white/80 p-5"><div className="text-[11px] font-bold uppercase tracking-wide text-slate-500">Connections made</div><div className="font-heading mt-2 text-3xl font-extrabold text-slate-800">{requests.filter((request) => request.status === "accepted").length}</div><p className="mt-1 text-[11px] text-slate-500">Conversations unlocked</p></div><div className="rounded-2xl border border-slate-200 bg-white/80 p-5"><div className="text-[11px] font-bold uppercase tracking-wide text-slate-500">Upcoming events</div><div className="font-heading mt-2 text-3xl font-extrabold text-slate-800">{events.length}</div><p className="mt-1 text-[11px] text-slate-500">Ways to meet the community</p></div></div>
           </div>
-          <section className="mt-8"><div className="mb-4 flex items-end justify-between"><div><div className="text-[11px] font-bold uppercase tracking-widest text-slate-500">MARK YOUR CALENDAR</div><h2 className="font-heading mt-1 text-[25px] font-extrabold text-slate-800" style={{color: '#0f172a'}}>Upcoming community events</h2></div><button onClick={() => setActiveTab("home")} className="text-xs font-bold text-slate-700 hover:underline">Go to Chats →</button></div><div className="grid gap-5 md:grid-cols-2">{events.map((event) => <article key={event.id} className="rounded-[24px] border border-slate-200 bg-white p-6 shadow-sm" style={{background: 'rgba(255,255,255,0.92)'}}><div className="flex items-center justify-between gap-3"><span className="rounded-full bg-slate-100 px-3 py-1 text-[10px] font-bold uppercase tracking-wide text-slate-600">{event.category}</span><span className="text-xs font-semibold text-slate-500">{event.date}</span></div><h3 className="font-heading mt-4 text-[19px] font-extrabold" style={{color: '#0f172a'}}>{event.title}</h3><p className="mt-2 text-[13px]" style={{color: '#475569'}}>{event.time} · {event.venue}</p><p className="mt-3 text-[13px] leading-5" style={{color: '#334155'}}>{event.desc}</p></article>)}</div></section>
+          <section className="mt-8"><div className="mb-4 flex items-end justify-between"><div><div className="text-[11px] font-bold uppercase tracking-widest text-slate-500">MARK YOUR CALENDAR</div><h2 className="font-heading mt-1 text-[22px] sm:text-[25px] font-extrabold text-slate-800" style={{color: '#0f172a'}}>Upcoming community events</h2></div><button onClick={() => setActiveTab("home")} className="text-xs font-bold text-slate-700 hover:underline">Go to Chats →</button></div><div className="grid gap-5 md:grid-cols-2">{events.map((event) => <article key={event.id} className="rounded-[24px] border border-slate-200 bg-white p-6 shadow-sm" style={{background: 'rgba(255,255,255,0.92)'}}><div className="flex items-center justify-between gap-3"><span className="rounded-full bg-slate-100 px-3 py-1 text-[10px] font-bold uppercase tracking-wide text-slate-600">{event.category}</span><span className="text-xs font-semibold text-slate-500">{event.date}</span></div><h3 className="font-heading mt-4 text-[19px] font-extrabold" style={{color: '#0f172a'}}>{event.title}</h3><p className="mt-2 text-[13px]" style={{color: '#475569'}}>{event.time} · {event.venue}</p><p className="mt-3 text-[13px] leading-5" style={{color: '#334155'}}>{event.desc}</p></article>)}</div></section>
           <section className="mt-10">
             <div className="mb-4 flex items-end justify-between gap-4">
               <div>
                 <div className="text-[11px] font-bold uppercase tracking-widest text-slate-500">IDEAS GAINING MOMENTUM</div>
-                <h2 className="font-heading mt-1 text-[25px] font-extrabold text-slate-800">What the community is building</h2>
+                <h2 className="font-heading mt-1 text-[22px] sm:text-[25px] font-extrabold text-slate-800">What the community is building</h2>
                 <p className="text-[13px] text-slate-600 mt-1">Swipe to explore — founder or not, ideas need eyes.</p>
               </div>
               <div className="hidden sm:flex items-center gap-2 shrink-0">
@@ -1228,7 +1287,7 @@ export default function App() {
                 const getTime = (x)=> x.created_at?.seconds ? x.created_at.seconds*1000 : (x.created_at?.toMillis ? x.created_at.toMillis() : Date.parse(x.createdDate||0) || Number((x.id||'').split('_')[1]||0));
                 return getTime(b) - getTime(a);
               }).slice(0,12).map((idea) => (
-                <article key={idea.id} className="snap-start shrink-0 w-[300px] md:w-[360px] rounded-[24px] border border-slate-200 bg-white/85 p-6 shadow-sm flex flex-col">
+                <article key={idea.id} className="snap-start shrink-0 w-[78vw] max-w-[300px] sm:w-[300px] md:w-[360px] rounded-[24px] border border-slate-200 bg-white/85 p-6 shadow-sm flex flex-col">
                   <div className="flex items-center gap-3"><span className="rounded-full bg-slate-100 px-3 py-1 text-[10px] font-bold text-slate-600">{idea.category}</span></div>
                   <h3 className="font-heading mt-4 text-[20px] font-extrabold text-slate-800">{idea.title}</h3>
                   <p className="mt-1 text-[12px] font-medium text-slate-500">By {idea.founder}</p>
@@ -1245,13 +1304,13 @@ export default function App() {
          TAB 1: IDEAS BOARD (FRONT PAGE SHOWCASE)
          ========================================================================== */}
       {activeTab === "ideas" && currentUser && (
-        <section id="ideas" className="mx-auto max-w-[1200px] px-5 md:px-8 py-12">
+        <section id="ideas" className="mx-auto max-w-[1200px] px-4 sm:px-5 md:px-8 py-8 md:py-12">
           <div className="flex flex-col md:flex-row md:items-end justify-between gap-6 border-b border-white/10 pb-6">
             <div>
               <div className="text-[11px] font-bold tracking-widest text-zinc-400 uppercase">
                 FEATURED STARTUP IDEAS
               </div>
-              <h2 className="font-heading text-[28px] md:text-[36px] font-extrabold mt-1">
+              <h2 className="font-heading text-[24px] sm:text-[28px] md:text-[36px] font-extrabold mt-1">
                 Campus Ideas Board
               </h2>
               <p className="text-[13.5px] text-zinc-400 mt-1 max-w-[600px]">
@@ -1377,13 +1436,13 @@ export default function App() {
          TAB 2: SKILLED TALENT DIRECTORY
          ========================================================================== */}
       {activeTab === "talent" && currentUser && (
-        <section id="talent" className="mx-auto max-w-[1200px] px-5 md:px-8 py-12">
+        <section id="talent" className="mx-auto max-w-[1200px] px-4 sm:px-5 md:px-8 py-8 md:py-12">
           <div className="flex flex-col md:flex-row md:items-end justify-between gap-6 border-b border-white/10 pb-6">
             <div>
               <div className="text-[11px] font-bold tracking-widest text-zinc-400 uppercase">
                 SKILLED BUILDERS DIRECTORY
               </div>
-              <h2 className="font-heading text-[28px] md:text-[36px] font-extrabold mt-1">
+              <h2 className="font-heading text-[24px] sm:text-[28px] md:text-[36px] font-extrabold mt-1">
                 Campus Coders & Designers
               </h2>
               <p className="text-[13.5px] text-zinc-400 mt-1 max-w-[600px]">
@@ -1468,13 +1527,13 @@ export default function App() {
          TAB 3: BACKERS HUB
          ========================================================================== */}
       {activeTab === "backers" && currentUser && (
-        <section id="backers" className="mx-auto max-w-[1200px] px-5 md:px-8 py-12">
+        <section id="backers" className="mx-auto max-w-[1200px] px-4 sm:px-5 md:px-8 py-8 md:py-12">
           <div className="flex flex-col md:flex-row md:items-end justify-between gap-6 border-b border-white/10 pb-6">
             <div>
               <div className="text-[11px] font-bold tracking-widest text-zinc-400 uppercase">
                 BACKERS & MENTORS HUB
               </div>
-              <h2 className="font-heading text-[28px] md:text-[36px] font-extrabold mt-1">
+              <h2 className="font-heading text-[24px] sm:text-[28px] md:text-[36px] font-extrabold mt-1">
                 Backers Directory
               </h2>
               <p className="text-[13.5px] text-zinc-400 mt-1 max-w-[600px]">
@@ -1563,7 +1622,7 @@ export default function App() {
          TAB 4: EVENTS & MEETUPS
          ========================================================================== */}
       {activeTab === "events" && (
-        <section id="events" className="mx-auto max-w-[1200px] px-5 md:px-8 py-12">
+        <section id="events" className="mx-auto max-w-[1200px] px-4 sm:px-5 md:px-8 py-8 md:py-12">
           <div className="flex flex-col gap-4 border-b border-white/10 pb-6 md:flex-row md:items-end md:justify-between">
             <div>
               <div className="text-[11px] font-bold tracking-widest text-zinc-400 uppercase">
@@ -1715,7 +1774,7 @@ export default function App() {
 
       {/* A separate inbox keeps interest-based conversations away from discovery. */}
       {activeTab === "chats" && currentUser && (
-        <section className="mx-auto max-w-[1200px] px-5 py-10 md:px-8">
+        <section className="mx-auto max-w-[1200px] px-4 sm:px-5 py-8 md:px-8">
           <div className="rounded-[28px] border border-slate-200 bg-white p-6 shadow-sm">
             <div className="mb-7 flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between"><div><div className="inline-flex items-center gap-1.5 rounded-full bg-indigo-50 border border-indigo-200 px-2.5 py-1 text-[10px] font-bold uppercase tracking-widest text-indigo-700">University of Hyderabad • Private</div><h1 className="font-heading mt-3 text-[32px] font-extrabold text-slate-800">Your interest-based chats</h1><p className="mt-1 text-[13.5px] text-slate-500">Only accepted connections can start a conversation. Keep it respectful — this is a UoH student community.</p></div><div className="rounded-2xl bg-amber-50 border border-amber-200 p-3 text-[11px] leading-4 text-amber-800 max-w-[320px]"><strong>Community note:</strong> Misuse of chat can lead to removal. Conversations are interest-based and require acceptance.</div></div>
             <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
@@ -1785,7 +1844,7 @@ export default function App() {
          TAB 5: ROLE-SPECIFIC DASHBOARD (FOR LOGGED IN USER)
          ========================================================================== */}
       {activeTab === "dashboard" && currentUser && (
-        <section className="dashboard-surface mx-auto max-w-[1200px] px-5 md:px-8 py-10">
+        <section className="dashboard-surface mx-auto max-w-[1200px] px-4 sm:px-5 md:px-8 py-8 md:py-10">
           {/* Manual test helpers — hide/show demo data */}
           {currentUser.role === "admin" && (
             <div className="mb-4 flex flex-wrap gap-2">
@@ -2146,7 +2205,7 @@ export default function App() {
 
       {/* PROFILE TAB — dedicated profile for any logged-in user */}
       {activeTab === "profile" && currentUser && (
-        <section className="mx-auto max-w-[1200px] px-5 md:px-8 py-10">
+        <section className="mx-auto max-w-[1200px] px-4 sm:px-5 md:px-8 py-8 md:py-10">
           <div className="rounded-[28px] border border-slate-200 bg-white p-4 sm:p-6 md:p-7">
             <div className="flex gap-3 sm:gap-4 items-start">
               {(() => {
@@ -2264,7 +2323,7 @@ export default function App() {
                       }catch{}
                       setCurrentUser({...currentUser, name:t});
                       setProfileNameEditOpen(false);
-                      showToast("✓ Name updated");
+                      propagateNameChange({ ...currentUser, name: t }, t);
                     }catch{ showToast("Failed"); }
                   }} className="h-9 px-5 rounded-full bg-slate-900 text-white text-sm font-bold">Save</button>
                 </div>
@@ -2422,36 +2481,36 @@ export default function App() {
 
       {/* BOTTOM TAB BAR — text only, no emojis, for logged-in users */}
       {currentUser && (
-        <nav className="fixed bottom-0 left-0 right-0 z-40 bg-white/95 backdrop-blur border-t border-slate-200 shadow-[0_-4px_12px_rgba(0,0,0,0.05)]">
-          <div className="mx-auto max-w-[1200px] px-2 sm:px-6 h-[60px] flex items-center justify-around sm:justify-center gap-1 sm:gap-2 overflow-x-auto">
-            <button onClick={() => setActiveTab("home")} className={`px-4 py-2 rounded-full text-[12px] font-bold whitespace-nowrap transition ${activeTab === "home" ? "bg-slate-900 text-white shadow" : "text-slate-600 hover:text-slate-900 hover:bg-slate-100"}`}>
+        <nav className="fixed bottom-0 left-0 right-0 z-40 bg-white/95 backdrop-blur border-t border-slate-200 shadow-[0_-4px_12px_rgba(0,0,0,0.05)] pb-[env(safe-area-inset-bottom)]">
+          <div className="mx-auto max-w-[1200px] px-2 sm:px-6 h-[60px] flex items-center justify-start sm:justify-center gap-1 sm:gap-2 overflow-x-auto scrollbar-hide">
+            <button onClick={() => setActiveTab("home")} className={`shrink-0 px-3 sm:px-4 py-2 rounded-full text-[12px] font-bold whitespace-nowrap transition ${activeTab === "home" ? "bg-slate-900 text-white shadow" : "text-slate-600 hover:text-slate-900 hover:bg-slate-100"}`}>
               Home
             </button>
             {showIdeasTab && (
-              <button onClick={() => setActiveTab("ideas")} className={`px-4 py-2 rounded-full text-[12px] font-bold whitespace-nowrap transition ${activeTab === "ideas" ? "bg-slate-900 text-white shadow" : "text-slate-600 hover:text-slate-900 hover:bg-slate-100"}`}>
+              <button onClick={() => setActiveTab("ideas")} className={`shrink-0 px-3 sm:px-4 py-2 rounded-full text-[12px] font-bold whitespace-nowrap transition ${activeTab === "ideas" ? "bg-slate-900 text-white shadow" : "text-slate-600 hover:text-slate-900 hover:bg-slate-100"}`}>
                 Ideas
               </button>
             )}
             {showTalentTab && (
-              <button onClick={() => setActiveTab("talent")} className={`px-4 py-2 rounded-full text-[12px] font-bold whitespace-nowrap transition ${activeTab === "talent" ? "bg-slate-900 text-white shadow" : "text-slate-600 hover:text-slate-900 hover:bg-slate-100"}`}>
+              <button onClick={() => setActiveTab("talent")} className={`shrink-0 px-3 sm:px-4 py-2 rounded-full text-[12px] font-bold whitespace-nowrap transition ${activeTab === "talent" ? "bg-slate-900 text-white shadow" : "text-slate-600 hover:text-slate-900 hover:bg-slate-100"}`}>
                 Talent
               </button>
             )}
             {showBackersTab && (
-              <button onClick={() => setActiveTab("backers")} className={`px-4 py-2 rounded-full text-[12px] font-bold whitespace-nowrap transition ${activeTab === "backers" ? "bg-slate-900 text-white shadow" : "text-slate-600 hover:text-slate-900 hover:bg-slate-100"}`}>
+              <button onClick={() => setActiveTab("backers")} className={`shrink-0 px-3 sm:px-4 py-2 rounded-full text-[12px] font-bold whitespace-nowrap transition ${activeTab === "backers" ? "bg-slate-900 text-white shadow" : "text-slate-600 hover:text-slate-900 hover:bg-slate-100"}`}>
                 Backers
               </button>
             )}
             {showEventsTab && (
-              <button onClick={() => setActiveTab("events")} className={`px-4 py-2 rounded-full text-[12px] font-bold whitespace-nowrap transition ${activeTab === "events" ? "bg-slate-900 text-white shadow" : "text-slate-600 hover:text-slate-900 hover:bg-slate-100"}`}>
+              <button onClick={() => setActiveTab("events")} className={`shrink-0 px-3 sm:px-4 py-2 rounded-full text-[12px] font-bold whitespace-nowrap transition ${activeTab === "events" ? "bg-slate-900 text-white shadow" : "text-slate-600 hover:text-slate-900 hover:bg-slate-100"}`}>
                 Events
               </button>
             )}
-            <button onClick={() => setActiveTab("chats")} className={`px-4 py-2 rounded-full text-[12px] font-bold whitespace-nowrap transition relative ${activeTab === "chats" ? "bg-slate-900 text-white shadow" : "text-slate-600 hover:text-slate-900 hover:bg-slate-100"}`}>
+            <button onClick={() => setActiveTab("chats")} className={`shrink-0 px-3 sm:px-4 py-2 rounded-full text-[12px] font-bold whitespace-nowrap transition relative ${activeTab === "chats" ? "bg-slate-900 text-white shadow" : "text-slate-600 hover:text-slate-900 hover:bg-slate-100"}`}>
               Chats
               {myIncomingRequests.filter(r=>r.status==="pending").length>0 && <span className="absolute -top-0.5 -right-0.5 h-2.5 w-2.5 rounded-full bg-emerald-500 border-2 border-white"></span>}
             </button>
-            <button onClick={() => setActiveTab("profile")} className={`px-4 py-2 rounded-full text-[12px] font-bold whitespace-nowrap transition ${activeTab === "profile" ? "bg-slate-900 text-white shadow" : "text-slate-600 hover:text-slate-900 hover:bg-slate-100"}`}>
+            <button onClick={() => setActiveTab("profile")} className={`shrink-0 px-3 sm:px-4 py-2 rounded-full text-[12px] font-bold whitespace-nowrap transition ${activeTab === "profile" ? "bg-slate-900 text-white shadow" : "text-slate-600 hover:text-slate-900 hover:bg-slate-100"}`}>
               Profile
             </button>
           </div>
@@ -2553,7 +2612,7 @@ export default function App() {
                   <label className="block text-[12px] font-semibold text-slate-700 mb-1.5">
                     Choose your role — <span className="font-normal text-slate-500">one role per student</span> *
                   </label>
-                  <div className="grid grid-cols-3 gap-1.5 sm:gap-2">
+                  <div className="grid grid-cols-1 min-[420px]:grid-cols-3 gap-1.5 sm:gap-2">
                     {[
                       ["founder", "Founder", "Post ideas"],
                       ["talent", "Builder", "Build teams"],
@@ -2660,7 +2719,7 @@ export default function App() {
             className="absolute inset-0 bg-black/85 backdrop-blur-md"
             onClick={() => setIdeaModalOpen(false)}
           />
-          <div className="relative w-full max-w-[480px] rounded-[28px] bg-white border border-slate-200 shadow-2xl p-6 sm:p-8 text-slate-800">
+          <div className="relative w-full max-w-[480px] max-h-[90dvh] overflow-y-auto rounded-[28px] bg-white border border-slate-200 shadow-2xl p-5 sm:p-8 text-slate-800">
             <div className="flex items-center justify-between border-b border-slate-200 pb-4">
               <div>
                 <div className="font-heading font-extrabold text-[22px]">
@@ -2692,7 +2751,7 @@ export default function App() {
                 />
               </div>
 
-              <div className="grid grid-cols-2 gap-3">
+              <div className="grid grid-cols-1 min-[420px]:grid-cols-2 gap-3">
                 <div>
                   <label className="block text-[12px] font-semibold text-slate-600 mb-1">
                     Category
@@ -2757,7 +2816,7 @@ export default function App() {
             className="absolute inset-0 bg-black/85 backdrop-blur-md"
             onClick={() => setConnectModalOpen(false)}
           />
-          <div className="relative w-full max-w-[440px] rounded-[28px] bg-zinc-950 border border-white/20 shadow-2xl p-6 sm:p-8 text-white">
+          <div className="relative w-full max-w-[440px] max-h-[90dvh] overflow-y-auto rounded-[28px] bg-zinc-950 border border-white/20 shadow-2xl p-5 sm:p-8 text-white">
             <div className="flex items-center justify-between border-b border-slate-200 pb-4">
               <div>
                 <div className="font-heading font-extrabold text-[20px]">
@@ -2807,7 +2866,7 @@ export default function App() {
             className="absolute inset-0 bg-black/40 backdrop-blur-md"
             onClick={() => setChatModalOpen(false)}
           />
-          <div className="relative w-full max-w-[540px] h-[560px] rounded-[28px] bg-white border border-slate-200 shadow-2xl flex flex-col justify-between overflow-hidden text-slate-800">
+          <div className="relative w-full max-w-[540px] h-[82dvh] min-h-[420px] max-h-[600px] rounded-[24px] sm:rounded-[28px] bg-white border border-slate-200 shadow-2xl flex flex-col justify-between overflow-hidden text-slate-800">
             {/* Chat Top Header */}
             <div className="p-5 bg-slate-50 border-b border-slate-200 flex items-center justify-between">
               <div className="flex items-center gap-3">
@@ -2877,11 +2936,11 @@ export default function App() {
                 value={chatInputText}
                 onChange={(e) => setChatInputText(e.target.value)}
                 placeholder="Type a respectful message..."
-                className="flex-1 h-11 rounded-full bg-slate-50 border border-slate-200 px-4 text-[13.5px] text-slate-800 placeholder-slate-400 outline-none focus:border-slate-300 focus:bg-white"
+                className="min-w-0 flex-1 h-11 rounded-full bg-slate-50 border border-slate-200 px-4 text-[13.5px] text-slate-800 placeholder-slate-400 outline-none focus:border-slate-300 focus:bg-white"
               />
               <button
                 type="submit"
-                className="h-11 px-6 rounded-full bg-slate-900 text-white font-bold text-[13px] hover:bg-slate-800 transition shadow"
+                className="h-11 px-4 sm:px-6 rounded-full bg-slate-900 text-white font-bold text-[13px] hover:bg-slate-800 transition shadow shrink-0"
               >
                 Send
               </button>
@@ -2897,7 +2956,7 @@ export default function App() {
             className="absolute inset-0 bg-black/85 backdrop-blur-md"
             onClick={() => setEventAddModalOpen(false)}
           />
-          <div className="relative w-full max-w-[480px] rounded-[28px] bg-white border border-slate-200 shadow-2xl p-6 sm:p-8 text-slate-800">
+          <div className="relative w-full max-w-[480px] max-h-[90dvh] overflow-y-auto rounded-[28px] bg-white border border-slate-200 shadow-2xl p-5 sm:p-8 text-slate-800">
             <div className="flex items-center justify-between border-b border-slate-200 pb-4">
               <div>
                 <div className="font-heading font-extrabold text-[22px]">Add Community Event</div>
@@ -2938,7 +2997,7 @@ export default function App() {
                 <label className="block text-[12px] font-semibold text-slate-600 mb-1">Event Title *</label>
                 <input required value={eventForm.title} onChange={(e) => setEventForm({ ...eventForm, title: e.target.value })} placeholder="Launch Week Meetup" className="w-full h-11 rounded-full bg-slate-50 border border-slate-200 px-4 text-[13px] text-slate-800 outline-none focus:border-slate-400" />
               </div>
-              <div className="grid grid-cols-2 gap-3">
+              <div className="grid grid-cols-1 min-[420px]:grid-cols-2 gap-3">
                 <div>
                   <label className="block text-[12px] font-semibold text-slate-600 mb-1">Date *</label>
                   <input required value={eventForm.date} onChange={(e) => setEventForm({ ...eventForm, date: e.target.value })} placeholder="Saturday, Sep 12" className="w-full h-11 rounded-full bg-slate-50 border border-slate-200 px-4 text-[13px] text-slate-800 outline-none focus:border-slate-400" />
@@ -2965,7 +3024,7 @@ export default function App() {
                 <label className="block text-[12px] font-semibold text-slate-600 mb-1">Description *</label>
                 <textarea required value={eventForm.desc} onChange={(e) => setEventForm({ ...eventForm, desc: e.target.value })} placeholder="Give a short description of the event." className="w-full min-h-[90px] rounded-[20px] bg-slate-50 border border-slate-200 p-4 text-[13px] text-slate-800 outline-none focus:border-slate-400" />
               </div>
-              <div className="grid grid-cols-2 gap-3">
+              <div className="grid grid-cols-1 min-[420px]:grid-cols-2 gap-3">
                 <div>
                   <label className="block text-[12px] font-semibold text-slate-600 mb-1">Organizer</label>
                   <input value={eventForm.organizer} onChange={(e) => setEventForm({ ...eventForm, organizer: e.target.value })} placeholder="Daksh Dua / Startify Team" className="w-full h-11 rounded-full bg-slate-50 border border-slate-200 px-4 text-[13px] text-slate-800 outline-none" />
@@ -2975,7 +3034,7 @@ export default function App() {
                   <input value={eventForm.capacity} onChange={(e) => setEventForm({ ...eventForm, capacity: e.target.value })} placeholder="e.g. 80 seats" className="w-full h-11 rounded-full bg-slate-50 border border-slate-200 px-4 text-[13px] text-slate-800 outline-none" />
                 </div>
               </div>
-              <div className="grid grid-cols-2 gap-3">
+              <div className="grid grid-cols-1 min-[420px]:grid-cols-2 gap-3">
                 <div>
                   <label className="block text-[12px] font-semibold text-slate-600 mb-1">Event Type</label>
                   <select value={eventForm.eventType} onChange={(e) => setEventForm({ ...eventForm, eventType: e.target.value })} className="w-full h-11 rounded-full bg-slate-50 border border-slate-200 px-4 text-[13px] text-slate-800 outline-none">
@@ -3014,7 +3073,7 @@ export default function App() {
             className="absolute inset-0 bg-black/85 backdrop-blur-md"
             onClick={() => setEventModalOpen(false)}
           />
-          <div className="relative w-full max-w-[440px] rounded-[28px] bg-zinc-950 border border-white/20 shadow-2xl p-6 sm:p-8 text-white">
+          <div className="relative w-full max-w-[440px] max-h-[90dvh] overflow-y-auto rounded-[28px] bg-zinc-950 border border-white/20 shadow-2xl p-5 sm:p-8 text-white">
             <div className="flex items-center justify-between border-b border-slate-200 pb-4">
               <div>
                 <div className="font-heading font-extrabold text-[20px]">
