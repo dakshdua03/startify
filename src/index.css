@@ -668,6 +668,14 @@ nav .scrollbar-hide::-webkit-scrollbar { display: none !important; }
   /* Toast sits above bottom tab bar, full-width */
   .fixed.z-\[70\] { max-width: calc(100vw - 2rem); }
 }
+/* Gradient headline spans must stay transparent (global color resets override them) */
+.text-transparent,
+.bg-clip-text.text-transparent,
+span.text-transparent {
+  color: transparent !important;
+  -webkit-text-fill-color: transparent !important;
+}
+
 /* Fix white text on white inputs — ensure typed text is dark and visible */
 input.bg-slate-50,
 input.bg-white,

@@ -1178,7 +1178,7 @@ export default function App() {
               <div className="mt-8 rounded-[20px] bg-white p-5 md:p-6 border border-slate-200 shadow-sm overflow-hidden relative">
                 <div className="relative">
                   <div className="inline-flex items-center gap-2 rounded-full bg-slate-100 border border-slate-200 px-3 py-1 text-[10px] font-bold tracking-widest text-slate-600">OUR BELIEF</div>
-                  <blockquote className="font-heading mt-3 text-[22px] md:text-[26px] font-extrabold leading-tight tracking-tight text-slate-900">“If you can think it, you can build it.”</blockquote>
+                  <blockquote className="font-heading mt-3 text-[20px] sm:text-[22px] md:text-[26px] font-extrabold leading-tight tracking-tight text-slate-900">“If you can think it, you can build it.”</blockquote>
                   <p className="mt-2 text-[13px] leading-6 text-slate-600">A platform that connects ideas with people, and people with purpose — where every idea gets space to be built, tested, and launched.</p>
                 </div>
               </div>
@@ -1194,7 +1194,7 @@ export default function App() {
                     ["Builder", "Build with ambitious teams", "Discover UoH founder ideas that need your skills.", "talent", "bg-white border-slate-200 hover:border-sky-300 hover:shadow-md shadow-sm"],
                     ["Backer", "Back promising people", "Browse UoH ideas and the talent behind them.", "backer", "bg-white border-slate-200 hover:border-violet-300 hover:shadow-md shadow-sm"],
                   ].map(([title, label, detail, role, cls]) => (
-                    <button key={role} onClick={() => { setSelectedRegisterRole(role); setAuthMode("register"); setAuthModalOpen(true); }} className={`group w-full rounded-2xl border p-5 text-left transition ${cls}`}>
+                    <button key={role} onClick={() => { setSelectedRegisterRole(role); setAuthMode("register"); setAuthModalOpen(true); }} className={`group w-full rounded-2xl border p-4 sm:p-5 text-left transition ${cls}`}>
                       <div className="min-w-0"><div className="font-heading text-[16px] font-bold text-slate-800">{title} <span className="ml-1 text-[12px] font-medium text-slate-500">— {label}</span></div><p className="mt-1 text-[13px] leading-5 text-slate-600">{detail}</p></div>
                     </button>
                   ))}
@@ -1260,7 +1260,7 @@ export default function App() {
       {activeTab === "home" && currentUser && (
         <main className="mx-auto max-w-[1200px] px-4 sm:px-5 py-8 md:px-8 md:py-12">
           <div className="rounded-[24px] sm:rounded-[30px] border border-slate-200 bg-gradient-to-br from-white via-slate-50 to-slate-200 p-5 sm:p-7 shadow-sm md:p-10">
-            <div className="grid gap-8 lg:grid-cols-[1.3fr_.7fr] lg:items-end"><div><div className="inline-flex items-center gap-1.5 rounded-full bg-indigo-50 border border-indigo-200 px-2.5 py-1 text-[10px] font-bold uppercase tracking-widest text-indigo-700">University of Hyderabad • An initiative for UoH students</div><h1 className="font-heading home-calligraphy mt-3 text-[28px] leading-[1.1] font-extrabold tracking-tight text-slate-800 sm:text-[34px] md:text-[46px] text-balance">Good to see you, {currentUser.name.split(" ")[0]}.</h1><p className="mt-3 max-w-[650px] text-[15px] leading-6 text-slate-600">Your UoH community is actively connecting ideas, talent and support. Explore your dashboard for role-specific matches, or open Chats to continue a conversation.</p></div><div className="rounded-2xl border border-white/80 bg-white/70 p-5 shadow-sm"><div className="text-[11px] font-bold uppercase tracking-widest text-slate-500">MOTIVATION OF THE DAY</div><blockquote className="font-heading mt-3 text-[22px] font-bold leading-tight text-slate-800">“{dailyQuote.text}”</blockquote><div className="mt-2 text-[11px] text-slate-500 italic">— {dailyQuote.author}</div><div className="mt-3 h-1 w-12 rounded-full bg-slate-700" /></div></div>
+            <div className="grid gap-8 lg:grid-cols-[1.3fr_.7fr] lg:items-end"><div><div className="inline-flex max-w-full flex-wrap items-center gap-1.5 rounded-full bg-indigo-50 border border-indigo-200 px-2.5 py-1 text-[10px] font-bold uppercase tracking-widest text-indigo-700 leading-4">University of Hyderabad<span className="hidden min-[420px]:inline"> • An initiative for UoH students</span></div><h1 className="font-heading home-calligraphy mt-3 text-[28px] leading-[1.1] font-extrabold tracking-tight text-slate-800 sm:text-[34px] md:text-[46px] text-balance">Good to see you, {currentUser.name.split(" ")[0]}.</h1><p className="mt-3 max-w-[650px] text-[15px] leading-6 text-slate-600">Your UoH community is actively connecting ideas, talent and support. Explore your dashboard for role-specific matches, or open Chats to continue a conversation.</p></div><div className="rounded-2xl border border-white/80 bg-white/70 p-5 shadow-sm"><div className="text-[11px] font-bold uppercase tracking-widest text-slate-500">MOTIVATION OF THE DAY</div><blockquote className="font-heading mt-3 text-[22px] font-bold leading-tight text-slate-800">“{dailyQuote.text}”</blockquote><div className="mt-2 text-[11px] text-slate-500 italic">— {dailyQuote.author}</div><div className="mt-3 h-1 w-12 rounded-full bg-slate-700" /></div></div>
             <div className="mt-8 grid gap-4 sm:grid-cols-2 lg:grid-cols-4"><div className="rounded-2xl border border-slate-200 bg-white/80 p-5"><div className="text-[11px] font-bold uppercase tracking-wide text-slate-500">Live ideas</div><div className="font-heading mt-2 text-3xl font-extrabold text-slate-800">{ideas.length}</div><p className="mt-1 text-[11px] text-slate-500">Projects looking for momentum</p></div><div className="rounded-2xl border border-slate-200 bg-white/80 p-5"><div className="text-[11px] font-bold uppercase tracking-wide text-slate-500">Active people</div><div className="font-heading mt-2 text-3xl font-extrabold text-slate-800">{(() => { const emails = new Set(); builders.forEach(b => { if (b.email) emails.add(b.email.toLowerCase()); }); funders.forEach(f => { if (f.email) emails.add(f.email.toLowerCase()); }); ideas.forEach(i => { if (i.email) emails.add(i.email.toLowerCase()); }); return emails.size; })()}</div><p className="mt-1 text-[11px] text-slate-500">Unique people by email</p></div><div className="rounded-2xl border border-slate-200 bg-white/80 p-5"><div className="text-[11px] font-bold uppercase tracking-wide text-slate-500">Connections made</div><div className="font-heading mt-2 text-3xl font-extrabold text-slate-800">{requests.filter((request) => request.status === "accepted").length}</div><p className="mt-1 text-[11px] text-slate-500">Conversations unlocked</p></div><div className="rounded-2xl border border-slate-200 bg-white/80 p-5"><div className="text-[11px] font-bold uppercase tracking-wide text-slate-500">Upcoming events</div><div className="font-heading mt-2 text-3xl font-extrabold text-slate-800">{events.length}</div><p className="mt-1 text-[11px] text-slate-500">Ways to meet the community</p></div></div>
           </div>
           <section className="mt-8"><div className="mb-4 flex items-end justify-between"><div><div className="text-[11px] font-bold uppercase tracking-widest text-slate-500">MARK YOUR CALENDAR</div><h2 className="font-heading mt-1 text-[22px] sm:text-[25px] font-extrabold text-slate-800" style={{color: '#0f172a'}}>Upcoming community events</h2></div><button onClick={() => setActiveTab("home")} className="text-xs font-bold text-slate-700 hover:underline">Go to Chats →</button></div><div className="grid gap-5 md:grid-cols-2">{events.map((event) => <article key={event.id} className="rounded-[24px] border border-slate-200 bg-white p-6 shadow-sm" style={{background: 'rgba(255,255,255,0.92)'}}><div className="flex items-center justify-between gap-3"><span className="rounded-full bg-slate-100 px-3 py-1 text-[10px] font-bold uppercase tracking-wide text-slate-600">{event.category}</span><span className="text-xs font-semibold text-slate-500">{event.date}</span></div><h3 className="font-heading mt-4 text-[19px] font-extrabold" style={{color: '#0f172a'}}>{event.title}</h3><p className="mt-2 text-[13px]" style={{color: '#475569'}}>{event.time} · {event.venue}</p><p className="mt-3 text-[13px] leading-5" style={{color: '#334155'}}>{event.desc}</p></article>)}</div></section>
@@ -1776,7 +1776,7 @@ export default function App() {
       {activeTab === "chats" && currentUser && (
         <section className="mx-auto max-w-[1200px] px-4 sm:px-5 py-8 md:px-8">
           <div className="rounded-[28px] border border-slate-200 bg-white p-6 shadow-sm">
-            <div className="mb-7 flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between"><div><div className="inline-flex items-center gap-1.5 rounded-full bg-indigo-50 border border-indigo-200 px-2.5 py-1 text-[10px] font-bold uppercase tracking-widest text-indigo-700">University of Hyderabad • Private</div><h1 className="font-heading mt-3 text-[32px] font-extrabold text-slate-800">Your interest-based chats</h1><p className="mt-1 text-[13.5px] text-slate-500">Only accepted connections can start a conversation. Keep it respectful — this is a UoH student community.</p></div><div className="rounded-2xl bg-amber-50 border border-amber-200 p-3 text-[11px] leading-4 text-amber-800 max-w-[320px]"><strong>Community note:</strong> Misuse of chat can lead to removal. Conversations are interest-based and require acceptance.</div></div>
+            <div className="mb-7 flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between"><div><div className="inline-flex items-center gap-1.5 rounded-full bg-indigo-50 border border-indigo-200 px-2.5 py-1 text-[10px] font-bold uppercase tracking-widest text-indigo-700">University of Hyderabad • Private</div><h1 className="font-heading mt-3 text-[24px] sm:text-[32px] font-extrabold text-slate-800 text-balance">Your interest-based chats</h1><p className="mt-1 text-[13.5px] text-slate-500">Only accepted connections can start a conversation. Keep it respectful — this is a UoH student community.</p></div><div className="rounded-2xl bg-amber-50 border border-amber-200 p-3 text-[11px] leading-4 text-amber-800 max-w-[320px]"><strong>Community note:</strong> Misuse of chat can lead to removal. Conversations are interest-based and require acceptance.</div></div>
             <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
               {myAcceptedConnections.map((req) => {
                 const partnerName = req.senderId === currentUser.id ? req.receiverName : req.senderName;
@@ -2205,8 +2205,8 @@ export default function App() {
 
       {/* PROFILE TAB — dedicated profile for any logged-in user */}
       {activeTab === "profile" && currentUser && (
-        <section className="mx-auto max-w-[1200px] px-4 sm:px-5 md:px-8 py-8 md:py-10">
-          <div className="rounded-[28px] border border-slate-200 bg-white p-4 sm:p-6 md:p-7">
+        <section className="mx-auto max-w-[1200px] w-full min-w-0 px-4 sm:px-5 md:px-8 pt-6 sm:pt-8 pb-4 md:py-10">
+          <div className="rounded-[24px] sm:rounded-[28px] border border-slate-200 bg-white p-4 sm:p-6 md:p-7 w-full min-w-0 overflow-hidden">
             <div className="flex gap-3 sm:gap-4 items-start">
               {(() => {
                 const img = getProfileImage(currentUser.email);
@@ -2479,45 +2479,46 @@ export default function App() {
         </div>
       )}
 
-      {/* BOTTOM TAB BAR — text only, no emojis, for logged-in users */}
+      {/* BOTTOM TAB BAR — text only, no emojis, for logged-in users.
+          Phone: every tab fits on one row, no swipe (flex-1 equal slices). */}
       {currentUser && (
         <nav className="fixed bottom-0 left-0 right-0 z-40 bg-white/95 backdrop-blur border-t border-slate-200 shadow-[0_-4px_12px_rgba(0,0,0,0.05)] pb-[env(safe-area-inset-bottom)]">
-          <div className="mx-auto max-w-[1200px] px-2 sm:px-6 h-[60px] flex items-center justify-start sm:justify-center gap-1 sm:gap-2 overflow-x-auto scrollbar-hide">
-            <button onClick={() => setActiveTab("home")} className={`shrink-0 px-3 sm:px-4 py-2 rounded-full text-[12px] font-bold whitespace-nowrap transition ${activeTab === "home" ? "bg-slate-900 text-white shadow" : "text-slate-600 hover:text-slate-900 hover:bg-slate-100"}`}>
+          <div className="mx-auto max-w-[1200px] px-1.5 min-[380px]:px-2 sm:px-6 h-[58px] sm:h-[60px] flex items-center justify-between sm:justify-center gap-1 sm:gap-2 overflow-hidden">
+            <button onClick={() => setActiveTab("home")} className={`min-w-0 flex-1 sm:flex-none truncate text-center px-1 min-[380px]:px-2 sm:px-4 py-2 rounded-full text-[10px] min-[380px]:text-[11px] sm:text-[12px] font-bold whitespace-nowrap transition ${activeTab === "home" ? "bg-slate-900 text-white shadow" : "text-slate-600 hover:text-slate-900 hover:bg-slate-100"}`}>
               Home
             </button>
             {showIdeasTab && (
-              <button onClick={() => setActiveTab("ideas")} className={`shrink-0 px-3 sm:px-4 py-2 rounded-full text-[12px] font-bold whitespace-nowrap transition ${activeTab === "ideas" ? "bg-slate-900 text-white shadow" : "text-slate-600 hover:text-slate-900 hover:bg-slate-100"}`}>
+              <button onClick={() => setActiveTab("ideas")} className={`min-w-0 flex-1 sm:flex-none truncate text-center px-1 min-[380px]:px-2 sm:px-4 py-2 rounded-full text-[10px] min-[380px]:text-[11px] sm:text-[12px] font-bold whitespace-nowrap transition ${activeTab === "ideas" ? "bg-slate-900 text-white shadow" : "text-slate-600 hover:text-slate-900 hover:bg-slate-100"}`}>
                 Ideas
               </button>
             )}
             {showTalentTab && (
-              <button onClick={() => setActiveTab("talent")} className={`shrink-0 px-3 sm:px-4 py-2 rounded-full text-[12px] font-bold whitespace-nowrap transition ${activeTab === "talent" ? "bg-slate-900 text-white shadow" : "text-slate-600 hover:text-slate-900 hover:bg-slate-100"}`}>
+              <button onClick={() => setActiveTab("talent")} className={`min-w-0 flex-1 sm:flex-none truncate text-center px-1 min-[380px]:px-2 sm:px-4 py-2 rounded-full text-[10px] min-[380px]:text-[11px] sm:text-[12px] font-bold whitespace-nowrap transition ${activeTab === "talent" ? "bg-slate-900 text-white shadow" : "text-slate-600 hover:text-slate-900 hover:bg-slate-100"}`}>
                 Talent
               </button>
             )}
             {showBackersTab && (
-              <button onClick={() => setActiveTab("backers")} className={`shrink-0 px-3 sm:px-4 py-2 rounded-full text-[12px] font-bold whitespace-nowrap transition ${activeTab === "backers" ? "bg-slate-900 text-white shadow" : "text-slate-600 hover:text-slate-900 hover:bg-slate-100"}`}>
+              <button onClick={() => setActiveTab("backers")} className={`min-w-0 flex-1 sm:flex-none truncate text-center px-1 min-[380px]:px-2 sm:px-4 py-2 rounded-full text-[10px] min-[380px]:text-[11px] sm:text-[12px] font-bold whitespace-nowrap transition ${activeTab === "backers" ? "bg-slate-900 text-white shadow" : "text-slate-600 hover:text-slate-900 hover:bg-slate-100"}`}>
                 Backers
               </button>
             )}
             {showEventsTab && (
-              <button onClick={() => setActiveTab("events")} className={`shrink-0 px-3 sm:px-4 py-2 rounded-full text-[12px] font-bold whitespace-nowrap transition ${activeTab === "events" ? "bg-slate-900 text-white shadow" : "text-slate-600 hover:text-slate-900 hover:bg-slate-100"}`}>
+              <button onClick={() => setActiveTab("events")} className={`min-w-0 flex-1 sm:flex-none truncate text-center px-1 min-[380px]:px-2 sm:px-4 py-2 rounded-full text-[10px] min-[380px]:text-[11px] sm:text-[12px] font-bold whitespace-nowrap transition ${activeTab === "events" ? "bg-slate-900 text-white shadow" : "text-slate-600 hover:text-slate-900 hover:bg-slate-100"}`}>
                 Events
               </button>
             )}
-            <button onClick={() => setActiveTab("chats")} className={`shrink-0 px-3 sm:px-4 py-2 rounded-full text-[12px] font-bold whitespace-nowrap transition relative ${activeTab === "chats" ? "bg-slate-900 text-white shadow" : "text-slate-600 hover:text-slate-900 hover:bg-slate-100"}`}>
+            <button onClick={() => setActiveTab("chats")} className={`min-w-0 flex-1 sm:flex-none truncate text-center px-1 min-[380px]:px-2 sm:px-4 py-2 rounded-full text-[10px] min-[380px]:text-[11px] sm:text-[12px] font-bold whitespace-nowrap transition relative ${activeTab === "chats" ? "bg-slate-900 text-white shadow" : "text-slate-600 hover:text-slate-900 hover:bg-slate-100"}`}>
               Chats
-              {myIncomingRequests.filter(r=>r.status==="pending").length>0 && <span className="absolute -top-0.5 -right-0.5 h-2.5 w-2.5 rounded-full bg-emerald-500 border-2 border-white"></span>}
+              {myIncomingRequests.filter(r=>r.status==="pending").length>0 && <span className="absolute top-1 right-2 h-2 w-2 rounded-full bg-emerald-500 border border-white"></span>}
             </button>
-            <button onClick={() => setActiveTab("profile")} className={`shrink-0 px-3 sm:px-4 py-2 rounded-full text-[12px] font-bold whitespace-nowrap transition ${activeTab === "profile" ? "bg-slate-900 text-white shadow" : "text-slate-600 hover:text-slate-900 hover:bg-slate-100"}`}>
+            <button onClick={() => setActiveTab("profile")} className={`min-w-0 flex-1 sm:flex-none truncate text-center px-1 min-[380px]:px-2 sm:px-4 py-2 rounded-full text-[10px] min-[380px]:text-[11px] sm:text-[12px] font-bold whitespace-nowrap transition ${activeTab === "profile" ? "bg-slate-900 text-white shadow" : "text-slate-600 hover:text-slate-900 hover:bg-slate-100"}`}>
               Profile
             </button>
           </div>
         </nav>
       )}
-      {/* Spacer for bottom nav so footer stays visible when scrolling up */}
-      {currentUser && <div className="h-[76px] shrink-0" />}
+      {/* Spacer for bottom nav so last content is never hidden behind it */}
+      {currentUser && <div className="h-[calc(74px+env(safe-area-inset-bottom))] shrink-0" />}
 
       {/* FOOTER — only for logged-out visitors, hidden when logged in */}
       {!currentUser && (
