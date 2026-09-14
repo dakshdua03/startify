@@ -1274,7 +1274,7 @@ export default function App() {
                 <div className="space-y-4">
                   {[
                     ["Founder", "Post and manage ideas", "Meet verified UoH builders and campus backers.", "founder", "bg-white border-slate-200 hover:border-slate-300 hover:shadow-md shadow-sm"],
-                    ["Builder", "Build with ambitious teams", "Discover UoH founder ideas that need your skills.", "talent", "bg-white border-slate-200 hover:border-sky-300 hover:shadow-md shadow-sm"],
+                    ["Talent", "Build with ambitious teams", "Discover UoH founder ideas that need your skills.", "talent", "bg-white border-slate-200 hover:border-sky-300 hover:shadow-md shadow-sm"],
                     ["Backer", "Back promising people", "Browse UoH ideas and the talent behind them.", "backer", "bg-white border-slate-200 hover:border-violet-300 hover:shadow-md shadow-sm"],
                   ].map(([title, label, detail, role, cls]) => (
                     <button key={role} onClick={() => { setSelectedRegisterRole(role); setAuthMode("register"); setAuthModalOpen(true); }} className={`group w-full rounded-2xl border p-4 sm:p-5 text-left transition ${cls}`}>
