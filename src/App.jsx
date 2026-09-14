@@ -136,6 +136,7 @@ export default function App() {
   const [ideaModalOpen, setIdeaModalOpen] = useState(false);
   const [connectModalOpen, setConnectModalOpen] = useState(false);
   const [chatModalOpen, setChatModalOpen] = useState(false);
+  const [chatProfileOpen, setChatProfileOpen] = useState(false);
   const [eventModalOpen, setEventModalOpen] = useState(false);
   const [eventAddModalOpen, setEventAddModalOpen] = useState(false);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
@@ -1859,6 +1860,9 @@ export default function App() {
         <section className="mx-auto max-w-[1200px] px-4 sm:px-5 py-8 md:px-8">
           <div className="rounded-[28px] border border-slate-200 bg-white p-6 shadow-sm">
             <div className="mb-7 flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between"><div><div className="inline-flex items-center gap-1.5 rounded-full bg-indigo-50 border border-indigo-200 px-2.5 py-1 text-[10px] font-bold uppercase tracking-widest text-indigo-700">University of Hyderabad • Private</div><h1 className="font-heading mt-3 text-[24px] sm:text-[32px] font-extrabold text-slate-800 text-balance">Your interest-based chats</h1><p className="mt-1 text-[13.5px] text-slate-500">Only accepted connections can start a conversation. Keep it respectful — this is a UoH student community.</p></div><div className="rounded-2xl bg-amber-50 border border-amber-200 p-3 text-[11px] leading-4 text-amber-800 max-w-[320px]"><strong>Community note:</strong> Misuse of chat can lead to removal. Conversations are interest-based and require acceptance.</div></div>
+            {currentUser?.role === "backer" && currentUser?._backerPending && (
+              <div className="mb-4 rounded-full border border-amber-200 bg-amber-50 px-4 py-2.5 text-center text-[12px] font-semibold text-amber-800">Backer approval pending — you can chat with anyone after admin approves your account.</div>
+            )}
             <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
               {myAcceptedConnections.map((req) => {
                 const partnerName = req.senderId === currentUser.id ? req.receiverName : req.senderName;
@@ -2951,26 +2955,34 @@ export default function App() {
           />
           <div className="relative w-full max-w-[540px] h-[82dvh] min-h-[420px] max-h-[600px] rounded-[24px] sm:rounded-[28px] bg-white border border-slate-200 shadow-2xl flex flex-col justify-between overflow-hidden text-slate-800">
             {/* Chat Top Header */}
-            <div className="p-5 bg-slate-50 border-b border-slate-200 flex items-center justify-between">
-              <div className="flex items-center gap-3">
+            <div className="p-5 bg-slate-50 border-b border-slate-200 flex items-center justify-between gap-2">
+              <button onClick={() => setChatProfileOpen(true)} title="View profile" className="flex items-center gap-3 min-w-0 text-left hover:bg-white rounded-2xl p-1 -m-1 transition">
                 <div className="h-10 w-10 rounded-full bg-slate-100 border border-slate-200 grid place-items-center text-[18px] shrink-0">👤</div>
-                <div>
-                  <div className="font-heading font-bold text-[16px] text-slate-800">
+                <div className="min-w-0">
+                  <div className="font-heading font-bold text-[16px] text-slate-800 truncate underline decoration-slate-300 underline-offset-2">
                     {activeChatRequest.senderId === currentUser.id
                       ? activeChatRequest.receiverName
                       : activeChatRequest.senderName}
                   </div>
                   <div className="text-[11px] text-slate-500">
-                    Topic: {activeChatRequest.targetTitle} • Connection Accepted ✓ • UoH community
+                    Topic: {activeChatRequest.targetTitle} • Tap to view profile
                   </div>
                 </div>
-              </div>
-              <button
-                onClick={() => setChatModalOpen(false)}
-                className="h-8 w-8 rounded-full border border-slate-200 bg-white grid place-items-center text-slate-500 hover:text-slate-800 hover:border-slate-300"
-              >
-                ✕
               </button>
+              <div className="flex items-center gap-2 shrink-0">
+                <button
+                  onClick={() => setChatProfileOpen(true)}
+                  className="h-8 px-3 rounded-full bg-white border border-slate-200 text-[11px] font-bold text-slate-600 hover:bg-slate-50"
+                >
+                  Profile
+                </button>
+                <button
+                  onClick={() => { setChatModalOpen(false); setChatProfileOpen(false); }}
+                  className="h-8 w-8 rounded-full border border-slate-200 bg-white grid place-items-center text-slate-500 hover:text-slate-800 hover:border-slate-300"
+                >
+                  ✕
+                </button>
+              </div>
             </div>
 
             {/* Chat Messages Body */}
@@ -2984,7 +2996,7 @@ export default function App() {
                       key={msg.id}
                       className={`flex flex-col ${isMe ? "items-end" : "items-start"}`}
                     >
-                      <div className="text-[10px] text-slate-400 mb-1 px-1">
+                      <div className="text-[10px] text-slate-500 mb-1 px-1">
                         {isMe ? "You" : msg.senderName} • {msg.createdAt}
                       </div>
                       <div
@@ -3029,6 +3041,79 @@ export default function App() {
               </button>
             </form>
           </div>
+        </div>
+      )}
+
+      {/* CHAT PARTNER PROFILE POPUP — name + about of the person you're chatting with */}
+      {chatProfileOpen && activeChatRequest && currentUser && (
+        <div className="fixed inset-0 z-[70] grid place-items-center p-4">
+          <div
+            className="absolute inset-0 bg-black/60 backdrop-blur-sm"
+            onClick={() => setChatProfileOpen(false)}
+          />
+          {(() => {
+            const isSender = activeChatRequest.senderId === currentUser.id;
+            const pid = isSender ? activeChatRequest.receiverId : activeChatRequest.senderId;
+            const pem = (isSender ? activeChatRequest.receiverEmail : activeChatRequest.senderEmail) || "";
+            const pname = isSender ? activeChatRequest.receiverName : activeChatRequest.senderName;
+            const prole = isSender ? (activeChatRequest.receiverRole || "") : (activeChatRequest.senderRole || "");
+            let found = null;
+            try {
+              const profs = JSON.parse(localStorage.getItem("startify_user_profiles") || "[]");
+              found = profs.find(p => p.id === pid) || (pem && profs.find(p => (p.email || "").toLowerCase() === pem.toLowerCase()));
+            } catch {}
+            if (!found) {
+              const b = builders.find(x => x.id === pid || (pem && (x.email || "").toLowerCase() === pem.toLowerCase()));
+              if (b) found = { ...b, role: "talent", email: b.email || pem };
+            }
+            if (!found) {
+              const f = funders.find(x => x.id === pid || (pem && (x.email || "").toLowerCase() === pem.toLowerCase()));
+              if (f) found = { ...f, role: "backer", email: f.email || pem };
+            }
+            const name = found?.name || pname || "Unknown";
+            const role = found?.role || prole || "partner";
+            const email = found?.email || pem || "";
+            const about = (email && getProfileAbout(email)) || found?.bio || "";
+            const photo = (email && getProfileImage(email)) || found?.profileImage || "";
+            return (
+              <div className="relative w-full max-w-[400px] rounded-[24px] bg-white border border-slate-200 shadow-2xl p-6 text-slate-800 max-h-[85vh] overflow-y-auto">
+                <div className="flex items-start justify-between gap-3">
+                  <div className="flex items-center gap-3 min-w-0">
+                    {photo ? (
+                      <img src={photo} alt={name} className="h-14 w-14 rounded-2xl object-cover border border-slate-200 shrink-0" />
+                    ) : (
+                      <div className="h-14 w-14 rounded-2xl bg-slate-100 border border-slate-200 grid place-items-center text-2xl shrink-0">👤</div>
+                    )}
+                    <div className="min-w-0">
+                      <div className="font-heading font-extrabold text-[18px] leading-tight truncate">{name}</div>
+                      <div className="mt-1"><span className="px-2 py-0.5 rounded-full text-[11px] font-bold border bg-slate-100 border-slate-200 text-slate-600">{ROLE_META[role]?.label || role}</span></div>
+                    </div>
+                  </div>
+                  <button onClick={() => setChatProfileOpen(false)} className="h-8 w-8 rounded-full border border-slate-200 grid place-items-center text-slate-500 hover:text-slate-800 shrink-0">✕</button>
+                </div>
+                {email ? <div className="mt-3 text-xs text-slate-500 break-all">{email}</div> : null}
+                {email ? <div className="mt-1 text-[11px] text-slate-400">Student ID: <strong className="text-slate-600">{email.split("@")[0].toUpperCase()}</strong></div> : null}
+                <div className="mt-4">
+                  <div className="text-[11px] font-bold uppercase tracking-widest text-slate-500">About</div>
+                  {about ? <p className="mt-1 text-[13px] text-slate-700 leading-5 bg-slate-50 border border-slate-200 rounded-xl p-3">{about}</p> : <p className="mt-1 text-[13px] text-slate-400 italic">No about added yet.</p>}
+                </div>
+                {(found?.skills || found?.roleTitle) ? (
+                  <div className="mt-3 p-3 rounded-xl bg-slate-50 border border-slate-200">
+                    <div className="text-[11px] font-bold uppercase tracking-widest text-slate-500">Skills</div>
+                    {found?.roleTitle ? <div className="mt-1 text-[13px] font-semibold text-slate-800">{found.roleTitle}</div> : null}
+                    {found?.skills ? <div className="mt-0.5 text-[13px] text-slate-600 break-words">{found.skills}</div> : null}
+                  </div>
+                ) : null}
+                {found?.focus ? (
+                  <div className="mt-3 p-3 rounded-xl bg-slate-50 border border-slate-200">
+                    <div className="text-[11px] font-bold uppercase tracking-widest text-slate-500">Focus</div>
+                    <div className="mt-1 text-[13px] text-slate-600 break-words">{found.focus}</div>
+                  </div>
+                ) : null}
+                <div className="mt-3 text-[11px] text-slate-500">Chatting about: <strong className="text-slate-700">{activeChatRequest.targetTitle}</strong></div>
+              </div>
+            );
+          })()}
         </div>
       )}
 
