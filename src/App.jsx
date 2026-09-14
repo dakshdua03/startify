@@ -8,7 +8,7 @@ import { dbService, isFirebaseConfigured as isSupabaseConfigured, authService } 
 
 export const ROLE_META = {
   founder: { label: "Founder", icon: "", accent: "#111111", dot: "bg-emerald-500" },
-  talent: { label: "Builder", icon: "", accent: "#3b82f6", dot: "bg-sky-500" },
+  talent: { label: "Talent", icon: "", accent: "#3b82f6", dot: "bg-sky-500" },
   backer: { label: "Backer", icon: "", accent: "#7c3aed", dot: "bg-violet-500" },
   admin: { label: "Admin", icon: "", accent: "#0f172a", dot: "bg-amber-500" },
 };
@@ -652,9 +652,9 @@ export default function App() {
             id: newUser.id,
             name: newUser.name,
             email: newUser.email.toLowerCase(),
-            role: authForm.roleTitle || "Builder",
+            role: authForm.roleTitle || "Talent",
             skills: authForm.skills || "Development & Design",
-            year: "Campus Builder",
+            year: "Campus Talent",
             verifiedStudent: true,
             status: "Available for Collaboration"
           };
@@ -681,7 +681,7 @@ export default function App() {
       return;
     }
     if (authMode === "register" && (targetRole === "founder" || targetRole === "talent") && !isUoHEmail(email)) {
-      showToast("Use your University of Hyderabad email ending in @uohyd.ac.in for Founder/Builder accounts. Backers can use any email.");
+      showToast("Use your University of Hyderabad email ending in @uohyd.ac.in for Founder/Talent accounts. Backers can use any email.");
       return;
     }
     // Firebase password+link flow
@@ -691,7 +691,7 @@ export default function App() {
         if (authMode === "register") {
           if (!authForm.name.trim()) { showToast("Please enter your full name."); return; }
           if ((targetRole === "founder" || targetRole === "talent") && !isUoHEmail(email)) {
-            showToast("Founder/Builder requires @uohyd.ac.in. Use Backer for Gmail.");
+            showToast("Founder/Talent requires @uohyd.ac.in. Use Backer for Gmail.");
             return;
           }
           try {
@@ -871,7 +871,7 @@ export default function App() {
       if (hasStoredPassword && !checkCredential(email, password)) { showToast("An account with this email already uses a different password."); return; }
       const derivedStudentId = email.split("@")[0].toUpperCase();
       const pendingUser = { id: `user_${Date.now()}`, name: authForm.name.trim(), email, role: targetRole, studentId: derivedStudentId, roleTitle: authForm.roleTitle, skills: authForm.skills, focus: authForm.focus, bio: authForm.bio };
-      if ((pendingUser.role === "founder" || pendingUser.role === "talent") && !isUoHEmail(pendingUser.email)) { showToast("Founder/Builder requires @uohyd.ac.in."); return; }
+      if ((pendingUser.role === "founder" || pendingUser.role === "talent") && !isUoHEmail(pendingUser.email)) { showToast("Founder/Talent requires @uohyd.ac.in."); return; }
       completeRegistration(pendingUser, targetRole);
     }
   };
@@ -1185,7 +1185,7 @@ export default function App() {
       : currentUser?.role === "talent"
         ? [{ title: "Founders & ideas", subtitle: "Teams looking for a builder like you", items: ideas.filter((i) => !isOwnIdea(i)), kind: "idea" }]
         : currentUser?.role === "admin"
-          ? [{ title: "Founders & ideas", subtitle: "All live ideas", items: ideas, kind: "idea" }, { title: "Talent & skills", subtitle: "All builders", items: builders, kind: "builder" }]
+          ? [{ title: "Founders & ideas", subtitle: "All live ideas", items: ideas, kind: "idea" }, { title: "Talent & skills", subtitle: "All talent", items: builders, kind: "builder" }]
           : [{ title: "Founders & ideas", subtitle: "Teams looking for collaborators", items: ideas, kind: "idea" }, { title: "Backers", subtitle: "Backers and mentors in the network", items: funders, kind: "backer" }];
 
   return (
@@ -1328,7 +1328,7 @@ export default function App() {
                 <div className="text-xs font-bold uppercase tracking-widest text-slate-500">Ecosystem workflow</div>
                 <div className="mt-3 grid grid-cols-1 sm:grid-cols-3 gap-3 sm:gap-4">
                   {[
-                    ["→", "Create account", "Pick a role — Founder, Builder or Backer."],
+                    ["→", "Create account", "Pick a role — Founder, Talent or Backer."],
                     ["→", "Send a request", "Pitch an idea or offer your skills."],
                     ["→", "Get accepted & chat", "Chat unlocks after acceptance."],
                   ].map(([n, t, d]) => (
@@ -2017,7 +2017,7 @@ export default function App() {
             {dashboardGroups.map((group) => {
               const allowed = canConnect(currentUser.role, group.kind);
               return <section key={group.title} className="rounded-[24px] border border-slate-200 bg-white p-6">
-              <div className="border-b border-slate-200 pb-4"><div className="text-[11px] font-bold uppercase tracking-widest text-slate-500">DISCOVER</div><h2 className="font-heading mt-1 text-[26px] font-extrabold text-slate-800">{group.title}</h2><p className="mt-1 text-[12px] text-slate-500">{group.subtitle} {group.kind === "backer" && currentUser.role === "talent" ? "· not needed for builders" : ""}</p></div>
+              <div className="border-b border-slate-200 pb-4"><div className="text-[11px] font-bold uppercase tracking-widest text-slate-500">DISCOVER</div><h2 className="font-heading mt-1 text-[26px] font-extrabold text-slate-800">{group.title}</h2><p className="mt-1 text-[12px] text-slate-500">{group.subtitle} {group.kind === "backer" && currentUser.role === "talent" ? "· not needed for talent" : ""}</p></div>
               <div className="mt-4 space-y-3">{group.items.length === 0 ? <div className="py-6 text-center text-sm text-slate-500">Nothing to show here for your role right now.</div> : (group.kind === "builder" ? (showAllBuilders ? group.items : group.items.slice(0,3)) : group.kind === "backer" ? (showAllFunders ? group.items : group.items.slice(0,3)) : (showAllIdeas ? group.items : group.items.slice(0,3))).map((person) => { const isIdea = Boolean(person.title); const name = person.name || person.title; const detail = isIdea ? `${person.category} · ${person.founder}` : person.role || person.focus; return <div key={person.id} className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 rounded-2xl border border-slate-200 bg-slate-50 p-4"><div className="min-w-0 flex-1"><div className="truncate font-heading font-bold text-slate-800">{name}</div><div className="mt-0.5 truncate text-[11.5px] text-slate-500">{detail}</div></div>{allowed ? <button onClick={() => { setTargetConnectItem(person); setConnectModalOpen(true); }} className="w-full sm:w-auto shrink-0 rounded-full border border-slate-200 bg-slate-900 px-4 py-2 text-[11px] font-bold text-white hover:bg-slate-800 transition text-center">Connect</button> : <span className="shrink-0 text-[11px] text-slate-400 px-3 py-1.5 rounded-full bg-white border border-slate-200 text-center">Via ideas</span>}</div>; })}</div>
               {group.items.length > 3 && (
                 <div className="mt-3 flex justify-center">
@@ -2392,7 +2392,7 @@ export default function App() {
                 {currentUser.role === "talent" && (
                   <div className="mt-4 p-4 rounded-xl bg-slate-50 border border-slate-200">
                     <div className="text-xs font-bold uppercase tracking-widest text-slate-500">Skills & Role</div>
-                    <div className="mt-1 text-sm font-semibold text-slate-800">{currentUser.roleTitle || "Builder"}</div>
+                    <div className="mt-1 text-sm font-semibold text-slate-800">{currentUser.roleTitle || "Talent"}</div>
                     <div className="text-sm text-slate-600 mt-1 break-words">{currentUser.skills || "No skills added"}</div>
                     <button onClick={()=>{ setProfileRoleTitleDraft(currentUser.roleTitle||""); setProfileSkillsDraft(currentUser.skills||""); setProfileSkillsEditOpen(true); }} className="mt-3 h-8 px-3 rounded-full bg-white border border-slate-200 text-xs font-bold">Edit skills</button>
                   </div>
@@ -2742,7 +2742,7 @@ export default function App() {
                   <div className="grid grid-cols-1 min-[420px]:grid-cols-3 gap-1.5 sm:gap-2">
                     {[
                       ["founder", "Founder", "Post ideas"],
-                      ["talent", "Builder", "Build teams"],
+                      ["talent", "Talent", "Build teams"],
                       ["backer", "Backer", "Fund people"],
                     ].map(([role, label, sub]) => (
                       <button
@@ -2793,7 +2793,7 @@ export default function App() {
                 <p className="mt-1.5 text-[11px] leading-4 text-slate-500">
                   {selectedRegisterRole === "backer"
                     ? "Backers may be outside UoH — any verified email works."
-                    : "Founder & Builder accounts are UoH-only."}
+                    : "Founder & Talent accounts are UoH-only."}
                 </p>
               </div>
 
