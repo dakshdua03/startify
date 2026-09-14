@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef } from "react";
 import logoImg from "./assets/startify-wordmark-full.png";
 import { dbService, isFirebaseConfigured as isSupabaseConfigured, authService } from "./lib/firebase";
+import { processRazorpayPayment } from "./lib/payment";
 
 /* ==========================================================================
    PRE-CREATED TEST ACCOUNTS & DEMO DATA FOR EASY TESTING
@@ -80,6 +81,71 @@ export const dropRemovedRequests = (arr) =>
   (arr || []).filter((r) => r && !REMOVED_REQUEST_IDS.has(r.id));
 
 export const MAIN_WHATSAPP_LINK = "https://chat.whatsapp.com/BOgivVivG5ZLQ1OqoIl3wi?s=cl&p=a&mlu=4";
+
+// ---- Fundraising helpers ----
+export const isFundingIdea = (idea) => (idea?.lookingFor || "team") === "funding";
+export const fmtINR = (n) => `₹${(Number(n) || 0).toLocaleString("en-IN")}`;
+export const normalizeDemoUrl = (u) => {
+  const t = (u || "").trim();
+  if (!t) return "";
+  if (/^https?:\/\//i.test(t)) return t;
+  return `https://${t}`;
+};
+export const isValidDemoUrl = (u) => {
+  try {
+    const url = new URL(normalizeDemoUrl(u));
+    return url.hostname.includes(".");
+  } catch { return false; }
+};
+
+// Small shared bits for fundraising UI (no hooks — safe to call anywhere)
+export function FundingBar({ idea, raised, donorCount }) {
+  const goal = Number(idea.goalAmount) || 0;
+  const pct = goal > 0 ? Math.min(100, Math.round(((Number(raised) || 0) / goal) * 100)) : 0;
+  const funded = goal > 0 && (Number(raised) || 0) >= goal;
+  return (
+    <div className="rounded-2xl border border-slate-200 bg-slate-50 p-3">
+      <div className="flex items-center justify-between gap-2 text-[11px] font-bold">
+        <span className="text-slate-800">{fmtINR(raised)} raised</span>
+        <span className="font-semibold text-slate-500">of {fmtINR(goal)}</span>
+      </div>
+      <div className="mt-2 h-2 overflow-hidden rounded-full bg-slate-200">
+        <div className="h-full rounded-full bg-emerald-500 transition-all" style={{ width: `${pct}%` }} />
+      </div>
+      <div className="mt-1.5 text-[10px] font-semibold text-slate-500">
+        {pct}% funded{funded ? " ✓ Goal reached" : ""} · {donorCount || 0} donor{(donorCount || 0) === 1 ? "" : "s"}
+      </div>
+    </div>
+  );
+}
+export function DemoLink({ url, className }) {
+  if (!url) return null;
+  return (
+    <a
+      href={normalizeDemoUrl(url)}
+      target="_blank"
+      rel="noreferrer"
+      onClick={(e) => e.stopPropagation()}
+      className={className || "inline-flex items-center gap-1 text-[11px] font-bold text-indigo-600 hover:text-indigo-800 hover:underline"}
+    >
+      View demo →
+    </a>
+  );
+}
+export function LookingForPill({ idea }) {
+  if (isFundingIdea(idea)) {
+    return (
+      <span className="rounded-full bg-emerald-50 border border-emerald-200 px-3 py-1 text-[10px] font-bold text-emerald-700 whitespace-nowrap">
+        💰 Seeking funds
+      </span>
+    );
+  }
+  return (
+    <span className="rounded-full bg-sky-50 border border-sky-200 px-3 py-1 text-[10px] font-bold text-sky-700 whitespace-nowrap">
+      👥 Seeking team
+    </span>
+  );
+}
 
 export default function App() {
   const [currentUser, setCurrentUser] = useState(() => {
@@ -398,8 +464,23 @@ export default function App() {
     title: "",
     category: "Tech / AI",
     desc: "",
-    seeking: "Tech Co-Founder"
+    seeking: "Tech Co-Founder",
+    lookingFor: "team", // "team" | "funding"
+    goalAmount: "",
+    demoUrl: ""
   });
+
+  // Fundraising state
+  const [donations, setDonations] = useState([]);
+  const [donateModalOpen, setDonateModalOpen] = useState(false);
+  const [targetDonateIdea, setTargetDonateIdea] = useState(null);
+  const [donateAmount, setDonateAmount] = useState("");
+  const [donateLoading, setDonateLoading] = useState(false);
+  const donorsForIdea = (ideaId) => donations.filter((d) => d && d.ideaId === ideaId);
+  const raisedForIdea = (idea) => {
+    const fromDonations = donorsForIdea(idea.id).reduce((s, d) => s + (Number(d.amount) || 0), 0);
+    return Math.max(Number(idea.raisedAmount) || 0, fromDonations);
+  };
 
   const [connectForm, setConnectForm] = useState({ message: "" });
   const [chatInputText, setChatInputText] = useState("");
@@ -470,6 +551,13 @@ export default function App() {
     dbService.getMessages().then((cm) => { if (cm && Array.isArray(cm)) setMessages((prev) => {
       const map = new Map(); [...prev, ...cm].forEach(x=> map.set(x.id, x)); return Array.from(map.values());
     }); });
+    try {
+      const localDon = JSON.parse(localStorage.getItem("startify_donations") || "null");
+      if (localDon && Array.isArray(localDon) && localDon.length) setDonations((prev) => [...localDon, ...prev]);
+    } catch {}
+    dbService.getDonations().then((cd) => { if (cd && Array.isArray(cd)) setDonations((prev) => {
+      const map = new Map(); [...prev, ...cd].forEach(x=> map.set(x.id, x)); return Array.from(map.values());
+    }); });
     dbService.getRsvps().then((rv) => { if (rv && Array.isArray(rv) && rv.length) setRsvps(rv); });
     // Realtime: Firestore onSnapshot for chats so two devices sync without reload
     const unsubReq = dbService.subscribeRequests ? dbService.subscribeRequests((cloudReqs) => {
@@ -484,6 +572,11 @@ export default function App() {
     }) : () => {};
     const unsubRsvp = dbService.subscribeRsvps ? dbService.subscribeRsvps((cloudRsvps) => {
       if (cloudRsvps && Array.isArray(cloudRsvps)) setRsvps(cloudRsvps);
+    }) : () => {};
+    const unsubDon = dbService.subscribeDonations ? dbService.subscribeDonations((cloudDon) => {
+      if (cloudDon && Array.isArray(cloudDon)) setDonations((prev) => {
+        const map = new Map(); [...prev, ...cloudDon].forEach(x=> map.set(x.id, x)); return Array.from(map.values());
+      });
     }) : () => {};
     // Live update when admin approves in another tab + chats arrive cross-tab
     const onStorage = (e) => {
@@ -524,7 +617,7 @@ export default function App() {
     document.addEventListener("visibilitychange", onVisible);
     // Heal rows written before the rename fix (old snapshot names)
     backfillNamesFromProfiles();
-    return () => { window.removeEventListener("storage", onStorage); document.removeEventListener("visibilitychange", onVisible); unsubReq(); unsubMsg(); unsubRsvp(); };
+    return () => { window.removeEventListener("storage", onStorage); document.removeEventListener("visibilitychange", onVisible); unsubReq(); unsubMsg(); unsubRsvp(); unsubDon(); };
   }, []);
 
   useEffect(() => {
@@ -545,6 +638,9 @@ export default function App() {
       localStorage.setItem("startify_messages", JSON.stringify(userMsgs));
     } catch {}
   }, [messages]);
+  useEffect(() => {
+    try { localStorage.setItem("startify_donations", JSON.stringify(donations)); } catch {}
+  }, [donations]);
 
   // --- Password auth helpers (localStorage) ---
   const getCredentials = () => {
@@ -876,13 +972,28 @@ export default function App() {
     }
   };
 
-  // Submit New Idea (Requires Login & Founder Role)
+  // Submit New Idea (Requires Login & Founder Role) — team or funding
   const handleIdeaSubmit = (e) => {
     e.preventDefault();
     if (!currentUser) return;
     if (currentUser.role !== "founder") {
       showToast("Only Founder accounts can post ideas.");
       setIdeaModalOpen(false);
+      return;
+    }
+    const lookingFor = newIdeaForm.lookingFor === "funding" ? "funding" : "team";
+    const goalAmount = Math.floor(Number(newIdeaForm.goalAmount) || 0);
+    if (lookingFor === "funding" && goalAmount < 100) {
+      showToast("Set a funding goal of at least ₹100.");
+      return;
+    }
+    const demoUrl = normalizeDemoUrl(newIdeaForm.demoUrl);
+    if (lookingFor === "funding" && !isValidDemoUrl(newIdeaForm.demoUrl)) {
+      showToast("Add a valid demo / prototype link (https://...). Funders need to see it.");
+      return;
+    }
+    if (demoUrl && !isValidDemoUrl(newIdeaForm.demoUrl)) {
+      showToast("That demo link doesn't look valid — check it once.");
       return;
     }
 
@@ -897,7 +1008,11 @@ export default function App() {
       verifiedStudent: true,
       studentId: currentUser.email.split("@")[0].toUpperCase(),
       desc: newIdeaForm.desc,
-      seeking: newIdeaForm.seeking,
+      seeking: lookingFor === "funding" ? "Funding" : newIdeaForm.seeking,
+      lookingFor,
+      goalAmount: lookingFor === "funding" ? goalAmount : 0,
+      raisedAmount: 0,
+      demoUrl,
       status: "Pending Review",
       createdDate: nowStr
     };
@@ -906,7 +1021,61 @@ export default function App() {
     setIdeas([newIdea, ...ideas]);
     setIdeaModalOpen(false);
     showToast(`✓ Idea "${newIdeaForm.title}" sent for admin review.`);
-    setNewIdeaForm({ title: "", category: "Tech / AI", desc: "", seeking: "Tech Co-Founder" });
+    setNewIdeaForm({ title: "", category: "Tech / AI", desc: "", seeking: "Tech Co-Founder", lookingFor: "team", goalAmount: "", demoUrl: "" });
+  };
+
+  // Donate to a funding idea (any logged-in user; Razorpay or demo simulator)
+  const handleDonateSubmit = (e) => {
+    e.preventDefault();
+    const idea = targetDonateIdea;
+    if (!currentUser || !idea) return;
+    if (isOwnIdea(idea)) {
+      showToast("You can't donate to your own idea.");
+      return;
+    }
+    const amount = Math.floor(Number(donateAmount) || 0);
+    if (amount < 10) {
+      showToast("Minimum donation is ₹10.");
+      return;
+    }
+    setDonateLoading(true);
+    processRazorpayPayment({
+      title: `Donation: ${idea.title}`,
+      amountInINR: amount,
+      userName: currentUser.name,
+      userEmail: currentUser.email,
+      userContact: "",
+      onSuccess: (payment) => {
+        const donation = {
+          id: `don_${Date.now()}`,
+          ideaId: idea.id,
+          ideaTitle: idea.title,
+          donorId: currentUser.id,
+          donorName: currentUser.name,
+          donorEmail: currentUser.email.toLowerCase(),
+          amount,
+          paymentId: payment.paymentId || "",
+          createdAt: new Date().toISOString()
+        };
+        dbService.saveDonation(donation);
+        setDonations((prev) => [donation, ...prev]);
+        const updatedIdea = { ...idea, raisedAmount: (Number(idea.raisedAmount) || 0) + amount };
+        setIdeas((prev) => prev.map((i) => (i.id === idea.id ? updatedIdea : i)));
+        dbService.saveIdea(updatedIdea);
+        try {
+          const stored = JSON.parse(localStorage.getItem("startify_submitted_ideas") || "[]");
+          localStorage.setItem("startify_submitted_ideas", JSON.stringify(stored.map((i) => (i.id === idea.id ? updatedIdea : i))));
+        } catch {}
+        setDonateLoading(false);
+        setDonateModalOpen(false);
+        setDonateAmount("");
+        showToast(`✓ Thank you! You donated ${fmtINR(amount)} to "${idea.title}".`);
+      },
+      onFailure: (msg) => {
+        setDonateLoading(false);
+        showToast(msg || "Donation failed. Try again.");
+      }
+    });
   };
 
   const handleApproveIdea = (ideaId) => {
@@ -1370,7 +1539,12 @@ export default function App() {
                   <h3 className="font-heading mt-3 text-[18px] font-extrabold text-slate-800">{idea.title}</h3>
                   <p className="mt-1 text-[12px] font-medium text-slate-500">By {idea.founder}</p>
                   <p className="mt-3 text-[13px] leading-5 text-slate-600 line-clamp-3">{idea.desc}</p>
-                  <div className="mt-3 text-[11px] font-semibold text-slate-600">Seeking: {idea.seeking}</div>
+                  {isFundingIdea(idea) ? (
+                    <div className="mt-3 text-[11px] font-semibold text-slate-600">💰 {fmtINR(raisedForIdea(idea))} raised <span className="font-normal text-slate-500">of {fmtINR(idea.goalAmount)}</span></div>
+                  ) : (
+                    <div className="mt-3 text-[11px] font-semibold text-slate-600">Seeking: {idea.seeking}</div>
+                  )}
+                  {idea.demoUrl ? <div className="mt-2"><DemoLink url={idea.demoUrl} /></div> : null}
                 </article>
               ))}
             </div>
@@ -1415,7 +1589,12 @@ export default function App() {
                   <h3 className="font-heading mt-4 text-[20px] font-extrabold text-slate-800">{idea.title}</h3>
                   <p className="mt-1 text-[12px] font-medium text-slate-500">By {idea.founder}</p>
                   <p className="mt-3 text-[13px] leading-5 text-slate-600 line-clamp-3">{idea.desc}</p>
-                  <div className="mt-4 border-t border-slate-200 pt-3 text-[11px] font-semibold text-slate-600">Seeking: {idea.seeking}</div>
+                  {isFundingIdea(idea) ? (
+                    <div className="mt-4 border-t border-slate-200 pt-3 text-[11px] font-semibold text-slate-600">💰 {fmtINR(raisedForIdea(idea))} raised <span className="font-normal text-slate-500">of {fmtINR(idea.goalAmount)}</span></div>
+                  ) : (
+                    <div className="mt-4 border-t border-slate-200 pt-3 text-[11px] font-semibold text-slate-600">Seeking: {idea.seeking}</div>
+                  )}
+                  {idea.demoUrl ? <div className="mt-2"><DemoLink url={idea.demoUrl} /></div> : null}
                 </article>
               ))}
             </div>
@@ -1516,8 +1695,29 @@ export default function App() {
                   <p className="text-[14px] text-slate-600 leading-[1.6] mt-4">
                     {idea.desc}
                   </p>
+                  <div className="mt-3 flex flex-wrap items-center gap-2">
+                    <LookingForPill idea={idea} />
+                    {idea.demoUrl ? <DemoLink url={idea.demoUrl} /> : null}
+                  </div>
                 </div>
 
+                {isFundingIdea(idea) ? (
+                  <div className="mt-6 pt-5 border-t border-slate-200 space-y-3">
+                    <FundingBar idea={idea} raised={raisedForIdea(idea)} donorCount={donorsForIdea(idea.id).length} />
+                    <button
+                      onClick={() =>
+                        requireAuth(() => {
+                          setTargetDonateIdea(idea);
+                          setDonateAmount("");
+                          setDonateModalOpen(true);
+                        })
+                      }
+                      className="w-full h-10 rounded-full bg-slate-900 text-white text-[12.5px] font-bold hover:bg-black transition"
+                    >
+                      Donate →
+                    </button>
+                  </div>
+                ) : (
                 <div className="mt-6 pt-5 border-t border-slate-200 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
                   <div className="text-[12px] text-slate-600">
                     <span className="font-semibold text-slate-900">Seeking:</span>{" "}
@@ -1540,6 +1740,7 @@ export default function App() {
                     <span className="text-[11px] px-3 py-1.5 rounded-full bg-slate-50 border border-slate-200 text-slate-500">Connect available to Talent & Backers</span>
                   )}
                 </div>
+                )}
               </div>
             );})}
           </div>
@@ -2018,7 +2219,7 @@ export default function App() {
               const allowed = canConnect(currentUser.role, group.kind);
               return <section key={group.title} className="rounded-[24px] border border-slate-200 bg-white p-6">
               <div className="border-b border-slate-200 pb-4"><div className="text-[11px] font-bold uppercase tracking-widest text-slate-500">DISCOVER</div><h2 className="font-heading mt-1 text-[26px] font-extrabold text-slate-800">{group.title}</h2><p className="mt-1 text-[12px] text-slate-500">{group.subtitle} {group.kind === "backer" && currentUser.role === "talent" ? "· not needed for builders" : ""}</p></div>
-              <div className="mt-4 space-y-3">{group.items.length === 0 ? <div className="py-6 text-center text-sm text-slate-500">Nothing to show here for your role right now.</div> : (group.kind === "builder" ? (showAllBuilders ? group.items : group.items.slice(0,3)) : group.kind === "backer" ? (showAllFunders ? group.items : group.items.slice(0,3)) : (showAllIdeas ? group.items : group.items.slice(0,3))).map((person) => { const isIdea = Boolean(person.title); const name = person.name || person.title; const detail = isIdea ? `${person.category} · ${person.founder}` : person.role || person.focus; return <div key={person.id} className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 rounded-2xl border border-slate-200 bg-slate-50 p-4"><div className="min-w-0 flex-1"><div className="truncate font-heading font-bold text-slate-800">{name}</div><div className="mt-0.5 truncate text-[11.5px] text-slate-500">{detail}</div></div>{allowed ? <button onClick={() => { setTargetConnectItem(person); setConnectModalOpen(true); }} className="w-full sm:w-auto shrink-0 rounded-full border border-slate-200 bg-slate-900 px-4 py-2 text-[11px] font-bold text-white hover:bg-slate-800 transition text-center">Connect</button> : <span className="shrink-0 text-[11px] text-slate-400 px-3 py-1.5 rounded-full bg-white border border-slate-200 text-center">Via ideas</span>}</div>; })}</div>
+              <div className="mt-4 space-y-3">{group.items.length === 0 ? <div className="py-6 text-center text-sm text-slate-500">Nothing to show here for your role right now.</div> : (group.kind === "builder" ? (showAllBuilders ? group.items : group.items.slice(0,3)) : group.kind === "backer" ? (showAllFunders ? group.items : group.items.slice(0,3)) : (showAllIdeas ? group.items : group.items.slice(0,3))).map((person) => { const isIdea = Boolean(person.title); const name = person.name || person.title; const detail = isIdea ? `${person.category} · ${person.founder}${isFundingIdea(person) ? ` · 💰 ${fmtINR(raisedForIdea(person))}/${fmtINR(person.goalAmount)}` : ""}` : person.role || person.focus; return <div key={person.id} className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 rounded-2xl border border-slate-200 bg-slate-50 p-4"><div className="min-w-0 flex-1"><div className="truncate font-heading font-bold text-slate-800">{name}</div><div className="mt-0.5 truncate text-[11.5px] text-slate-500">{detail}</div></div>{allowed ? <button onClick={() => { setTargetConnectItem(person); setConnectModalOpen(true); }} className="w-full sm:w-auto shrink-0 rounded-full border border-slate-200 bg-slate-900 px-4 py-2 text-[11px] font-bold text-white hover:bg-slate-800 transition text-center">Connect</button> : <span className="shrink-0 text-[11px] text-slate-400 px-3 py-1.5 rounded-full bg-white border border-slate-200 text-center">Via ideas</span>}</div>; })}</div>
               {group.items.length > 3 && (
                 <div className="mt-3 flex justify-center">
                   <button onClick={() => {
@@ -2313,7 +2514,7 @@ export default function App() {
                         <div>
                           <div className="font-bold text-slate-800 text-[14px]">{idea.title}</div>
                           <div className="text-[11.5px] text-slate-500 mt-0.5">
-                            Category: {idea.category} • Seeking: {idea.seeking}
+                            Category: {idea.category} • {isFundingIdea(idea) ? `Goal ${fmtINR(idea.goalAmount)} • Raised ${fmtINR(raisedForIdea(idea))} (${donorsForIdea(idea.id).length} donors)` : `Seeking: ${idea.seeking}`}
                           </div>
                         </div>
                         <span className="px-2.5 py-1 rounded-full bg-slate-100 border border-slate-200 text-[10.5px] text-slate-600 font-medium">
@@ -2416,7 +2617,7 @@ export default function App() {
                         <div key={idea.id} className="p-3 rounded-xl bg-white border border-slate-200 flex items-center justify-between gap-2">
                           <div className="min-w-0">
                             <div className="font-bold text-slate-800 text-[13px] truncate">{idea.title}</div>
-                            <div className="text-[11px] text-slate-500">{idea.category} • Seeking: {idea.seeking}</div>
+                            <div className="text-[11px] text-slate-500">{idea.category} • {isFundingIdea(idea) ? `💰 ${fmtINR(raisedForIdea(idea))}/${fmtINR(idea.goalAmount)}` : `Seeking: ${idea.seeking}`}</div>
                           </div>
                           <span className="px-2 py-1 rounded-full bg-slate-100 border border-slate-200 text-[10px] text-slate-600 font-medium whitespace-nowrap">{idea.status}</span>
                         </div>
@@ -2878,6 +3079,65 @@ export default function App() {
                 />
               </div>
 
+              <div>
+                <label className="block text-[12px] font-semibold text-slate-600 mb-1">
+                  What are you looking for? *
+                </label>
+                <div className="grid grid-cols-2 gap-2 p-1 bg-slate-100 rounded-full border border-slate-200 text-xs font-semibold text-center">
+                  <button
+                    type="button"
+                    onClick={() => setNewIdeaForm({ ...newIdeaForm, lookingFor: "team" })}
+                    className={`py-2 rounded-full transition ${
+                      newIdeaForm.lookingFor !== "funding" ? "bg-slate-900 text-white font-bold shadow-sm" : "text-slate-500"
+                    }`}
+                  >
+                    👥 Team
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setNewIdeaForm({ ...newIdeaForm, lookingFor: "funding" })}
+                    className={`py-2 rounded-full transition ${
+                      newIdeaForm.lookingFor === "funding" ? "bg-slate-900 text-white font-bold shadow-sm" : "text-slate-500"
+                    }`}
+                  >
+                    💰 Funding
+                  </button>
+                </div>
+              </div>
+
+              {newIdeaForm.lookingFor === "funding" && (
+                <div>
+                  <label className="block text-[12px] font-semibold text-slate-600 mb-1">
+                    Funding goal (₹) *
+                  </label>
+                  <input
+                    required
+                    type="number"
+                    min="100"
+                    step="100"
+                    value={newIdeaForm.goalAmount}
+                    onChange={(e) => setNewIdeaForm({ ...newIdeaForm, goalAmount: e.target.value })}
+                    placeholder="e.g. 50000"
+                    className="w-full h-11 rounded-full bg-slate-50 border border-slate-200 px-4 text-[13px] text-slate-800 outline-none focus:border-slate-400"
+                  />
+                  <p className="mt-1.5 text-[11px] leading-4 text-slate-500">Anyone on Startify can donate toward this goal once approved.</p>
+                </div>
+              )}
+
+              <div>
+                <label className="block text-[12px] font-semibold text-slate-600 mb-1">
+                  Demo / prototype link {newIdeaForm.lookingFor === "funding" ? "*" : <span className="font-normal text-slate-400">(optional)</span>}
+                </label>
+                <input
+                  required={newIdeaForm.lookingFor === "funding"}
+                  type="url"
+                  value={newIdeaForm.demoUrl}
+                  onChange={(e) => setNewIdeaForm({ ...newIdeaForm, demoUrl: e.target.value })}
+                  placeholder="https://your-demo-link.com"
+                  className="w-full h-11 rounded-full bg-slate-50 border border-slate-200 px-4 text-[13px] text-slate-800 outline-none focus:border-slate-400"
+                />
+              </div>
+
               <div className="grid grid-cols-1 min-[420px]:grid-cols-2 gap-3">
                 <div>
                   <label className="block text-[12px] font-semibold text-slate-600 mb-1">
@@ -2895,6 +3155,7 @@ export default function App() {
                   </select>
                 </div>
 
+                {newIdeaForm.lookingFor !== "funding" && (
                 <div>
                   <label className="block text-[12px] font-semibold text-slate-600 mb-1">
                     Seeking Role
@@ -2910,6 +3171,7 @@ export default function App() {
                     <option>Pre-Seed Backer</option>
                   </select>
                 </div>
+                )}
               </div>
 
               <div>
@@ -2982,6 +3244,77 @@ export default function App() {
                 Send Request →
               </button>
             </form>
+          </div>
+        </div>
+      )}
+
+      {/* MODAL 3B: DONATE TO A FUNDING IDEA (any logged-in user) */}
+      {donateModalOpen && targetDonateIdea && (
+        <div className="fixed inset-0 z-50 grid place-items-center p-4">
+          <div
+            className="absolute inset-0 bg-black/85 backdrop-blur-md"
+            onClick={() => setDonateModalOpen(false)}
+          />
+          <div className="relative w-full max-w-[440px] max-h-[90dvh] overflow-y-auto rounded-[28px] bg-white border border-slate-200 shadow-2xl p-5 sm:p-8 text-slate-800">
+            <div className="flex items-center justify-between border-b border-slate-200 pb-4">
+              <div className="min-w-0">
+                <div className="font-heading font-extrabold text-[20px] truncate">
+                  Donate to {targetDonateIdea.title}
+                </div>
+                <div className="text-[12px] text-slate-500 mt-0.5">
+                  By {targetDonateIdea.founder} • Donating as <strong>{currentUser?.name}</strong>
+                </div>
+              </div>
+              <button
+                onClick={() => setDonateModalOpen(false)}
+                className="h-8 w-8 shrink-0 rounded-full border border-slate-200 grid place-items-center text-slate-500 hover:text-slate-800"
+              >
+                ✕
+              </button>
+            </div>
+
+            <div className="mt-5 space-y-4">
+              <FundingBar idea={targetDonateIdea} raised={raisedForIdea(targetDonateIdea)} donorCount={donorsForIdea(targetDonateIdea.id).length} />
+              <div>
+                <label className="block text-[12px] font-semibold text-slate-600 mb-1">
+                  Amount (₹) *
+                </label>
+                <div className="flex flex-wrap gap-2 mb-2">
+                  {[100, 500, 1000, 5000].map((amt) => (
+                    <button
+                      key={amt}
+                      type="button"
+                      onClick={() => setDonateAmount(String(amt))}
+                      className={`h-9 px-4 rounded-full text-[12px] font-bold border transition ${
+                        donateAmount === String(amt)
+                          ? "bg-slate-900 text-white border-slate-900"
+                          : "bg-white text-slate-700 border-slate-200 hover:border-slate-400"
+                      }`}
+                    >
+                      {fmtINR(amt)}
+                    </button>
+                  ))}
+                </div>
+                <input
+                  required
+                  type="number"
+                  min="10"
+                  step="10"
+                  value={donateAmount}
+                  onChange={(e) => setDonateAmount(e.target.value)}
+                  placeholder="Custom amount (min ₹10)"
+                  className="w-full h-11 rounded-full bg-slate-50 border border-slate-200 px-4 text-[13px] text-slate-800 outline-none focus:border-slate-400"
+                />
+              </div>
+              <button
+                onClick={handleDonateSubmit}
+                disabled={donateLoading}
+                className="w-full h-12 rounded-full bg-slate-900 text-white font-bold text-[14px] hover:bg-slate-800 transition disabled:opacity-50"
+              >
+                {donateLoading ? "Processing..." : `Donate ${donateAmount ? fmtINR(donateAmount) : ""} →`}
+              </button>
+              <p className="text-center text-[11px] text-slate-400">Secured via Razorpay. 100% goes to the founder.</p>
+            </div>
           </div>
         </div>
       )}

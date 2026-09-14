@@ -164,6 +164,10 @@ export const dbService = {
           id: idea.id,
           title: idea.title, category: idea.category, founder: idea.founder, email: idea.email || "", founderId: idea.founderId || "",
           desc: idea.desc, seeking: idea.seeking, status: idea.status || "Pending Review",
+          lookingFor: idea.lookingFor || "team",
+          goalAmount: Number(idea.goalAmount) || 0,
+          raisedAmount: Number(idea.raisedAmount) || 0,
+          demoUrl: idea.demoUrl || "",
           created_at: serverTimestamp(), createdDate: idea.createdDate || new Date().toISOString(),
         }), { merge: true });
       } catch (err) { console.warn("Firestore idea save error", err); }
@@ -312,6 +316,37 @@ export const dbService = {
       return onSnapshot(collection(db, "messages"), (snap) => {
         callback(snap.docs.map(d => ({ id: d.id, ...d.data() })));
       }, (err) => console.warn("Messages snapshot error:", err));
+    } catch { return () => {}; }
+  },
+
+  // ---- Idea donations (fundraising) ----
+  async getDonations() {
+    if (isFirebaseConfigured && db) {
+      try {
+        const snap = await getDocs(collection(db, "donations"));
+        return snap.docs.map(d => ({ id: d.id, ...d.data() }));
+      } catch (e) { console.warn("Firestore donations fetch error", e); }
+    }
+    try { return JSON.parse(localStorage.getItem("startify_donations") || "[]"); } catch { return []; }
+  },
+  async saveDonation(donation) {
+    try {
+      const arr = JSON.parse(localStorage.getItem("startify_donations") || "[]");
+      const idx = arr.findIndex(x => x.id === donation.id);
+      if (idx >= 0) arr[idx] = donation; else arr.unshift(donation);
+      localStorage.setItem("startify_donations", JSON.stringify(arr));
+    } catch {}
+    if (isFirebaseConfigured && db) {
+      try { await setDoc(doc(db, "donations", donation.id), sanitizeForFirestore({ ...donation, created_at: serverTimestamp() }), { merge: true }); } catch (e) { console.warn("Firestore donation save error", e); }
+    }
+    return true;
+  },
+  subscribeDonations(callback) {
+    if (!isFirebaseConfigured || !db) return () => {};
+    try {
+      return onSnapshot(collection(db, "donations"), (snap) => {
+        callback(snap.docs.map(d => ({ id: d.id, ...d.data() })));
+      }, (err) => console.warn("Donations snapshot error:", err));
     } catch { return () => {}; }
   },
 
