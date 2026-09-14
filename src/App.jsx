@@ -215,7 +215,7 @@ export default function App() {
   };
   // Rename propagation: requests/ideas/messages/directory store names as snapshots,
   // so a rename must update every row belonging to this human (by id or email).
-  const propagateNameChange = (profile, newName) => {
+  const propagateNameChange = (profile, newName, silent = false) => {
     const emailLower = (profile.email || "").toLowerCase();
     const pid = profile.id;
     const matchHuman = (id, em) =>
@@ -269,7 +269,87 @@ export default function App() {
       });
       return touched ? next : prev;
     });
-    showToast("✓ Name updated everywhere");
+    if (!silent) showToast("✓ Name updated everywhere");
+  };
+  // One-time backfill: rows written before the rename fix still carry old names.
+  // Reconcile every row against the latest profile name per email (runs once on mount).
+  const backfillNamesFromProfiles = async () => {
+    try {
+      const local = JSON.parse(localStorage.getItem("startify_user_profiles") || "[]");
+      let cloud = [];
+      try { cloud = await dbService.getProfiles(); } catch {}
+      const map = new Map();
+      [...(Array.isArray(local) ? local : []), ...(Array.isArray(cloud) ? cloud : [])].forEach(p => {
+        if (p && p.email && p.role) map.set(`${p.email.toLowerCase()}_${p.role}`, p);
+      });
+      const byEmail = new Map();
+      Array.from(map.values()).forEach(p => {
+        if (!p.name) return;
+        const k = (p.email || "").toLowerCase();
+        const cur = byEmail.get(k);
+        if (!cur || new Date(p.createdAt || 0) > new Date(cur.createdAt || 0)) byEmail.set(k, p);
+      });
+      byEmail.forEach((p) => {
+        const emailLower = (p.email || "").toLowerCase();
+        const nm = p.name;
+        const fixReq = (prev) => prev.map(r => {
+          const c = { ...r };
+          if (((r.senderId && r.senderId === p.id) || (emailLower && (r.senderEmail || "").toLowerCase() === emailLower)) && c.senderName !== nm) c.senderName = nm;
+          if (((r.receiverId && r.receiverId === p.id) || (emailLower && (r.receiverEmail || "").toLowerCase() === emailLower)) && c.receiverName !== nm) c.receiverName = nm;
+          return c;
+        });
+        const fixIdea = (prev) => prev.map(i => {
+          if ((p.id && i.founderId === p.id) || (emailLower && (i.email || "").toLowerCase() === emailLower)) {
+            if (i.founder !== nm) return { ...i, founder: nm };
+          }
+          return i;
+        });
+        const fixMsg = (prev) => prev.map(m => {
+          if (p.id && m.senderId === p.id && m.senderName !== nm) return { ...m, senderName: nm };
+          return m;
+        });
+        setRequests(prev => {
+          const next = fixReq(prev);
+          const changed = next.filter((c, idx) => c !== prev[idx]);
+          if (changed.length) { changed.forEach(c => dbService.saveRequest(c)); return next; }
+          return prev;
+        });
+        setIdeas(prev => {
+          const next = fixIdea(prev);
+          const changed = next.filter((c, idx) => c !== prev[idx]);
+          if (changed.length) { changed.forEach(c => dbService.saveIdea(c)); return next; }
+          return prev;
+        });
+        setMessages(prev => {
+          const next = fixMsg(prev);
+          const changed = next.filter((c, idx) => c !== prev[idx]);
+          if (changed.length) { changed.forEach(c => dbService.saveMessage(c)); return next; }
+          return prev;
+        });
+        setBuilders(prev => {
+          const next = prev.map(b => {
+            if (((b.email || "").toLowerCase() === emailLower && emailLower) || (p.id && b.id === p.id)) {
+              if (b.name !== nm) return { ...b, name: nm };
+            }
+            return b;
+          });
+          const changed = next.filter((c, idx) => c !== prev[idx]);
+          if (changed.length) { changed.forEach(c => dbService.saveBuilder(c)); return next; }
+          return prev;
+        });
+        setFunders(prev => {
+          const next = prev.map(f => {
+            if (((f.email || "").toLowerCase() === emailLower && emailLower) || (p.id && f.id === p.id)) {
+              if (f.name !== nm) return { ...f, name: nm };
+            }
+            return f;
+          });
+          const changed = next.filter((c, idx) => c !== prev[idx]);
+          if (changed.length) { changed.forEach(c => dbService.saveFunder(c)); return next; }
+          return prev;
+        });
+      });
+    } catch (e) { console.warn("Name backfill failed", e); }
   };
   const getProfileImageKey = (email) => `startify_profile_img_${email.toLowerCase()}`;
   const getProfileAboutKey = (email) => `startify_profile_about_${email.toLowerCase()}`;
@@ -431,6 +511,8 @@ export default function App() {
     window.addEventListener("storage", onStorage);
     const onVisible = () => { if (!document.hidden) loadIdeas(); };
     document.addEventListener("visibilitychange", onVisible);
+    // Heal rows written before the rename fix (old snapshot names)
+    backfillNamesFromProfiles();
     return () => { window.removeEventListener("storage", onStorage); document.removeEventListener("visibilitychange", onVisible); unsubReq(); unsubMsg(); unsubRsvp(); };
   }, []);
 
