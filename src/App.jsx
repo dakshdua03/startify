@@ -1089,6 +1089,36 @@ export default function App() {
   const visibleBuilders = dedupeByEmail(builders.filter((b) => !isOwnBuilder(b)));
   const visibleFunders = dedupeByEmail(funders.filter((f) => !isOwnFunder(f)));
 
+  // Active people — union of EVERY identity in the system.
+  // The old logic only counted builders/funders/ideas rows that had an email
+  // field, so pending backers, event attendees, request participants,
+  // registered profiles and anyone missing an email were invisible in the
+  // total (always undercounted). Identity key: email → id → name.
+  const activePeopleCount = (() => {
+    const seen = new Set();
+    const add = (email, id, name) => {
+      const e = (email || "").trim().toLowerCase();
+      if (e) { seen.add(`e:${e}`); return; }
+      if (id !== undefined && id !== null && String(id).trim() !== "") { seen.add(`i:${String(id).trim()}`); return; }
+      const n = (name || "").trim().toLowerCase();
+      if (n) seen.add(`n:${n}`);
+    };
+    builders.forEach((b) => add(b.email, b.id, b.name));
+    funders.forEach((f) => add(f.email, f.id, f.name));
+    ideas.forEach((i) => add(i.email, i.founderId || i.id, i.founder));
+    pendingBackers.forEach((b) => add(b.email, b.id, b.name));
+    rsvps.forEach((r) => add(r.email, r.id, r.name));
+    requests.forEach((r) => { add(r.senderEmail, r.senderId, r.senderName); add(r.receiverEmail, r.receiverId, r.receiverName); });
+    if (currentUser) add(currentUser.email, currentUser.id, currentUser.name);
+    try {
+      const profiles = JSON.parse(localStorage.getItem("startify_user_profiles") || "[]");
+      profiles.forEach((p) => add(p.email, p.id, p.name));
+      const regs = JSON.parse(localStorage.getItem("startify_registrations") || "[]");
+      regs.forEach((r) => add(r.email, r.id || r.email, r.name));
+    } catch {}
+    return seen.size;
+  })();
+
   // Role-based connection permissions
   // founder -> talent/backer | talent -> idea only | backer -> idea + talent | admin -> all
   const canConnect = (senderRole, targetKind) => {
@@ -1354,7 +1384,7 @@ export default function App() {
         <main className="mx-auto max-w-[1200px] px-4 sm:px-5 py-8 md:px-8 md:py-12">
           <div className="rounded-[24px] sm:rounded-[30px] border border-slate-200 bg-gradient-to-br from-white via-slate-50 to-slate-200 p-5 sm:p-7 shadow-sm md:p-10">
             <div className="grid gap-8 lg:grid-cols-[1.3fr_.7fr] lg:items-end"><div><div className="inline-flex max-w-full flex-wrap items-center gap-1.5 rounded-full bg-indigo-50 border border-indigo-200 px-2.5 py-1 text-[10px] font-bold uppercase tracking-widest text-indigo-700 leading-4">University of Hyderabad<span className="hidden min-[420px]:inline"> • An initiative for UoH students</span></div><h1 className="font-heading home-calligraphy mt-3 text-[28px] leading-[1.1] font-extrabold tracking-tight text-slate-800 sm:text-[34px] md:text-[46px] text-balance">Good to see you, {currentUser.name.split(" ")[0]}.</h1><p className="mt-3 max-w-[650px] text-[15px] leading-6 text-slate-600">Your UoH community is actively connecting ideas, talent and support. Explore your dashboard for role-specific matches, or open Chats to continue a conversation.</p></div><div className="rounded-2xl border border-white/80 bg-white/70 p-5 shadow-sm"><div className="text-[11px] font-bold uppercase tracking-widest text-slate-500">MOTIVATION OF THE DAY</div><blockquote className="font-heading mt-3 text-[22px] font-bold leading-tight text-slate-800">“{dailyQuote.text}”</blockquote><div className="mt-2 text-[11px] text-slate-500 italic">— {dailyQuote.author}</div><div className="mt-3 h-1 w-12 rounded-full bg-slate-700" /></div></div>
-            <div className="mt-8 grid gap-4 sm:grid-cols-2 lg:grid-cols-4"><div className="rounded-2xl border border-slate-200 bg-white/80 p-5"><div className="text-[11px] font-bold uppercase tracking-wide text-slate-500">Live ideas</div><div className="font-heading mt-2 text-3xl font-extrabold text-slate-800">{ideas.length}</div><p className="mt-1 text-[11px] text-slate-500">Projects looking for momentum</p></div><div className="rounded-2xl border border-slate-200 bg-white/80 p-5"><div className="text-[11px] font-bold uppercase tracking-wide text-slate-500">Active people</div><div className="font-heading mt-2 text-3xl font-extrabold text-slate-800">{(() => { const emails = new Set(); builders.forEach(b => { if (b.email) emails.add(b.email.toLowerCase()); }); funders.forEach(f => { if (f.email) emails.add(f.email.toLowerCase()); }); ideas.forEach(i => { if (i.email) emails.add(i.email.toLowerCase()); }); return emails.size; })()}</div><p className="mt-1 text-[11px] text-slate-500">Unique people by email</p></div><div className="rounded-2xl border border-slate-200 bg-white/80 p-5"><div className="text-[11px] font-bold uppercase tracking-wide text-slate-500">Connections made</div><div className="font-heading mt-2 text-3xl font-extrabold text-slate-800">{requests.filter((request) => request.status === "accepted").length}</div><p className="mt-1 text-[11px] text-slate-500">Conversations unlocked</p></div><div className="rounded-2xl border border-slate-200 bg-white/80 p-5"><div className="text-[11px] font-bold uppercase tracking-wide text-slate-500">Upcoming events</div><div className="font-heading mt-2 text-3xl font-extrabold text-slate-800">{events.length}</div><p className="mt-1 text-[11px] text-slate-500">Ways to meet the community</p></div></div>
+            <div className="mt-8 grid gap-4 sm:grid-cols-2 lg:grid-cols-4"><div className="rounded-2xl border border-slate-200 bg-white/80 p-5"><div className="text-[11px] font-bold uppercase tracking-wide text-slate-500">Live ideas</div><div className="font-heading mt-2 text-3xl font-extrabold text-slate-800">{ideas.length}</div><p className="mt-1 text-[11px] text-slate-500">Projects looking for momentum</p></div><div className="rounded-2xl border border-slate-200 bg-white/80 p-5"><div className="text-[11px] font-bold uppercase tracking-wide text-slate-500">Active people</div><div className="font-heading mt-2 text-3xl font-extrabold text-slate-800">{activePeopleCount}</div><p className="mt-1 text-[11px] text-slate-500">Unique people across the community</p></div><div className="rounded-2xl border border-slate-200 bg-white/80 p-5"><div className="text-[11px] font-bold uppercase tracking-wide text-slate-500">Connections made</div><div className="font-heading mt-2 text-3xl font-extrabold text-slate-800">{requests.filter((request) => request.status === "accepted").length}</div><p className="mt-1 text-[11px] text-slate-500">Conversations unlocked</p></div><div className="rounded-2xl border border-slate-200 bg-white/80 p-5"><div className="text-[11px] font-bold uppercase tracking-wide text-slate-500">Upcoming events</div><div className="font-heading mt-2 text-3xl font-extrabold text-slate-800">{events.length}</div><p className="mt-1 text-[11px] text-slate-500">Ways to meet the community</p></div></div>
           </div>
           <section className="mt-8"><div className="mb-4 flex items-end justify-between"><div><div className="text-[11px] font-bold uppercase tracking-widest text-slate-500">MARK YOUR CALENDAR</div><h2 className="font-heading mt-1 text-[22px] sm:text-[25px] font-extrabold text-slate-800" style={{color: '#0f172a'}}>Upcoming community events</h2></div><button onClick={() => setActiveTab("home")} className="text-xs font-bold text-slate-700 hover:underline">Go to Chats →</button></div><div className="grid gap-5 md:grid-cols-2">{events.map((event) => <article key={event.id} className="rounded-[24px] border border-slate-200 bg-white p-6 shadow-sm" style={{background: 'rgba(255,255,255,0.92)'}}><div className="flex items-center justify-between gap-3"><span className="rounded-full bg-slate-100 px-3 py-1 text-[10px] font-bold uppercase tracking-wide text-slate-600">{event.category}</span><span className="text-xs font-semibold text-slate-500">{event.date}</span></div><h3 className="font-heading mt-4 text-[19px] font-extrabold" style={{color: '#0f172a'}}>{event.title}</h3><p className="mt-2 text-[13px]" style={{color: '#475569'}}>{event.time} · {event.venue}</p><p className="mt-3 text-[13px] leading-5" style={{color: '#334155'}}>{event.desc}</p></article>)}</div></section>
           <section className="mt-10 min-w-0 max-w-full">
