@@ -628,6 +628,46 @@ nav .scrollbar-hide::-webkit-scrollbar { display: none !important; }
   color: #555555 !important;
 }
 
+/* ─────────────────────────────────────────────
+   PHONE SAFETY NET (≤640px) — no horizontal scroll,
+   tappable targets, readable type, keyboard-safe modals
+   ───────────────────────────────────────────── */
+@media (max-width: 640px) {
+  html { font-size: 16px; }
+  body { font-size: 15px; -webkit-text-size-adjust: 100%; }
+
+  img, svg, video, canvas { max-width: 100%; }
+
+  /* Horizontal swipe rows: edge-to-edge feel, no page-level x-scroll */
+  .snap-x {
+    scroll-padding-left: 1rem;
+    scroll-padding-right: 1rem;
+    -webkit-overflow-scrolling: touch;
+    overscroll-behavior-x: contain;
+  }
+
+  /* Modal wrappers: never trap content under keyboard / small viewport */
+  .fixed.inset-0.z-50,
+  .fixed.inset-0.z-\[60\] {
+    overflow-y: auto;
+    overscroll-behavior: contain;
+    padding: 0.75rem;
+  }
+
+  /* Long words (emails, links, chat text) never force page-level x-scroll */
+  p, h1, h2, h3, blockquote {
+    overflow-wrap: break-word;
+  }
+
+  /* Bottom tab bar: smooth finger scroll, no clipped pills */
+  nav.fixed.bottom-0 .scrollbar-hide { padding-bottom: env(safe-area-inset-bottom); }
+
+  /* Touch targets: min 40px height on small buttons */
+  nav.fixed.bottom-0 button { min-height: 40px; }
+
+  /* Toast sits above bottom tab bar, full-width */
+  .fixed.z-\[70\] { max-width: calc(100vw - 2rem); }
+}
 /* Fix white text on white inputs — ensure typed text is dark and visible */
 input.bg-slate-50,
 input.bg-white,
