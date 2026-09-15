@@ -184,75 +184,6 @@ export function LookingForPill({ idea }) {
   );
 }
 
-// Dedicated fundraising rail — funding ideas never merge with team-seeking ones.
-// signedIn=false renders a Join CTA instead of Donate (logged-out visitors).
-export function FundingSection({ ideas, signedIn, onDonate, onJoin, raisedFor, donorCountFor, showJoin = true, noTopMargin = false }) {
-  const scrollRef = useRef(null);
-  const list = [...(ideas || [])].filter((i) => i && i.status !== "Rejected").sort((a, b) => {
-    const getTime = (x) => x.created_at?.seconds ? x.created_at.seconds * 1000 : (x.created_at?.toMillis ? x.created_at.toMillis() : Date.parse(x.createdDate || 0) || Number((x.id || "").split("_")[1] || 0));
-    return getTime(b) - getTime(a);
-  }).slice(0, 12);
-  if (!list.length) return null;
-  return (
-    <section className={`${noTopMargin ? "" : "mt-8 "}min-w-0 max-w-full`}>
-      <div className="mb-4 flex items-end justify-between gap-4">
-        <div className="min-w-0">
-          <h2 className="font-heading mt-1 text-[22px] sm:text-[25px] font-extrabold text-slate-900">Fundraising</h2>
-        </div>
-        <div className="hidden sm:flex items-center gap-2 shrink-0">
-          <button onClick={() => scrollRef.current?.scrollBy({ left: -320, behavior: "smooth" })} className="h-9 w-9 rounded-full bg-white border border-slate-200 grid place-items-center text-slate-700 hover:bg-slate-900 hover:text-white transition" aria-label="Previous">‹</button>
-          <button onClick={() => scrollRef.current?.scrollBy({ left: 320, behavior: "smooth" })} className="h-9 w-9 rounded-full bg-slate-900 text-white grid place-items-center hover:bg-black transition" aria-label="Next">›</button>
-        </div>
-      </div>
-      <div className="flex items-center justify-between sm:hidden mb-3 gap-2">
-        <div className="flex gap-2">
-          <button onClick={() => scrollRef.current?.scrollBy({ left: -320, behavior: "smooth" })} className="h-8 w-8 rounded-full bg-white border border-slate-200 grid place-items-center text-slate-700">‹</button>
-          <button onClick={() => scrollRef.current?.scrollBy({ left: 320, behavior: "smooth" })} className="h-8 w-8 rounded-full bg-slate-900 text-white grid place-items-center">›</button>
-        </div>
-        <span className="text-[11px] text-slate-500">Swipe →</span>
-      </div>
-      <div ref={scrollRef} className="flex gap-5 min-w-0 w-full max-w-full overflow-x-auto snap-x snap-mandatory pb-2 scrollbar-hide scroll-smooth" style={{ scrollbarWidth: "none" }}>
-        {list.map((idea) => (
-           <article key={idea.id} className="snap-start flex-none w-[calc(50%-10px)] rounded-[24px] border border-emerald-100 bg-white p-6 shadow-sm flex flex-col h-[352px] overflow-hidden">
-             <div className="flex items-center gap-2 flex-wrap">
-               <span className="rounded-full bg-slate-100 px-3 py-1 text-[10px] font-bold text-slate-600">{idea.category}</span>
-               {idea.demoUrl ? (
-                 <DemoLink
-                   url={idea.demoUrl}
-                   className="text-[11px] font-bold text-indigo-600 hover:underline whitespace-nowrap"
-                 />
-               ) : null}
-             </div>
-            <h3 className="font-heading mt-3 text-[18px] font-extrabold text-slate-800 line-clamp-2">{idea.title}</h3>
-            <p className="mt-1 text-[12px] font-medium text-slate-500 truncate">By {idea.founder}</p>
-            <p className="mt-3 min-h-0 flex-1 overflow-y-auto text-[13px] leading-5 text-slate-600" style={{ scrollbarWidth: "thin" }}>{idea.desc}</p>
-            <div className="mt-4">
-              <FundingBar idea={idea} raised={raisedFor(idea)} donorCount={donorCountFor(idea.id)} />
-            </div>
-            <div className="mt-auto pt-4">
-              {signedIn ? (
-                <button
-                  onClick={() => onDonate && onDonate(idea)}
-                  className="w-full h-10 rounded-full bg-slate-900 text-white text-[12.5px] font-bold hover:bg-black transition"
-                >
-                  Donate →
-                </button>
-              ) : showJoin ? (
-                <button
-                  onClick={() => onJoin && onJoin()}
-                  className="w-full h-10 rounded-full bg-slate-900 text-white text-[12.5px] font-bold hover:bg-black transition"
-                >
-                  Join to donate →
-                </button>
-              ) : null}
-            </div>
-          </article>
-        ))}
-      </div>
-    </section>
-  );
-}
-
 export default function App() {
   const [currentUser, setCurrentUser] = useState(() => {
     try {
@@ -334,6 +265,7 @@ export default function App() {
   const [showAllIdeas, setShowAllIdeas] = useState(false);
   const ideasScrollRef = useRef(null);
   const ideasScrollRefSignedIn = useRef(null);
+  const catScrollRef = useRef(null);
   const [profileNameEditOpen, setProfileNameEditOpen] = useState(false);
   const [profileNameDraft, setProfileNameDraft] = useState("");
   // Profile popup (quick switch, no extra screen)
@@ -1363,10 +1295,11 @@ export default function App() {
     return matchesCategory && matchesSearch;
   });
 
-  // Funding ideas live in their own section (never merged with team-seeking ideas)
-  const fundingIdeas = ideas.filter((idea) => idea && isFundingIdea(idea) && idea.status !== "Rejected");
-
-  // Self-filtered directories — deduped and never show own profile (same email across roles hidden)
+  // Categories ordered by most-used first (ties keep definition order)
+  const orderedCats = ["All", ...[...IDEA_CATEGORIES].sort((a, b) => {
+    const countFor = (c) => ideas.filter((i) => (i?.category || "") === c).length;
+    return countFor(b) - countFor(a);
+  })];
   const dedupeByEmail = (arr) => {
     const seen = new Set();
     return arr.filter(item => {
@@ -1596,8 +1529,8 @@ export default function App() {
                 </ul>
               </div>
               {/* Our belief — white card like the rest, no blue */}
-              <div className="mt-8 flex-1 rounded-[20px] bg-white p-5 md:p-6 border border-slate-200 shadow-sm overflow-hidden relative">
-                <div className="relative">
+              <div className="mt-8 flex-1 rounded-[20px] bg-white p-5 md:p-6 border border-slate-200 shadow-sm overflow-hidden relative flex flex-col">
+                <div className="relative flex-1 flex flex-col justify-center">
                   <div className="inline-flex items-center gap-2 rounded-full bg-slate-100 border border-slate-200 px-3 py-1 text-[10px] font-bold tracking-widest text-slate-600">OUR BELIEF</div>
                   <blockquote className="font-heading mt-3 text-[20px] sm:text-[22px] md:text-[26px] font-extrabold leading-tight tracking-tight text-slate-900">“If you can think it, you can build it.”</blockquote>
                   <p className="mt-2 text-[13px] leading-6 text-slate-600">A platform that connects ideas with people, and people with purpose — where every idea gets space to be built, tested, and launched.</p>
@@ -1622,9 +1555,9 @@ export default function App() {
                 </div>
               </div>
               {/* Ecosystem workflow — separate card: compact & horizontal */}
-              <div className="flex-1 rounded-[28px] border border-slate-200 bg-white p-4 sm:p-5 shadow-sm w-full max-w-full overflow-hidden">
+              <div className="flex-1 rounded-[28px] border border-slate-200 bg-white p-4 sm:p-5 shadow-sm w-full max-w-full overflow-hidden flex flex-col">
                 <div className="text-xs font-bold uppercase tracking-widest text-slate-500">Ecosystem workflow</div>
-                <div className="mt-3 grid grid-cols-1 sm:grid-cols-3 gap-3 sm:gap-4">
+                <div className="mt-3 grid grid-cols-1 sm:grid-cols-3 gap-3 sm:gap-4 flex-1 content-center">
                   {[
                     ["→", "Create account", "Pick a role — Founder, Builder or Backer."],
                     ["→", "Send a request", "Pitch an idea or offer your skills."],
@@ -1636,12 +1569,11 @@ export default function App() {
               </div>
             </div>
           </div>
-          {/* Ideas on home — team-seeking and funding side by side */}
-          <div className="mt-8 grid min-w-0 max-w-full gap-8 lg:grid-cols-2 lg:items-start">
-          <section className="min-w-0 max-w-full">
+          {/* Ideas on home — one merged row, team + funding together */}
+          <section className="mt-8 min-w-0 max-w-full">
             <div className="mb-4 flex items-end justify-between gap-4">
               <div>
-                <h2 className="font-heading mt-1 text-[22px] sm:text-[25px] font-extrabold text-slate-900">Ideas seeking teammates</h2>
+                <h2 className="font-heading mt-1 text-[22px] sm:text-[25px] font-extrabold text-slate-900">Ideas gaining momentum</h2>
               </div>
               <div className="hidden sm:flex items-center gap-2 shrink-0">
                 <button onClick={()=> ideasScrollRef.current?.scrollBy({left:-320, behavior:'smooth'})} className="h-9 w-9 rounded-full bg-white border border-slate-200 grid place-items-center text-slate-700 hover:bg-slate-900 hover:text-white transition" aria-label="Previous">‹</button>
@@ -1656,32 +1588,29 @@ export default function App() {
               <span className="text-[11px] text-slate-500">Swipe →</span>
             </div>
              <div ref={ideasScrollRef} className="flex gap-5 min-w-0 w-full max-w-full overflow-x-auto snap-x snap-mandatory pb-2 scrollbar-hide scroll-smooth" style={{scrollbarWidth:'none'}}>
-               {[...ideas].filter(i=> i && i.status !== "Rejected" && !isFundingIdea(i)).sort((a,b)=> {
+               {[...ideas].filter(i=> i && i.status !== "Rejected").sort((a,b)=> {
                  const getTime = (x)=> x.created_at?.seconds ? x.created_at.seconds*1000 : (x.created_at?.toMillis ? x.created_at.toMillis() : Date.parse(x.createdDate||0) || Number((x.id||'').split('_')[1]||0));
                  return getTime(b) - getTime(a);
                }).slice(0,12).map((idea) => (
                   <article key={idea.id} className="snap-start flex-none w-[calc(50%-10px)] rounded-[24px] border border-slate-200 bg-white p-6 shadow-sm flex flex-col h-[352px] overflow-hidden">
-                  <div className="flex items-center gap-3">
+                  <div className="flex items-center gap-2 flex-wrap">
                     <span className="rounded-full bg-slate-100 px-3 py-1 text-[10px] font-bold text-slate-600">{idea.category}</span>
+                    {isFundingIdea(idea) ? <LookingForPill idea={idea} /> : null}
+                    {idea.demoUrl ? <DemoLink url={idea.demoUrl} className="text-[11px] font-bold text-indigo-600 hover:underline whitespace-nowrap" /> : null}
                   </div>
                   <h3 className="font-heading mt-3 text-[18px] font-extrabold text-slate-800 line-clamp-2">{idea.title}</h3>
                   <p className="mt-1 text-[12px] font-medium text-slate-500 truncate">By {idea.founder}</p>
                   <p className="mt-3 min-h-0 flex-1 overflow-y-auto text-[13px] leading-5 text-slate-600" style={{scrollbarWidth:'thin'}}>{idea.desc}</p>
-                   {idea.demoUrl ? <div className="mt-auto pt-2"><DemoLink url={idea.demoUrl} /></div> : null}
+                  {isFundingIdea(idea) ? (
+                    <div className="mt-3">
+                      <FundingBar idea={idea} raised={raisedForIdea(idea)} donorCount={donorsForIdea(idea.id).length} />
+                    </div>
+                  ) : null}
                  </article>
                ))}
              </div>
              {ideas.length === 0 && <div className="mt-4 rounded-2xl border border-dashed border-slate-200 bg-white py-8 text-center text-sm text-slate-500">No ideas yet — be the first to post!</div>}
            </section>
-           <FundingSection
-            ideas={fundingIdeas}
-            signedIn={false}
-            showJoin={false}
-            noTopMargin
-            raisedFor={raisedForIdea}
-            donorCountFor={(id) => donorsForIdea(id).length}
-          />
-          </div>
           <div className="mt-6 flex justify-center">
             <button
               onClick={() => { setAuthMode("register"); setAuthModalOpen(true); }}
@@ -1701,11 +1630,10 @@ export default function App() {
             <div className="mt-8 grid gap-4 sm:grid-cols-2 lg:grid-cols-4"><div className="rounded-2xl border border-slate-200 bg-white/80 p-5"><div className="text-[11px] font-bold uppercase tracking-wide text-slate-500">Live ideas</div><div className="font-heading mt-2 text-3xl font-extrabold text-slate-800">{ideas.length}</div><p className="mt-1 text-[11px] text-slate-500">Projects looking for momentum</p></div><div className="rounded-2xl border border-slate-200 bg-white/80 p-5"><div className="text-[11px] font-bold uppercase tracking-wide text-slate-500">Active people</div><div className="font-heading mt-2 text-3xl font-extrabold text-slate-800">{activePeopleCount}</div><p className="mt-1 text-[11px] text-slate-500">Unique people across the community</p></div><div className="rounded-2xl border border-slate-200 bg-white/80 p-5"><div className="text-[11px] font-bold uppercase tracking-wide text-slate-500">Connections made</div><div className="font-heading mt-2 text-3xl font-extrabold text-slate-800">{requests.filter((request) => request.status === "accepted").length}</div><p className="mt-1 text-[11px] text-slate-500">Conversations unlocked</p></div><div className="rounded-2xl border border-slate-200 bg-white/80 p-5"><div className="text-[11px] font-bold uppercase tracking-wide text-slate-500">Upcoming events</div><div className="font-heading mt-2 text-3xl font-extrabold text-slate-800">{events.length}</div><p className="mt-1 text-[11px] text-slate-500">Ways to meet the community</p></div></div>
           </div>
           <section className="mt-8"><div className="mb-4 flex items-end justify-between"><div><div className="text-[11px] font-bold uppercase tracking-widest text-slate-500">MARK YOUR CALENDAR</div><h2 className="font-heading mt-1 text-[22px] sm:text-[25px] font-extrabold text-slate-800" style={{color: '#0f172a'}}>Upcoming community events</h2></div><button onClick={() => setActiveTab("home")} className="text-xs font-bold text-slate-700 hover:underline">Go to Chats →</button></div><div className="grid gap-5 md:grid-cols-2">{events.map((event) => <article key={event.id} className="rounded-[24px] border border-slate-200 bg-white p-6 shadow-sm" style={{background: 'rgba(255,255,255,0.92)'}}><div className="flex items-center justify-between gap-3"><span className="rounded-full bg-slate-100 px-3 py-1 text-[10px] font-bold uppercase tracking-wide text-slate-600">{event.category}</span><span className="text-xs font-semibold text-slate-500">{event.date}</span></div><h3 className="font-heading mt-4 text-[19px] font-extrabold" style={{color: '#0f172a'}}>{event.title}</h3><p className="mt-2 text-[13px]" style={{color: '#475569'}}>{event.time} · {event.venue}</p><p className="mt-3 text-[13px] leading-5" style={{color: '#334155'}}>{event.desc}</p></article>)}</div></section>
-          <div className="mt-10 grid min-w-0 max-w-full gap-8 lg:grid-cols-2 lg:items-start">
-          <section className="min-w-0 max-w-full">
+          <section className="mt-10 min-w-0 max-w-full">
             <div className="mb-4 flex items-end justify-between gap-4">
               <div>
-                <h2 className="font-heading mt-1 text-[22px] sm:text-[25px] font-extrabold text-slate-800">Ideas seeking teammates</h2>
+                <h2 className="font-heading mt-1 text-[22px] sm:text-[25px] font-extrabold text-slate-800">What the community is building</h2>
               </div>
               <div className="hidden sm:flex items-center gap-2 shrink-0">
                 <button onClick={()=> ideasScrollRefSignedIn.current?.scrollBy({left:-320, behavior:'smooth'})} className="h-9 w-9 rounded-full bg-white border border-slate-200 grid place-items-center text-slate-700 hover:bg-slate-900 hover:text-white" aria-label="Prev">‹</button>
@@ -1718,29 +1646,38 @@ export default function App() {
               <span className="text-[11px] text-slate-500">Swipe →</span>
             </div>
              <div ref={ideasScrollRefSignedIn} className="flex gap-5 min-w-0 w-full max-w-full overflow-x-auto snap-x snap-mandatory pb-2 scroll-smooth" style={{scrollbarWidth:'none'}}>
-               {[...ideas].filter(i=> i && i.status !== "Rejected" && !isFundingIdea(i)).sort((a,b)=> {
+               {[...ideas].filter(i=> i && i.status !== "Rejected").sort((a,b)=> {
                  const getTime = (x)=> x.created_at?.seconds ? x.created_at.seconds*1000 : (x.created_at?.toMillis ? x.created_at.toMillis() : Date.parse(x.createdDate||0) || Number((x.id||'').split('_')[1]||0));
                  return getTime(b) - getTime(a);
                }).slice(0,12).map((idea) => (
                  <article key={idea.id} className="snap-start flex-none w-[calc(50%-10px)] rounded-[24px] border border-slate-200 bg-white/85 p-6 shadow-sm flex flex-col h-[352px] overflow-hidden">
-                  <div className="flex items-center gap-3"><span className="rounded-full bg-slate-100 px-3 py-1 text-[10px] font-bold text-slate-600">{idea.category}</span></div>
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <span className="rounded-full bg-slate-100 px-3 py-1 text-[10px] font-bold text-slate-600">{idea.category}</span>
+                    {isFundingIdea(idea) ? <LookingForPill idea={idea} /> : null}
+                    {idea.demoUrl ? <DemoLink url={idea.demoUrl} className="text-[11px] font-bold text-indigo-600 hover:underline whitespace-nowrap" /> : null}
+                  </div>
                   <h3 className="font-heading mt-4 text-[20px] font-extrabold text-slate-800 line-clamp-2">{idea.title}</h3>
                   <p className="mt-1 text-[12px] font-medium text-slate-500 truncate">By {idea.founder}</p>
                   <p className="mt-3 min-h-0 flex-1 overflow-y-auto text-[13px] leading-5 text-slate-600" style={{scrollbarWidth:'thin'}}>{idea.desc}</p>
-                   {idea.demoUrl ? <div className="mt-auto pt-2"><DemoLink url={idea.demoUrl} /></div> : null}
+                  {isFundingIdea(idea) ? (
+                    <div className="mt-3">
+                      <FundingBar idea={idea} raised={raisedForIdea(idea)} donorCount={donorsForIdea(idea.id).length} />
+                    </div>
+                  ) : null}
+                  {isFundingIdea(idea) ? (
+                    <div className="mt-auto pt-3">
+                      <button
+                        onClick={() => { setTargetDonateIdea(idea); setDonateAmount(""); setDonateModalOpen(true); }}
+                        className="w-full h-10 rounded-full bg-slate-900 text-white text-[12.5px] font-bold hover:bg-black transition"
+                      >
+                        Donate →
+                      </button>
+                    </div>
+                  ) : null}
                  </article>
                ))}
              </div>
            </section>
-           <FundingSection
-             ideas={fundingIdeas}
-             signedIn={true}
-            noTopMargin
-            onDonate={(idea) => { setTargetDonateIdea(idea); setDonateAmount(""); setDonateModalOpen(true); }}
-            raisedFor={raisedForIdea}
-            donorCountFor={(id) => donorsForIdea(id).length}
-          />
-          </div>
         </main>
       )}
 
@@ -1772,12 +1709,14 @@ export default function App() {
 
           {/* Search & Filters */}
           <div className="mt-8 flex flex-col sm:flex-row items-center justify-between gap-4">
-            <div className="flex flex-wrap gap-2 w-full sm:w-auto">
-              {["All", ...IDEA_CATEGORIES].map((cat) => (
+            <div className="flex items-center gap-2 w-full sm:w-auto min-w-0">
+              <button onClick={()=> catScrollRef.current?.scrollBy({left:-220, behavior:'smooth'})} className="h-9 w-9 shrink-0 rounded-full bg-white border border-slate-200 grid place-items-center text-slate-700 hover:bg-slate-900 hover:text-white transition" aria-label="Scroll categories left">‹</button>
+              <div ref={catScrollRef} className="flex gap-2 min-w-0 flex-1 overflow-x-auto pb-1 scroll-smooth" style={{scrollbarWidth:'none'}}>
+              {orderedCats.map((cat) => (
                 <button
                   key={cat}
                   onClick={() => setIdeaCategoryFilter(cat)}
-                  className={`h-9 px-4 rounded-full text-[12.5px] font-semibold transition border ${
+                  className={`h-9 px-4 shrink-0 rounded-full text-[12.5px] font-semibold transition border whitespace-nowrap ${
                     ideaCategoryFilter === cat
                       ? "bg-white text-black border-white"
                       : "bg-white text-slate-600 border-slate-200 hover:border-slate-400"
@@ -1786,6 +1725,8 @@ export default function App() {
                   {cat}
                 </button>
               ))}
+              </div>
+              <button onClick={()=> catScrollRef.current?.scrollBy({left:220, behavior:'smooth'})} className="h-9 w-9 shrink-0 rounded-full bg-slate-900 text-white grid place-items-center hover:bg-black transition" aria-label="Scroll categories right">›</button>
             </div>
 
             <div className="relative w-full sm:w-[280px]">
