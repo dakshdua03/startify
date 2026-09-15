@@ -186,8 +186,7 @@ export function FundingSection({ ideas, signedIn, onDonate, onJoin, raisedFor, d
     <section className={`${noTopMargin ? "" : "mt-8 "}min-w-0 max-w-full`}>
       <div className="mb-4 flex items-end justify-between gap-4">
         <div className="min-w-0">
-          <div className="text-[11px] font-bold uppercase tracking-widest text-emerald-700">FUNDRAISING</div>
-          <h2 className="font-heading mt-1 text-[22px] sm:text-[25px] font-extrabold text-slate-900">Ideas looking for funding</h2>
+          <h2 className="font-heading mt-1 text-[22px] sm:text-[25px] font-extrabold text-slate-900">Fundraising</h2>
         </div>
         <div className="hidden sm:flex items-center gap-2 shrink-0">
           <button onClick={() => scrollRef.current?.scrollBy({ left: -320, behavior: "smooth" })} className="h-9 w-9 rounded-full bg-white border border-slate-200 grid place-items-center text-slate-700 hover:bg-slate-900 hover:text-white transition" aria-label="Previous">‹</button>
@@ -201,9 +200,9 @@ export function FundingSection({ ideas, signedIn, onDonate, onJoin, raisedFor, d
         </div>
         <span className="text-[11px] text-slate-500">Swipe →</span>
       </div>
-      <div ref={scrollRef} className="grid grid-cols-2 gap-5 min-w-0 w-full max-w-full overflow-x-auto snap-x snap-mandatory pb-2 scrollbar-hide scroll-smooth" style={{ scrollbarWidth: "none" }}>
+      <div ref={scrollRef} className="flex gap-5 min-w-0 w-full max-w-full overflow-x-auto snap-x snap-mandatory pb-2 scrollbar-hide scroll-smooth" style={{ scrollbarWidth: "none" }}>
         {list.map((idea) => (
-           <article key={idea.id} className="snap-start rounded-[24px] border border-emerald-100 bg-white p-6 shadow-sm flex flex-col h-[340px] overflow-hidden">
+           <article key={idea.id} className="snap-start flex-none w-[calc(50%-10px)] rounded-[24px] border border-emerald-100 bg-white p-6 shadow-sm flex flex-col h-[340px] overflow-hidden">
              <div className="flex items-center gap-2 flex-wrap">
                <span className="rounded-full bg-slate-100 px-3 py-1 text-[10px] font-bold text-slate-600">{idea.category}</span>
                {idea.demoUrl ? (
@@ -1558,9 +1557,6 @@ export default function App() {
               <h1 className="font-heading mt-5 max-w-[720px] text-[32px] leading-[1.08] font-extrabold tracking-tight sm:text-[42px] md:text-[58px] text-slate-900 text-balance">
                 Find the people who can <span className="bg-gradient-to-r from-indigo-600 to-violet-600 bg-clip-text text-transparent">move your idea forward.</span>
               </h1>
-              <p className="mt-5 max-w-[620px] text-[16px] leading-7 text-slate-600">
-                A space where ideas are validated, teams find their builders, and every skill finds a mission. Startify connects people, gives your ideas a team, and turns thoughts into real ventures.
-              </p>
               <div className="mt-6 flex flex-wrap gap-2 text-[11px]">
                 <span className="px-3 py-1.5 rounded-full bg-white border border-slate-200 text-slate-600">✓ Verified UoH community</span>
                 <span className="px-3 py-1.5 rounded-full bg-white border border-slate-200 text-slate-600">✓ Direct founder → talent connect</span>
@@ -1612,7 +1608,7 @@ export default function App() {
           <section className="min-w-0 max-w-full">
             <div className="mb-4 flex items-end justify-between gap-4">
               <div>
-                <h2 className="font-heading mt-1 text-[22px] sm:text-[25px] font-extrabold text-slate-900">Ideas looking for teams</h2>
+                <h2 className="font-heading mt-1 text-[22px] sm:text-[25px] font-extrabold text-slate-900">Team-seeking ideas</h2>
               </div>
               <div className="hidden sm:flex items-center gap-2 shrink-0">
                 <button onClick={()=> ideasScrollRef.current?.scrollBy({left:-320, behavior:'smooth'})} className="h-9 w-9 rounded-full bg-white border border-slate-200 grid place-items-center text-slate-700 hover:bg-slate-900 hover:text-white transition" aria-label="Previous">‹</button>
@@ -1626,12 +1622,12 @@ export default function App() {
               </div>
               <span className="text-[11px] text-slate-500">Swipe →</span>
             </div>
-             <div ref={ideasScrollRef} className="grid grid-cols-2 gap-5 min-w-0 w-full max-w-full overflow-x-auto snap-x snap-mandatory pb-2 scrollbar-hide scroll-smooth" style={{scrollbarWidth:'none'}}>
+             <div ref={ideasScrollRef} className="flex gap-5 min-w-0 w-full max-w-full overflow-x-auto snap-x snap-mandatory pb-2 scrollbar-hide scroll-smooth" style={{scrollbarWidth:'none'}}>
                {[...ideas].filter(i=> i && i.status !== "Rejected" && !isFundingIdea(i)).sort((a,b)=> {
                  const getTime = (x)=> x.created_at?.seconds ? x.created_at.seconds*1000 : (x.created_at?.toMillis ? x.created_at.toMillis() : Date.parse(x.createdDate||0) || Number((x.id||'').split('_')[1]||0));
                  return getTime(b) - getTime(a);
                }).slice(0,12).map((idea) => (
-                  <article key={idea.id} className="snap-start rounded-[24px] border border-slate-200 bg-white p-6 shadow-sm flex flex-col h-[340px] overflow-hidden">
+                  <article key={idea.id} className="snap-start flex-none w-[calc(50%-10px)] rounded-[24px] border border-slate-200 bg-white p-6 shadow-sm flex flex-col h-[340px] overflow-hidden">
                   <div className="flex items-center gap-3">
                     <span className="rounded-full bg-slate-100 px-3 py-1 text-[10px] font-bold text-slate-600">{idea.category}</span>
                   </div>
@@ -1676,8 +1672,7 @@ export default function App() {
           <section className="min-w-0 max-w-full">
             <div className="mb-4 flex items-end justify-between gap-4">
               <div>
-                <div className="text-[11px] font-bold uppercase tracking-widest text-slate-500">TEAM-SEEKING IDEAS</div>
-                <h2 className="font-heading mt-1 text-[22px] sm:text-[25px] font-extrabold text-slate-800">Ideas looking for teams</h2>
+                <h2 className="font-heading mt-1 text-[22px] sm:text-[25px] font-extrabold text-slate-800">Team-seeking ideas</h2>
               </div>
               <div className="hidden sm:flex items-center gap-2 shrink-0">
                 <button onClick={()=> ideasScrollRefSignedIn.current?.scrollBy({left:-320, behavior:'smooth'})} className="h-9 w-9 rounded-full bg-white border border-slate-200 grid place-items-center text-slate-700 hover:bg-slate-900 hover:text-white" aria-label="Prev">‹</button>
@@ -1690,12 +1685,12 @@ export default function App() {
               <button onClick={()=> ideasScrollRefSignedIn.current?.scrollBy({left:320, behavior:'smooth'})} className="h-8 w-8 rounded-full bg-slate-900 text-white grid place-items-center">›</button>
               <span className="text-[11px] text-slate-500">Swipe →</span>
             </div>
-             <div ref={ideasScrollRefSignedIn} className="grid grid-cols-2 gap-5 min-w-0 w-full max-w-full overflow-x-auto snap-x snap-mandatory pb-2 scroll-smooth" style={{scrollbarWidth:'none'}}>
+             <div ref={ideasScrollRefSignedIn} className="flex gap-5 min-w-0 w-full max-w-full overflow-x-auto snap-x snap-mandatory pb-2 scroll-smooth" style={{scrollbarWidth:'none'}}>
                {[...ideas].filter(i=> i && i.status !== "Rejected" && !isFundingIdea(i)).sort((a,b)=> {
                  const getTime = (x)=> x.created_at?.seconds ? x.created_at.seconds*1000 : (x.created_at?.toMillis ? x.created_at.toMillis() : Date.parse(x.createdDate||0) || Number((x.id||'').split('_')[1]||0));
                  return getTime(b) - getTime(a);
                }).slice(0,12).map((idea) => (
-                 <article key={idea.id} className="snap-start rounded-[24px] border border-slate-200 bg-white/85 p-6 shadow-sm flex flex-col h-[340px] overflow-hidden">
+                 <article key={idea.id} className="snap-start flex-none w-[calc(50%-10px)] rounded-[24px] border border-slate-200 bg-white/85 p-6 shadow-sm flex flex-col h-[340px] overflow-hidden">
                   <div className="flex items-center gap-3"><span className="rounded-full bg-slate-100 px-3 py-1 text-[10px] font-bold text-slate-600">{idea.category}</span></div>
                   <h3 className="font-heading mt-4 text-[20px] font-extrabold text-slate-800">{idea.title}</h3>
                   <p className="mt-1 text-[12px] font-medium text-slate-500">By {idea.founder}</p>
