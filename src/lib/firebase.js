@@ -165,6 +165,7 @@ export const dbService = {
           title: idea.title, category: idea.category, founder: idea.founder, email: idea.email || "", founderId: idea.founderId || "",
           desc: idea.desc, seeking: idea.seeking, status: idea.status || "Pending Review",
           lookingFor: idea.lookingFor || "team",
+          level: idea.level || "L1",
           goalAmount: Number(idea.goalAmount) || 0,
           raisedAmount: Number(idea.raisedAmount) || 0,
           demoUrl: idea.demoUrl || "",

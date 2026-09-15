@@ -119,6 +119,47 @@ export const BACKER_TYPES = [
 ];
 export const backerTypeMeta = (id) => BACKER_TYPES.find((t) => t.id === id) || BACKER_TYPES[0];
 
+// ---- Idea levels L1-L5 — set when posting, shown as badges on cards ----
+export const IDEA_LEVELS = [
+  { id: "L1", label: "Idea Holder", badge: "L1 • Idea", blurb: "Owns the idea — needs interviews to kill or confirm it." },
+  { id: "L2", label: "Validator", badge: "L2 • Validated", blurb: "Has proof people want it — needs a builder for the MVP." },
+  { id: "L3", label: "Builder", badge: "L3 • Building", blurb: "Team formed, MVP in progress — needs distribution." },
+  { id: "L4", label: "Launcher", badge: "L4 • Launched", blurb: "Live with users, no revenue — needs growth + pricing." },
+  { id: "L5", label: "Earner", badge: "L5 • Earning", blurb: "Making money — needs talent and capital to scale." },
+];
+export const ideaLevelMeta = (id) => IDEA_LEVELS.find((l) => l.id === id) || IDEA_LEVELS[0];
+
+// ---- Builder kinds — set in profile, shown on talent cards ----
+export const BUILDER_GROUPS = [
+  { group: "Tech Builders", blurb: "Build the product.", types: [
+    { id: "frontend", label: "Frontend Builder", blurb: "React / Next.js — builds what users see." },
+    { id: "backend", label: "Backend Builder", blurb: "Node / Python — API, database, auth." },
+    { id: "fullstack", label: "Full-Stack Builder", blurb: "Does both — one person, whole MVP." },
+    { id: "mobile", label: "Mobile Builder", blurb: "Flutter / React Native — app-first ideas." },
+    { id: "aiml", label: "AI/ML Builder", blurb: "Python + LLMs — rare, high value." },
+    { id: "nocode", label: "No-Code Builder", blurb: "Bubble / Framer / FlutterFlow — MVP in days." },
+  ]},
+  { group: "Design Builders", blurb: "Make it usable, not ugly.", types: [
+    { id: "uiux", label: "UI/UX Builder", blurb: "Figma flows and wireframes." },
+    { id: "brand", label: "Brand Builder", blurb: "Logo, name, visual identity." },
+    { id: "product-design", label: "Product Designer", blurb: "UI + UX + brand in one person." },
+  ]},
+  { group: "Growth Builders", blurb: "Get the first 100 users.", types: [
+    { id: "content", label: "Content Builder", blurb: "Writes LinkedIn / Instagram for the idea." },
+    { id: "marketing", label: "Marketing Builder", blurb: "Runs campus channels and shoutouts." },
+    { id: "sales", label: "Sales Builder", blurb: "Talks to users, closes the first payers." },
+    { id: "community", label: "Community Builder", blurb: "Runs Discord / WhatsApp, replies to users." },
+    { id: "seo", label: "SEO / Performance Builder", blurb: "Makes the idea searchable." },
+  ]},
+];
+export const builderTypeMeta = (id) => {
+  for (const g of BUILDER_GROUPS) {
+    const t = g.types.find((t) => t.id === id);
+    if (t) return { ...t, group: g.group };
+  }
+  return { id: "", label: "", blurb: "", group: "" };
+};
+
 // ---- Fundraising helpers ----
 export const isFundingIdea = (idea) => (idea?.lookingFor || "team") === "funding";
 export const fmtINR = (n) => `₹${(Number(n) || 0).toLocaleString("en-IN")}`;
@@ -276,6 +317,7 @@ export default function App() {
   const [popupExtraDraft, setPopupExtraDraft] = useState("");
   const [popupBackerTypeDraft, setPopupBackerTypeDraft] = useState("mentorship");
   const [popupBackerOfferDraft, setPopupBackerOfferDraft] = useState("");
+  const [popupBuilderTypeDraft, setPopupBuilderTypeDraft] = useState("");
   const getDefaultAccount = () => {
     try { return JSON.parse(localStorage.getItem("startify_default_account") || "null"); } catch { return null; }
   };
@@ -309,13 +351,14 @@ export default function App() {
         arr[idx].name = name;
         arr[idx].bio = about || arr[idx].bio || "";
         if (profile.role === "talent") arr[idx].skills = popupExtraDraft.trim() || arr[idx].skills || "";
+        if (profile.role === "talent" && popupBuilderTypeDraft) arr[idx].builderType = popupBuilderTypeDraft;
         if (profile.role === "backer") arr[idx].focus = popupExtraDraft.trim() || arr[idx].focus || "";
         if (profile.role === "backer") { arr[idx].backerType = popupBackerTypeDraft || arr[idx].backerType || "mentorship"; arr[idx].backerOffer = popupBackerOfferDraft.trim() || arr[idx].backerOffer || ""; }
         if (profile.role === "talent" && popupExtraDraft.trim()) arr[idx].roleTitle = popupExtraDraft.trim();
         localStorage.setItem("startify_user_profiles", JSON.stringify(arr));
         savedProfile = arr[idx];
       } else {
-        savedProfile = { id: profile.id || profile.email, name, email: profile.email.toLowerCase(), role: profile.role, bio: about, skills: profile.role==="talent"?popupExtraDraft.trim():"", focus: profile.role==="backer"?popupExtraDraft.trim():"", createdAt: new Date().toISOString() };
+        savedProfile = { id: profile.id || profile.email, name, email: profile.email.toLowerCase(), role: profile.role, bio: about, skills: profile.role==="talent"?popupExtraDraft.trim():"", builderType: profile.role==="talent"?popupBuilderTypeDraft:"", focus: profile.role==="backer"?popupExtraDraft.trim():"", createdAt: new Date().toISOString() };
         arr.unshift(savedProfile);
         localStorage.setItem("startify_user_profiles", JSON.stringify(arr));
       }
@@ -325,7 +368,7 @@ export default function App() {
       localStorage.setItem(getProfileAboutKey(profile.email), about);
     } catch {}
     if (currentUser && currentUser.email.toLowerCase()===profile.email.toLowerCase() && currentUser.role===profile.role) {
-      setCurrentUser({ ...currentUser, name, bio: about || currentUser.bio, skills: profile.role==="talent" ? (popupExtraDraft.trim()||currentUser.skills) : currentUser.skills, focus: profile.role==="backer" ? (popupExtraDraft.trim()||currentUser.focus) : currentUser.focus, backerType: profile.role==="backer" ? (popupBackerTypeDraft || currentUser.backerType) : currentUser.backerType, backerOffer: profile.role==="backer" ? (popupBackerOfferDraft.trim()||currentUser.backerOffer) : currentUser.backerOffer });
+      setCurrentUser({ ...currentUser, name, bio: about || currentUser.bio, skills: profile.role==="talent" ? (popupExtraDraft.trim()||currentUser.skills) : currentUser.skills, builderType: profile.role==="talent" ? (popupBuilderTypeDraft || currentUser.builderType) : currentUser.builderType, focus: profile.role==="backer" ? (popupExtraDraft.trim()||currentUser.focus) : currentUser.focus, backerType: profile.role==="backer" ? (popupBackerTypeDraft || currentUser.backerType) : currentUser.backerType, backerOffer: profile.role==="backer" ? (popupBackerOfferDraft.trim()||currentUser.backerOffer) : currentUser.backerOffer });
     }
     setPopupEditId(null);
     if (name !== profile.name) propagateNameChange(profile, name);
@@ -510,6 +553,7 @@ export default function App() {
     desc: "",
     seeking: "Tech Co-Founder",
     lookingFor: "team", // "team" | "funding"
+    level: "L1", // L1..L5
     goalAmount: "",
     demoUrl: ""
   });
@@ -1060,6 +1104,7 @@ export default function App() {
       desc: newIdeaForm.desc,
       seeking: lookingFor === "funding" ? "Funding" : newIdeaForm.seeking,
       lookingFor,
+      level: newIdeaForm.level || "L1",
       goalAmount: lookingFor === "funding" ? goalAmount : 0,
       raisedAmount: 0,
       demoUrl,
@@ -1071,7 +1116,7 @@ export default function App() {
     setIdeas([newIdea, ...ideas]);
     setIdeaModalOpen(false);
     showToast(`✓ Idea "${newIdeaForm.title}" sent for admin review.`);
-    setNewIdeaForm({ title: "", category: "Tech / AI", desc: "", seeking: "Tech Co-Founder", lookingFor: "team", goalAmount: "", demoUrl: "" });
+    setNewIdeaForm({ title: "", category: "Tech / AI", desc: "", seeking: "Tech Co-Founder", lookingFor: "team", level: "L1", goalAmount: "", demoUrl: "" });
   };
 
   // Donate to a funding idea (any logged-in user; Razorpay or demo simulator)
@@ -1595,6 +1640,7 @@ export default function App() {
                   <article key={idea.id} className="snap-start flex-none w-[calc(50%-10px)] rounded-[24px] border border-slate-200 bg-white p-6 shadow-sm flex flex-col h-[352px] overflow-hidden">
                   <div className="flex items-center gap-2 flex-wrap">
                     <span className="rounded-full bg-slate-100 px-3 py-1 text-[10px] font-bold text-slate-600">{idea.category}</span>
+                    <span className="rounded-full bg-amber-50 border border-amber-200 px-3 py-1 text-[10px] font-bold text-amber-700 whitespace-nowrap">{ideaLevelMeta(idea.level).badge}</span>
                     {isFundingIdea(idea) ? <LookingForPill idea={idea} /> : null}
                     {idea.demoUrl ? <DemoLink url={idea.demoUrl} className="text-[11px] font-bold text-indigo-600 hover:underline whitespace-nowrap" /> : null}
                   </div>
@@ -1653,6 +1699,7 @@ export default function App() {
                  <article key={idea.id} className="snap-start flex-none w-[calc(50%-10px)] rounded-[24px] border border-slate-200 bg-white/85 p-6 shadow-sm flex flex-col h-[352px] overflow-hidden">
                   <div className="flex items-center gap-2 flex-wrap">
                     <span className="rounded-full bg-slate-100 px-3 py-1 text-[10px] font-bold text-slate-600">{idea.category}</span>
+                    <span className="rounded-full bg-amber-50 border border-amber-200 px-3 py-1 text-[10px] font-bold text-amber-700 whitespace-nowrap">{ideaLevelMeta(idea.level).badge}</span>
                     {isFundingIdea(idea) ? <LookingForPill idea={idea} /> : null}
                     {idea.demoUrl ? <DemoLink url={idea.demoUrl} className="text-[11px] font-bold text-indigo-600 hover:underline whitespace-nowrap" /> : null}
                   </div>
@@ -1780,6 +1827,9 @@ export default function App() {
                   </p>
                   <div className="mt-3 flex flex-wrap items-center gap-2">
                     <LookingForPill idea={idea} />
+                    <span className="rounded-full bg-amber-50 border border-amber-200 px-3 py-1 text-[10px] font-bold text-amber-700 whitespace-nowrap">
+                      {ideaLevelMeta(idea.level).badge}
+                    </span>
                     {idea.demoUrl ? <DemoLink url={idea.demoUrl} /> : null}
                   </div>
                 </div>
@@ -1888,6 +1938,13 @@ export default function App() {
                   <div className="text-[12px] font-semibold text-slate-600 mt-0.5">
                     {b.role}
                   </div>
+                  {builderTypeMeta(b.builderType).label ? (
+                    <div className="mt-1.5">
+                      <span className="inline-block rounded-full bg-sky-100 border border-sky-200 px-3 py-1 text-[10px] font-bold text-sky-700 whitespace-nowrap">
+                        🛠️ {builderTypeMeta(b.builderType).label}
+                      </span>
+                    </div>
+                  ) : null}
 
                   <div className="mt-4 p-3 rounded-xl bg-slate-50 border border-slate-200 text-[12px]">
                     <div className="text-slate-500 text-[10.5px] font-bold uppercase tracking-wider">
@@ -2881,16 +2938,27 @@ export default function App() {
                       <div className="mt-2">
                         {about ? <p className="text-xs text-slate-600 leading-4 line-clamp-2">{about}</p> : <p className="text-xs text-slate-400 italic">No about yet</p>}
                         {p.role === "talent" && <p className="text-[11px] text-slate-500 mt-1">Skills: {p.skills || p.roleTitle || "—"}</p>}
+                        {p.role === "talent" && builderTypeMeta(p.builderType).label ? <p className="mt-1"><span className="inline-block rounded-full bg-sky-100 border border-sky-200 px-2.5 py-0.5 text-[10px] font-bold text-sky-700">🛠️ {builderTypeMeta(p.builderType).label}</span></p> : null}
                         {p.role === "backer" && <p className="text-[11px] text-slate-500 mt-1">Focus: {p.focus || "—"}</p>}
                         {p.role === "backer" && <p className="mt-1"><span className="inline-block rounded-full bg-violet-100 border border-violet-200 px-2.5 py-0.5 text-[10px] font-bold text-violet-700">{backerTypeMeta(p.backerType).icon} {backerTypeMeta(p.backerType).label}</span></p>}
                         {p.role === "backer" && p.backerOffer ? <p className="text-[11px] text-slate-500 mt-1">Offers: {p.backerOffer}</p> : null}
-                        <button onClick={() => { setPopupEditId(`${p.email}|${p.role}`); setPopupNameDraft(p.name || ""); setPopupAboutDraft(about); setPopupExtraDraft(p.role === "talent" ? (p.skills || "") : p.role === "backer" ? (p.focus || "") : ""); setPopupBackerTypeDraft(p.backerType || "mentorship"); setPopupBackerOfferDraft(p.backerOffer || ""); }} className="mt-2 h-7 px-3 rounded-full bg-white border border-slate-200 text-[11px] font-bold">Edit {ROLE_META[p.role]?.label || p.role}</button>
+                        <button onClick={() => { setPopupEditId(`${p.email}|${p.role}`); setPopupNameDraft(p.name || ""); setPopupAboutDraft(about); setPopupExtraDraft(p.role === "talent" ? (p.skills || "") : p.role === "backer" ? (p.focus || "") : ""); setPopupBackerTypeDraft(p.backerType || "mentorship"); setPopupBackerOfferDraft(p.backerOffer || ""); setPopupBuilderTypeDraft(p.builderType || ""); }} className="mt-2 h-7 px-3 rounded-full bg-white border border-slate-200 text-[11px] font-bold">Edit {ROLE_META[p.role]?.label || p.role}</button>
                       </div>
                     ) : (
                       <div className="mt-3 space-y-2">
                         <input value={popupNameDraft} onChange={e=> setPopupNameDraft(e.target.value)} placeholder="Full name" className="w-full h-9 rounded-xl border border-slate-200 bg-slate-50 px-3 text-xs outline-none" />
                         <textarea value={popupAboutDraft} onChange={e=> setPopupAboutDraft(e.target.value)} placeholder={p.role === "founder" ? "What do you build?" : p.role === "talent" ? "About you + stack" : "What do you fund?"} className="w-full min-h-[64px] rounded-xl border border-slate-200 bg-slate-50 p-2.5 text-xs outline-none" />
                         {p.role === "talent" && <input value={popupExtraDraft} onChange={e=> setPopupExtraDraft(e.target.value)} placeholder="Skills e.g. React, Node.js" className="w-full h-9 rounded-xl border border-slate-200 bg-slate-50 px-3 text-xs outline-none" />}
+                        {p.role === "talent" && (
+                          <select value={popupBuilderTypeDraft} onChange={e=> setPopupBuilderTypeDraft(e.target.value)} className="w-full h-9 rounded-xl border border-slate-200 bg-slate-50 px-2 text-xs outline-none">
+                            <option value="">Builder kind…</option>
+                            {BUILDER_GROUPS.map((g) => (
+                              <optgroup key={g.group} label={`${g.group} — ${g.blurb}`}>
+                                {g.types.map((t) => <option key={t.id} value={t.id}>{t.label} — {t.blurb}</option>)}
+                              </optgroup>
+                            ))}
+                          </select>
+                        )}
                         {p.role === "backer" && <input value={popupExtraDraft} onChange={e=> setPopupExtraDraft(e.target.value)} placeholder="Focus e.g. EdTech, AI" className="w-full h-9 rounded-xl border border-slate-200 bg-slate-50 px-3 text-xs outline-none" />}
                         {p.role === "backer" && (
                           <select value={popupBackerTypeDraft} onChange={e=> setPopupBackerTypeDraft(e.target.value)} className="w-full h-9 rounded-xl border border-slate-200 bg-slate-50 px-2 text-xs outline-none">
@@ -3259,6 +3327,29 @@ export default function App() {
                   >
                     💰 Funding
                   </button>
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-[12px] font-semibold text-slate-600 mb-1">
+                  What level is this idea at? *
+                </label>
+                <div className="space-y-1.5">
+                  {IDEA_LEVELS.map((l) => (
+                    <button
+                      key={l.id}
+                      type="button"
+                      onClick={() => setNewIdeaForm({ ...newIdeaForm, level: l.id })}
+                      className={`w-full p-2.5 rounded-xl border text-left transition ${
+                        newIdeaForm.level === l.id
+                          ? "bg-slate-900 text-white border-slate-900 shadow"
+                          : "bg-slate-50 text-slate-800 border-slate-200 hover:border-slate-400"
+                      }`}
+                    >
+                      <span className="text-[12px] font-bold">{l.badge} · {l.label}</span>
+                      <span className={`block mt-0.5 text-[10.5px] leading-4 ${newIdeaForm.level === l.id ? "text-white/75" : "text-slate-500"}`}>{l.blurb}</span>
+                    </button>
+                  ))}
                 </div>
               </div>
 
