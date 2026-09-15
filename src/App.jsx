@@ -1349,7 +1349,6 @@ export default function App() {
   // Null-safe: cloud docs may miss fields, and one bad doc must not crash the whole board
   const filteredIdeas = ideas.filter((idea) => {
     if (!idea) return false;
-    if (isFundingIdea(idea)) return false;
     if (idea.status === "Pending Review" || idea.status === "Rejected") return false;
     if (isOwnIdea(idea)) return false;
     const cat = (idea.category || "").toLowerCase();
@@ -1711,7 +1710,6 @@ export default function App() {
               <div className="hidden sm:flex items-center gap-2 shrink-0">
                 <button onClick={()=> ideasScrollRefSignedIn.current?.scrollBy({left:-320, behavior:'smooth'})} className="h-9 w-9 rounded-full bg-white border border-slate-200 grid place-items-center text-slate-700 hover:bg-slate-900 hover:text-white" aria-label="Prev">‹</button>
                 <button onClick={()=> ideasScrollRefSignedIn.current?.scrollBy({left:320, behavior:'smooth'})} className="h-9 w-9 rounded-full bg-slate-900 text-white grid place-items-center hover:bg-black" aria-label="Next">›</button>
-                <button onClick={() => setActiveTab("home")} className="h-9 px-4 rounded-full bg-white border border-slate-200 text-xs font-bold hover:bg-slate-50">Dashboard →</button>
               </div>
             </div>
             <div className="flex sm:hidden items-center gap-2 mb-3">
@@ -1760,7 +1758,7 @@ export default function App() {
                 Campus Ideas Board
               </h2>
               <p className="text-[13.5px] text-zinc-400 mt-1 max-w-[600px]">
-                Browse startup ideas looking for co-founders and collaborators.
+                Browse startup ideas looking for teammates — or back a vision directly.
               </p>
             </div>
 
@@ -1775,7 +1773,7 @@ export default function App() {
           {/* Search & Filters */}
           <div className="mt-8 flex flex-col sm:flex-row items-center justify-between gap-4">
             <div className="flex flex-wrap gap-2 w-full sm:w-auto">
-              {["All", "Tech", "E-Commerce", "Food", "EdTech"].map((cat) => (
+              {["All", ...IDEA_CATEGORIES].map((cat) => (
                 <button
                   key={cat}
                   onClick={() => setIdeaCategoryFilter(cat)}
@@ -1863,11 +1861,6 @@ export default function App() {
                   </div>
                 ) : (
                 <div className="mt-6 pt-5 border-t border-slate-200 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-                  <div className="text-[12px] text-slate-600">
-                    <span className="font-semibold text-slate-900">Seeking:</span>{" "}
-                    <span className="text-slate-800">{idea.seeking}</span>
-                  </div>
-
                   {allowed ? (
                     <button
                       onClick={() =>
@@ -3116,7 +3109,7 @@ export default function App() {
                   <div className="grid grid-cols-1 min-[420px]:grid-cols-3 gap-1.5 sm:gap-2">
                     {[
                       ["founder", "Founder", "Post ideas"],
-                      ["talent", "Builder", "Build teams"],
+                      ["talent", "Builder", "Lend your skills"],
                       ["backer", "Backer", "Mentor & back"],
                     ].map(([role, label, sub]) => (
                       <button
@@ -3125,12 +3118,12 @@ export default function App() {
                         onClick={() => setSelectedRegisterRole(role)}
                         className={`p-2.5 sm:p-4 rounded-2xl border text-center transition flex flex-col items-center justify-center gap-1 min-h-[68px] sm:min-h-[74px] w-full max-w-full overflow-hidden ${
                           selectedRegisterRole === role
-                            ? "bg-slate-900 text-white border-slate-900 shadow-lg scale-[1.02]"
-                            : "bg-slate-50 text-slate-800 border-slate-300 hover:border-slate-400 hover:bg-white shadow-sm"
+                            ? "bg-slate-900 border-slate-900 shadow-lg scale-[1.02]"
+                            : "bg-slate-50 border-slate-300 hover:border-slate-400 hover:bg-white shadow-sm"
                         }`}
                       >
-                        <span className={`text-[11px] sm:text-[13px] font-bold leading-none break-words ${selectedRegisterRole === role ? "text-white" : "text-slate-900"}`}>{label}</span>
-                        <span className={`text-[9px] sm:text-[11px] leading-none break-words font-medium ${selectedRegisterRole === role ? "text-white/80" : "text-slate-600"}`}>{sub}</span>
+                        <span style={{ color: selectedRegisterRole === role ? "#fff" : "#0f172a" }} className="text-[11px] sm:text-[13px] font-bold leading-none break-words">{label}</span>
+                        <span style={{ color: selectedRegisterRole === role ? "rgba(255,255,255,0.85)" : "#475569" }} className="text-[9px] sm:text-[11px] leading-none break-words font-medium">{sub}</span>
                       </button>
                     ))}
                   </div>
