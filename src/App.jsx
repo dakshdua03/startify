@@ -188,7 +188,6 @@ export function FundingSection({ ideas, signedIn, onDonate, onJoin, raisedFor, d
         <div className="min-w-0">
           <div className="text-[11px] font-bold uppercase tracking-widest text-emerald-700">FUNDRAISING</div>
           <h2 className="font-heading mt-1 text-[22px] sm:text-[25px] font-extrabold text-slate-900">Ideas looking for funding</h2>
-          <p className="text-[13px] text-slate-600 mt-1">Back a vision directly — every rupee goes to the founder.</p>
         </div>
         <div className="hidden sm:flex items-center gap-2 shrink-0">
           <button onClick={() => scrollRef.current?.scrollBy({ left: -320, behavior: "smooth" })} className="h-9 w-9 rounded-full bg-white border border-slate-200 grid place-items-center text-slate-700 hover:bg-slate-900 hover:text-white transition" aria-label="Previous">‹</button>
@@ -1614,7 +1613,6 @@ export default function App() {
             <div className="mb-4 flex items-end justify-between gap-4">
               <div>
                 <h2 className="font-heading mt-1 text-[22px] sm:text-[25px] font-extrabold text-slate-900">Ideas looking for teams</h2>
-                <p className="text-[13px] text-slate-600 mt-1">Real UoH student ideas looking for co-founders — swipe to explore, join to connect.</p>
               </div>
               <div className="hidden sm:flex items-center gap-2 shrink-0">
                 <button onClick={()=> ideasScrollRef.current?.scrollBy({left:-320, behavior:'smooth'})} className="h-9 w-9 rounded-full bg-white border border-slate-200 grid place-items-center text-slate-700 hover:bg-slate-900 hover:text-white transition" aria-label="Previous">‹</button>
@@ -1680,7 +1678,6 @@ export default function App() {
               <div>
                 <div className="text-[11px] font-bold uppercase tracking-widest text-slate-500">TEAM-SEEKING IDEAS</div>
                 <h2 className="font-heading mt-1 text-[22px] sm:text-[25px] font-extrabold text-slate-800">Ideas looking for teams</h2>
-                <p className="text-[13px] text-slate-600 mt-1">Swipe to explore — founder or not, ideas need eyes.</p>
               </div>
               <div className="hidden sm:flex items-center gap-2 shrink-0">
                 <button onClick={()=> ideasScrollRefSignedIn.current?.scrollBy({left:-320, behavior:'smooth'})} className="h-9 w-9 rounded-full bg-white border border-slate-200 grid place-items-center text-slate-700 hover:bg-slate-900 hover:text-white" aria-label="Prev">‹</button>
