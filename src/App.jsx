@@ -212,9 +212,9 @@ export function FundingSection({ ideas, signedIn, onDonate, onJoin, raisedFor, d
                  />
                ) : null}
              </div>
-            <h3 className="font-heading mt-3 text-[18px] font-extrabold text-slate-800">{idea.title}</h3>
-            <p className="mt-1 text-[12px] font-medium text-slate-500">By {idea.founder}</p>
-            <p className="mt-3 text-[13px] leading-5 text-slate-600 line-clamp-2">{idea.desc}</p>
+            <h3 className="font-heading mt-3 text-[18px] font-extrabold text-slate-800 line-clamp-2">{idea.title}</h3>
+            <p className="mt-1 text-[12px] font-medium text-slate-500 truncate">By {idea.founder}</p>
+            <p className="mt-3 min-h-0 flex-1 overflow-y-auto text-[13px] leading-5 text-slate-600" style={{ scrollbarWidth: "thin" }}>{idea.desc}</p>
             <div className="mt-4">
               <FundingBar idea={idea} raised={raisedFor(idea)} donorCount={donorCountFor(idea.id)} />
             </div>
@@ -1550,7 +1550,7 @@ export default function App() {
       {activeTab === "home" && !currentUser && (
         <main className="mx-auto max-w-[1200px] px-4 sm:px-5 md:px-8 py-8 md:py-12 lg:py-16">
           <div className="grid lg:grid-cols-[1.15fr_.85fr] gap-6 md:gap-10 items-start lg:items-stretch">
-            <div>
+            <div className="flex flex-col min-w-0">
               <div className="inline-flex items-center gap-2 rounded-full border border-indigo-200 bg-indigo-50 px-3.5 py-1.5 text-xs text-indigo-700 font-bold shadow-sm">
                 <span className="h-2 w-2 rounded-full bg-indigo-600 animate-pulse" /> Connect • Build • Launch
               </div>
@@ -1574,7 +1574,7 @@ export default function App() {
                 </ul>
               </div>
               {/* Our belief — white card like the rest, no blue */}
-              <div className="mt-8 rounded-[20px] bg-white p-5 md:p-6 border border-slate-200 shadow-sm overflow-hidden relative">
+              <div className="mt-8 flex-1 rounded-[20px] bg-white p-5 md:p-6 border border-slate-200 shadow-sm overflow-hidden relative">
                 <div className="relative">
                   <div className="inline-flex items-center gap-2 rounded-full bg-slate-100 border border-slate-200 px-3 py-1 text-[10px] font-bold tracking-widest text-slate-600">OUR BELIEF</div>
                   <blockquote className="font-heading mt-3 text-[20px] sm:text-[22px] md:text-[26px] font-extrabold leading-tight tracking-tight text-slate-900">“If you can think it, you can build it.”</blockquote>
@@ -1600,7 +1600,7 @@ export default function App() {
                 </div>
               </div>
               {/* Ecosystem workflow — separate card: compact & horizontal */}
-              <div className="rounded-[28px] border border-slate-200 bg-white p-4 sm:p-5 shadow-sm w-full max-w-full overflow-hidden">
+              <div className="flex-1 rounded-[28px] border border-slate-200 bg-white p-4 sm:p-5 shadow-sm w-full max-w-full overflow-hidden">
                 <div className="text-xs font-bold uppercase tracking-widest text-slate-500">Ecosystem workflow</div>
                 <div className="mt-3 grid grid-cols-1 sm:grid-cols-3 gap-3 sm:gap-4">
                   {[
@@ -1642,9 +1642,9 @@ export default function App() {
                   <div className="flex items-center gap-3">
                     <span className="rounded-full bg-slate-100 px-3 py-1 text-[10px] font-bold text-slate-600">{idea.category}</span>
                   </div>
-                  <h3 className="font-heading mt-3 text-[18px] font-extrabold text-slate-800">{idea.title}</h3>
-                  <p className="mt-1 text-[12px] font-medium text-slate-500">By {idea.founder}</p>
-                  <p className="mt-3 text-[13px] leading-5 text-slate-600 line-clamp-5">{idea.desc}</p>
+                  <h3 className="font-heading mt-3 text-[18px] font-extrabold text-slate-800 line-clamp-2">{idea.title}</h3>
+                  <p className="mt-1 text-[12px] font-medium text-slate-500 truncate">By {idea.founder}</p>
+                  <p className="mt-3 min-h-0 flex-1 overflow-y-auto text-[13px] leading-5 text-slate-600" style={{scrollbarWidth:'thin'}}>{idea.desc}</p>
                    {idea.demoUrl ? <div className="mt-auto pt-2"><DemoLink url={idea.demoUrl} /></div> : null}
                  </article>
                ))}
@@ -1660,12 +1660,12 @@ export default function App() {
             donorCountFor={(id) => donorsForIdea(id).length}
           />
           </div>
-          <div className="mt-6">
+          <div className="mt-6 flex justify-center">
             <button
               onClick={() => { setAuthMode("register"); setAuthModalOpen(true); }}
-              className="w-full h-12 rounded-full bg-slate-900 text-white font-bold text-[14px] hover:bg-black transition shadow"
+              className="h-12 px-10 rounded-full bg-gradient-to-r from-indigo-600 to-violet-600 text-white font-bold text-[14px] hover:from-indigo-700 hover:to-violet-700 transition shadow-lg shadow-indigo-200"
             >
-              Join to connect / donate →
+              Join Startify →
             </button>
           </div>
         </main>
@@ -1703,9 +1703,9 @@ export default function App() {
                }).slice(0,12).map((idea) => (
                  <article key={idea.id} className="snap-start flex-none w-[calc(50%-10px)] rounded-[24px] border border-slate-200 bg-white/85 p-6 shadow-sm flex flex-col h-[352px] overflow-hidden">
                   <div className="flex items-center gap-3"><span className="rounded-full bg-slate-100 px-3 py-1 text-[10px] font-bold text-slate-600">{idea.category}</span></div>
-                  <h3 className="font-heading mt-4 text-[20px] font-extrabold text-slate-800">{idea.title}</h3>
-                  <p className="mt-1 text-[12px] font-medium text-slate-500">By {idea.founder}</p>
-                  <p className="mt-3 text-[13px] leading-5 text-slate-600 line-clamp-5">{idea.desc}</p>
+                  <h3 className="font-heading mt-4 text-[20px] font-extrabold text-slate-800 line-clamp-2">{idea.title}</h3>
+                  <p className="mt-1 text-[12px] font-medium text-slate-500 truncate">By {idea.founder}</p>
+                  <p className="mt-3 min-h-0 flex-1 overflow-y-auto text-[13px] leading-5 text-slate-600" style={{scrollbarWidth:'thin'}}>{idea.desc}</p>
                    {idea.demoUrl ? <div className="mt-auto pt-2"><DemoLink url={idea.demoUrl} /></div> : null}
                  </article>
                ))}
