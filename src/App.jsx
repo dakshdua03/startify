@@ -207,6 +207,12 @@ export function FundingSection({ ideas, signedIn, onDonate, onJoin, raisedFor, d
            <article key={idea.id} className="snap-start rounded-[24px] border border-emerald-100 bg-white p-6 shadow-sm flex flex-col h-[340px] overflow-hidden">
              <div className="flex items-center gap-2 flex-wrap">
                <span className="rounded-full bg-slate-100 px-3 py-1 text-[10px] font-bold text-slate-600">{idea.category}</span>
+               {idea.demoUrl ? (
+                 <DemoLink
+                   url={idea.demoUrl}
+                   className="text-[11px] font-bold text-indigo-600 hover:underline whitespace-nowrap"
+                 />
+               ) : null}
              </div>
             <h3 className="font-heading mt-3 text-[18px] font-extrabold text-slate-800">{idea.title}</h3>
             <p className="mt-1 text-[12px] font-medium text-slate-500">By {idea.founder}</p>
@@ -214,27 +220,21 @@ export function FundingSection({ ideas, signedIn, onDonate, onJoin, raisedFor, d
             <div className="mt-4">
               <FundingBar idea={idea} raised={raisedFor(idea)} donorCount={donorCountFor(idea.id)} />
             </div>
-            <div className="mt-4 flex gap-2">
+            <div className="mt-4">
               {signedIn ? (
                 <button
                   onClick={() => onDonate && onDonate(idea)}
-                  className="flex-1 h-10 rounded-full bg-slate-900 text-white text-[12.5px] font-bold hover:bg-black transition"
+                  className="w-full h-10 rounded-full bg-slate-900 text-white text-[12.5px] font-bold hover:bg-black transition"
                 >
                   Donate →
                 </button>
               ) : showJoin ? (
                 <button
                   onClick={() => onJoin && onJoin()}
-                  className="flex-1 h-10 rounded-full bg-slate-900 text-white text-[12.5px] font-bold hover:bg-black transition"
+                  className="w-full h-10 rounded-full bg-slate-900 text-white text-[12.5px] font-bold hover:bg-black transition"
                 >
                   Join to donate →
                 </button>
-              ) : null}
-              {idea.demoUrl ? (
-                <DemoLink
-                  url={idea.demoUrl}
-                  className="h-10 px-4 grid place-items-center rounded-full bg-white border border-slate-200 text-[12px] font-bold text-indigo-600 hover:bg-slate-50 whitespace-nowrap"
-                />
               ) : null}
             </div>
           </article>
