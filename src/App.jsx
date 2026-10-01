@@ -1576,7 +1576,6 @@ export default function App() {
               {/* Our belief — white card like the rest, no blue */}
               <div className="mt-8 flex-1 rounded-[20px] bg-white p-5 md:p-6 border border-slate-200 shadow-sm overflow-hidden relative flex flex-col">
                 <div className="relative flex-1 flex flex-col justify-center">
-                  <div className="inline-flex items-center gap-2 rounded-full bg-slate-100 border border-slate-200 px-3 py-1 text-[10px] font-bold tracking-widest text-slate-600">OUR BELIEF</div>
                   <blockquote className="font-heading mt-3 text-[20px] sm:text-[22px] md:text-[26px] font-extrabold leading-tight tracking-tight text-slate-900">“If you can think it, you can build it.”</blockquote>
                   <p className="mt-2 text-[13px] leading-6 text-slate-600">A platform that connects ideas with people, and people with purpose — where every idea gets space to be built, tested, and launched.</p>
                 </div>
@@ -1637,7 +1636,7 @@ export default function App() {
                  const getTime = (x)=> x.created_at?.seconds ? x.created_at.seconds*1000 : (x.created_at?.toMillis ? x.created_at.toMillis() : Date.parse(x.createdDate||0) || Number((x.id||'').split('_')[1]||0));
                  return getTime(b) - getTime(a);
                }).slice(0,12).map((idea) => (
-                  <article key={idea.id} className="snap-start flex-none w-[calc(50%-10px)] rounded-[24px] border border-slate-200 bg-white p-6 shadow-sm flex flex-col h-[352px] overflow-hidden">
+                  <article key={idea.id} className="snap-start flex-none w-[85%] sm:w-[calc(50%-10px)] lg:w-[calc(33.333%-14px)] rounded-[24px] border border-slate-200 bg-white p-6 shadow-sm flex flex-col h-[352px] overflow-hidden">
                   <div className="flex items-center gap-2 flex-wrap">
                     <span className="rounded-full bg-slate-100 px-3 py-1 text-[10px] font-bold text-slate-600">{idea.category}</span>
                     <span className="rounded-full bg-amber-50 border border-amber-200 px-3 py-1 text-[10px] font-bold text-amber-700 whitespace-nowrap">{ideaLevelMeta(idea.level).badge}</span>
@@ -1696,7 +1695,7 @@ export default function App() {
                  const getTime = (x)=> x.created_at?.seconds ? x.created_at.seconds*1000 : (x.created_at?.toMillis ? x.created_at.toMillis() : Date.parse(x.createdDate||0) || Number((x.id||'').split('_')[1]||0));
                  return getTime(b) - getTime(a);
                }).slice(0,12).map((idea) => (
-                 <article key={idea.id} className="snap-start flex-none w-[calc(50%-10px)] rounded-[24px] border border-slate-200 bg-white/85 p-6 shadow-sm flex flex-col h-[352px] overflow-hidden">
+                 <article key={idea.id} className="snap-start flex-none w-[85%] sm:w-[calc(50%-10px)] lg:w-[calc(33.333%-14px)] rounded-[24px] border border-slate-200 bg-white/85 p-6 shadow-sm flex flex-col h-[352px] overflow-hidden">
                   <div className="flex items-center gap-2 flex-wrap">
                     <span className="rounded-full bg-slate-100 px-3 py-1 text-[10px] font-bold text-slate-600">{idea.category}</span>
                     <span className="rounded-full bg-amber-50 border border-amber-200 px-3 py-1 text-[10px] font-bold text-amber-700 whitespace-nowrap">{ideaLevelMeta(idea.level).badge}</span>
