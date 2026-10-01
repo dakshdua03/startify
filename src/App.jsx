@@ -254,6 +254,10 @@ export default function App() {
   const [funders, setFunders] = useState(hideDemoFlag ? [] : INITIAL_FUNDERS.filter(f=> !deletedFunders.has(f.id)));
   const [builders, setBuilders] = useState(hideDemoFlag ? [] : INITIAL_BUILDERS.filter(b=> !deletedBuilders.has(b.id)));
   const [events, setEvents] = useState(hideDemoFlag ? [] : INITIAL_EVENTS);
+  const [backerResources, setBackerResources] = useState([]);
+  const [resourceModalOpen, setResourceModalOpen] = useState(false);
+  const [showAllResources, setShowAllResources] = useState(false);
+  const [resourceForm, setResourceForm] = useState({ title: "", offer: "", capacity: "", lookingFor: "both", details: "" });
   const [requests, setRequests] = useState(hideDemoFlag ? [] : INITIAL_REQUESTS);
   const [messages, setMessages] = useState(hideDemoFlag ? [] : INITIAL_MESSAGES);
   const [rsvps, setRsvps] = useState([]);
@@ -544,7 +548,9 @@ export default function App() {
     bio: "",
     backerType: "mentorship",
     backerOffer: "",
-    backerCapacity: ""
+    backerCapacity: "",
+    isUoH: false,
+    studentId: ""
   });
 
   const [newIdeaForm, setNewIdeaForm] = useState({
@@ -632,6 +638,15 @@ export default function App() {
     }); });
     dbService.getEventsStore().then((ce) => { if (ce && Array.isArray(ce)) setEvents((prev) => {
       const map = new Map(); [...prev, ...ce.filter(x=>!x.deleted)].forEach(x=> map.set(x.id, x)); return Array.from(map.values());
+    }); });
+    try {
+      const localRes = JSON.parse(localStorage.getItem("startify_backer_resources") || "null");
+      if (localRes && Array.isArray(localRes) && localRes.length) setBackerResources((prev) => {
+        const map = new Map(); [...localRes, ...prev].forEach(x=> { if (x && x.id) map.set(x.id, x); }); return Array.from(map.values());
+      });
+    } catch {}
+    dbService.getResources().then((cr2) => { if (cr2 && Array.isArray(cr2)) setBackerResources((prev) => {
+      const map = new Map(); [...prev, ...cr2].forEach(x=> { if (x && x.id) map.set(x.id, x); }); return Array.from(map.values());
     }); });
     dbService.getRequests().then((cr) => { if (cr && Array.isArray(cr)) setRequests((prev) => {
       const map = new Map(); [...prev, ...dropRemovedRequests(cr)].forEach(x=> map.set(x.id, x)); return Array.from(map.values());
@@ -796,12 +811,12 @@ export default function App() {
     showToast(`Logged in as ${user.name} (${user.role.toUpperCase()})`);
   };
 
-  // Sign In / Registration Handler — UoH students must use @uohyd.ac.in (backer open to outside) + password (no OTP)
+  // Sign In / Registration Handler — open to all; UoH membership optional with registration ID
   const isUoHEmail = (email) => email.trim().toLowerCase().endsWith("@uohyd.ac.in");
   const completeRegistration = (newUser, targetRole) => {
     // Persist to unified profile store so same-email switching works (local + Firestore)
-    const derivedSid = newUser.email.split("@")[0].toUpperCase();
-    const normalized={ id:newUser.id, name:newUser.name, email:newUser.email.toLowerCase(), role:newUser.role, studentId: derivedSid, roleTitle:newUser.roleTitle||"", skills:newUser.skills||"", focus:newUser.focus||"", bio:newUser.bio||"", backerType:newUser.backerType||"", backerOffer:newUser.backerOffer||"", backerCapacity:newUser.backerCapacity||"", createdAt:new Date().toISOString() };
+    const derivedSid = (newUser.studentId || newUser.email.split("@")[0]).toUpperCase();
+    const normalized={ id:newUser.id, name:newUser.name, email:newUser.email.toLowerCase(), role:newUser.role, studentId: derivedSid, isUoH: Boolean(newUser.isUoH), roleTitle:newUser.roleTitle||"", skills:newUser.skills||"", focus:newUser.focus||"", bio:newUser.bio||"", backerType:newUser.backerType||"", backerOffer:newUser.backerOffer||"", backerCapacity:newUser.backerCapacity||"", createdAt:new Date().toISOString() };
     try {
       const key="startify_user_profiles";
       const existing=JSON.parse(localStorage.getItem(key)||"[]");
@@ -854,7 +869,7 @@ export default function App() {
       showToast(`Registered as ${targetRole.toUpperCase()}! Welcome, ${newUser.name}.`);
     }
     setAuthModalOpen(false);
-    setAuthForm({ name: "", email: "", password: "", roleTitle: "", skills: "", focus: "", bio: "", backerType: "mentorship", backerOffer: "", backerCapacity: "" });
+    setAuthForm({ name: "", email: "", password: "", roleTitle: "", skills: "", focus: "", bio: "", backerType: "mentorship", backerOffer: "", backerCapacity: "", isUoH: false, studentId: "" });
     setResetMode(false);
   };
 
@@ -867,8 +882,8 @@ export default function App() {
       showToast("Password must be at least 6 characters.");
       return;
     }
-    if (authMode === "register" && (targetRole === "founder" || targetRole === "talent") && !isUoHEmail(email)) {
-      showToast("Use your University of Hyderabad email ending in @uohyd.ac.in for Founder/Builder accounts. Backers can use any email.");
+    if (authMode === "register" && authForm.isUoH && !authForm.studentId.trim()) {
+      showToast("Please enter your University of Hyderabad registration ID.");
       return;
     }
     // Firebase password+link flow
@@ -877,8 +892,8 @@ export default function App() {
       try {
         if (authMode === "register") {
           if (!authForm.name.trim()) { showToast("Please enter your full name."); return; }
-          if ((targetRole === "founder" || targetRole === "talent") && !isUoHEmail(email)) {
-            showToast("Founder/Builder requires @uohyd.ac.in. Use Backer for Gmail.");
+          if (authForm.isUoH && !authForm.studentId.trim()) {
+            showToast("Please enter your University of Hyderabad registration ID.");
             return;
           }
           try {
@@ -916,7 +931,8 @@ export default function App() {
             name: authForm.name.trim(),
             email,
             role: targetRole,
-            studentId: email.split("@")[0].toUpperCase(),
+            studentId: (authForm.isUoH && authForm.studentId.trim()) ? authForm.studentId.trim().toUpperCase() : email.split("@")[0].toUpperCase(),
+            isUoH: Boolean(authForm.isUoH),
             roleTitle: authForm.roleTitle,
             skills: authForm.skills,
             focus: authForm.focus,
@@ -941,7 +957,7 @@ export default function App() {
             setActiveTab("home");
             showToast(`Welcome back, ${demoUserEarly.name}! (Demo)`);
             setAuthModalOpen(false);
-            setAuthForm({ name: "", email: "", password: "", roleTitle: "", skills: "", focus: "", bio: "", backerType: "mentorship", backerOffer: "", backerCapacity: "" });
+            setAuthForm({ name: "", email: "", password: "", roleTitle: "", skills: "", focus: "", bio: "", backerType: "mentorship", backerOffer: "", backerCapacity: "", isUoH: false, studentId: "" });
             setResetMode(false);
             return;
           }
@@ -990,12 +1006,12 @@ export default function App() {
           } catch (e) { console.warn("Sign in profile fetch warning", e); }
 
           if (existingProfile) {
-            const reuseUser = { id: existingProfile.id || existingProfile.email, name: existingProfile.name || email.split("@")[0], email: existingProfile.email, role: existingProfile.role || targetRole, bio: existingProfile.bio || "", roleTitle: existingProfile.roleTitle, skills: existingProfile.skills, focus: existingProfile.focus };
+            const reuseUser = { id: existingProfile.id || existingProfile.email, name: existingProfile.name || email.split("@")[0], email: existingProfile.email, role: existingProfile.role || targetRole, bio: existingProfile.bio || "", roleTitle: existingProfile.roleTitle, skills: existingProfile.skills, focus: existingProfile.focus, studentId: existingProfile.studentId || existingProfile.email.split("@")[0].toUpperCase(), isUoH: Boolean(existingProfile.isUoH) };
             setCurrentUser(reuseUser);
             setActiveTab("home");
             showToast(`Welcome back, ${reuseUser.name}!`);
             setAuthModalOpen(false);
-            setAuthForm({ name: "", email: "", password: "", roleTitle: "", skills: "", focus: "", bio: "", backerType: "mentorship", backerOffer: "", backerCapacity: "" });
+            setAuthForm({ name: "", email: "", password: "", roleTitle: "", skills: "", focus: "", bio: "", backerType: "mentorship", backerOffer: "", backerCapacity: "", isUoH: false, studentId: "" });
             setResetMode(false);
             return;
           }
@@ -1006,7 +1022,7 @@ export default function App() {
           setActiveTab("home");
           showToast(`Welcome, ${fbUser.name}!`);
           setAuthModalOpen(false);
-          setAuthForm({ name: "", email: "", password: "", roleTitle: "", skills: "", focus: "", bio: "", backerType: "mentorship", backerOffer: "", backerCapacity: "" });
+          setAuthForm({ name: "", email: "", password: "", roleTitle: "", skills: "", focus: "", bio: "", backerType: "mentorship", backerOffer: "", backerCapacity: "", isUoH: false, studentId: "" });
           return;
         }
       } catch (err) {
@@ -1036,7 +1052,7 @@ export default function App() {
         if (hasStoredPassword && !checkCredential(email, password)) { showToast("Incorrect password."); return; }
         if (!hasStoredPassword) saveCredential(email, password);
         setCurrentUser(demoUser); setActiveTab("home"); showToast(`Welcome back, ${demoUser.name}!`);
-        setAuthModalOpen(false); setAuthForm({ name: "", email: "", password: "", roleTitle: "", skills: "", focus: "", bio: "", backerType: "mentorship", backerOffer: "", backerCapacity: "" }); setResetMode(false); return;
+        setAuthModalOpen(false); setAuthForm({ name: "", email: "", password: "", roleTitle: "", skills: "", focus: "", bio: "", backerType: "mentorship", backerOffer: "", backerCapacity: "", isUoH: false, studentId: "" }); setResetMode(false); return;
       }
       let existingProfile = null;
       try {
@@ -1046,9 +1062,9 @@ export default function App() {
       if (existingProfile) {
         if (hasStoredPassword && !checkCredential(email, password)) { showToast("Incorrect password. Click Forgot password?"); return; }
         if (!hasStoredPassword) saveCredential(email, password);
-        const reuseUser = { id: existingProfile.id, name: existingProfile.name || email.split("@")[0], email: existingProfile.email, role: existingProfile.role || targetRole, bio: existingProfile.bio || "" };
+        const reuseUser = { id: existingProfile.id, name: existingProfile.name || email.split("@")[0], email: existingProfile.email, role: existingProfile.role || targetRole, bio: existingProfile.bio || "", studentId: existingProfile.studentId || existingProfile.email.split("@")[0].toUpperCase(), isUoH: Boolean(existingProfile.isUoH) };
         setCurrentUser(reuseUser); setActiveTab("home"); showToast(`Welcome back, ${reuseUser.name}!`);
-        setAuthModalOpen(false); setAuthForm({ name: "", email: "", password: "", roleTitle: "", skills: "", focus: "", bio: "", backerType: "mentorship", backerOffer: "", backerCapacity: "" }); setResetMode(false); return;
+        setAuthModalOpen(false); setAuthForm({ name: "", email: "", password: "", roleTitle: "", skills: "", focus: "", bio: "", backerType: "mentorship", backerOffer: "", backerCapacity: "", isUoH: false, studentId: "" }); setResetMode(false); return;
       }
       showToast("No account found for this email. Switch to Create Account."); return;
     }
@@ -1059,9 +1075,9 @@ export default function App() {
         if (profiles.some(p => p.email.toLowerCase()===email.toLowerCase() && p.role===targetRole)) { showToast("An account with this email and role already exists. Please Sign In."); return; }
       } catch {}
       if (hasStoredPassword && !checkCredential(email, password)) { showToast("An account with this email already uses a different password."); return; }
-      const derivedStudentId = email.split("@")[0].toUpperCase();
-      const pendingUser = { id: `user_${Date.now()}`, name: authForm.name.trim(), email, role: targetRole, studentId: derivedStudentId, roleTitle: authForm.roleTitle, skills: authForm.skills, focus: authForm.focus, bio: authForm.bio, backerType: targetRole === "backer" ? (authForm.backerType || "mentorship") : undefined, backerOffer: targetRole === "backer" ? (authForm.backerOffer || "").trim() : undefined, backerCapacity: targetRole === "backer" ? (authForm.backerCapacity || "").trim() : undefined };
-      if ((pendingUser.role === "founder" || pendingUser.role === "talent") && !isUoHEmail(pendingUser.email)) { showToast("Founder/Builder requires @uohyd.ac.in."); return; }
+      if (authForm.isUoH && !authForm.studentId.trim()) { showToast("Please enter your University of Hyderabad registration ID."); return; }
+      const derivedStudentId = (authForm.isUoH && authForm.studentId.trim()) ? authForm.studentId.trim().toUpperCase() : email.split("@")[0].toUpperCase();
+      const pendingUser = { id: `user_${Date.now()}`, name: authForm.name.trim(), email, role: targetRole, studentId: derivedStudentId, isUoH: Boolean(authForm.isUoH), roleTitle: authForm.roleTitle, skills: authForm.skills, focus: authForm.focus, bio: authForm.bio, backerType: targetRole === "backer" ? (authForm.backerType || "mentorship") : undefined, backerOffer: targetRole === "backer" ? (authForm.backerOffer || "").trim() : undefined, backerCapacity: targetRole === "backer" ? (authForm.backerCapacity || "").trim() : undefined };
       completeRegistration(pendingUser, targetRole);
     }
   };
@@ -1117,6 +1133,48 @@ export default function App() {
     setIdeaModalOpen(false);
     showToast(`✓ Idea "${newIdeaForm.title}" sent for admin review.`);
     setNewIdeaForm({ title: "", category: "Tech / AI", desc: "", seeking: "Tech Co-Founder", lookingFor: "team", level: "L1", goalAmount: "", demoUrl: "" });
+  };
+
+  // Backer posts themselves as a resource (live instantly) — founders/talent apply via requests
+  const handleResourceSubmit = (e) => {
+    e.preventDefault();
+    if (!currentUser) return;
+    if (currentUser.role !== "backer" && currentUser.role !== "admin") {
+      showToast("Only Backer accounts can post resources.");
+      setResourceModalOpen(false);
+      return;
+    }
+    if (!resourceForm.title.trim() || !resourceForm.offer.trim()) {
+      showToast("Add a title and what you offer (e.g. ₹1L investment, reel shoutout).");
+      return;
+    }
+    const nowStr = new Date().toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' });
+    const newRes = {
+      id: `res_${Date.now()}`,
+      isResource: true,
+      backerId: currentUser.id,
+      backerName: currentUser.name,
+      backerEmail: (currentUser.email || "").toLowerCase(),
+      backerType: currentUser.backerType || "mentorship",
+      title: resourceForm.title.trim(),
+      offer: resourceForm.offer.trim(),
+      capacity: resourceForm.capacity.trim(),
+      lookingFor: resourceForm.lookingFor || "both",
+      details: resourceForm.details.trim(),
+      status: "open",
+      createdDate: nowStr
+    };
+    dbService.saveResource(newRes);
+    setBackerResources([newRes, ...backerResources]);
+    setResourceModalOpen(false);
+    setResourceForm({ title: "", offer: "", capacity: "", lookingFor: "both", details: "" });
+    showToast(`✓ Resource "${newRes.title}" is live — founders & talent can now request it.`);
+  };
+
+  const handleResourceDelete = (id) => {
+    setBackerResources(backerResources.filter(r => r.id !== id));
+    dbService.deleteResource(id);
+    showToast("Resource removed.");
   };
 
   // Donate to a funding idea (any logged-in user; Razorpay or demo simulator)
@@ -1202,8 +1260,9 @@ export default function App() {
     e.preventDefault();
     if (!currentUser || !targetConnectItem) return;
 
-    const recipientId = targetConnectItem.founderId || targetConnectItem.id;
-    const recipientName = targetConnectItem.founder || targetConnectItem.name;
+    const isResource = Boolean(targetConnectItem.isResource);
+    const recipientId = isResource ? targetConnectItem.backerId : (targetConnectItem.founderId || targetConnectItem.id);
+    const recipientName = isResource ? targetConnectItem.backerName : (targetConnectItem.founder || targetConnectItem.name);
 
     const newReq = {
       id: `req_${Date.now()}`,
@@ -1212,9 +1271,10 @@ export default function App() {
       senderName: currentUser.name,
       senderRole: currentUser.role,
       receiverId: recipientId,
-      receiverEmail: (targetConnectItem.email || "").toLowerCase(),
+      receiverEmail: (isResource ? targetConnectItem.backerEmail : targetConnectItem.email || "").toLowerCase(),
       receiverName: recipientName,
-      targetTitle: targetConnectItem.title || targetConnectItem.name,
+      targetTitle: isResource ? `Resource: ${targetConnectItem.title}` : (targetConnectItem.title || targetConnectItem.name),
+      resourceId: isResource ? targetConnectItem.id : undefined,
       message: connectForm.message,
       status: "pending",
       createdAt: "Just now"
@@ -1394,6 +1454,7 @@ export default function App() {
     if (targetKind === "idea") return senderRole === "talent" || senderRole === "backer";
     if (targetKind === "builder") return senderRole === "founder" || senderRole === "backer";
     if (targetKind === "backer") return senderRole === "founder";
+    if (targetKind === "resource") return senderRole === "founder" || senderRole === "talent";
     return false;
   };
 
@@ -1561,7 +1622,7 @@ export default function App() {
                 <div className="text-[11px] font-bold uppercase tracking-widest text-slate-500">WHY STARTIFY</div>
                 <ul className="mt-3 space-y-2.5">
                   {[
-                    "Verified UoH community",
+                    "Verified community (UoH + open)",
                     "Direct founder → talent connect",
                     "Chat after acceptance",
                     /* Add more features here — one string per line */
@@ -1588,9 +1649,9 @@ export default function App() {
                 </div>
                 <div className="space-y-4">
                   {[
-                    ["Founder", "Post and manage ideas", "Meet verified UoH builders and campus backers.", "founder", "bg-white border-slate-200 hover:border-slate-300 hover:shadow-md shadow-sm"],
-                    ["Talent", "Build with ambitious teams", "Discover UoH founder ideas that need your skills.", "talent", "bg-white border-slate-200 hover:border-sky-300 hover:shadow-md shadow-sm"],
-                    ["Backer", "Back promising people", "Browse UoH ideas and the talent behind them.", "backer", "bg-white border-slate-200 hover:border-violet-300 hover:shadow-md shadow-sm"],
+                    ["Founder", "Post and manage ideas", "Meet verified builders and campus backers.", "founder", "bg-white border-slate-200 hover:border-slate-300 hover:shadow-md shadow-sm"],
+                    ["Talent", "Build with ambitious teams", "Discover founder ideas that need your skills.", "talent", "bg-white border-slate-200 hover:border-sky-300 hover:shadow-md shadow-sm"],
+                    ["Backer", "Back promising people", "Browse ideas and the talent behind them.", "backer", "bg-white border-slate-200 hover:border-violet-300 hover:shadow-md shadow-sm"],
                   ].map(([title, label, detail, role, cls]) => (
                     <button key={role} onClick={() => { setSelectedRegisterRole(role); setAuthMode("register"); setAuthModalOpen(true); }} className={`group w-full rounded-2xl border p-4 sm:p-5 text-left transition ${cls}`}>
                       <div className="min-w-0"><div className="font-heading text-[16px] font-bold text-slate-800">{title} <span className="ml-1 text-[12px] font-medium text-slate-500">— {label}</span></div><p className="mt-1 text-[13px] leading-5 text-slate-600">{detail}</p></div>
@@ -1654,9 +1715,36 @@ export default function App() {
                  </article>
                ))}
              </div>
-             {ideas.length === 0 && <div className="mt-4 rounded-2xl border border-dashed border-slate-200 bg-white py-8 text-center text-sm text-slate-500">No ideas yet — be the first to post!</div>}
-           </section>
-          <div className="mt-6 flex justify-center">
+              {ideas.length === 0 && <div className="mt-4 rounded-2xl border border-dashed border-slate-200 bg-white py-8 text-center text-sm text-slate-500">No ideas yet — be the first to post!</div>}
+            </section>
+          {/* Backer resources teaser — motivates join: capital, shoutouts, mentoring up for grabs */}
+          <section className="mt-8 min-w-0 max-w-full">
+            <div className="mb-4 flex items-end justify-between gap-4">
+              <div>
+                <div className="text-[11px] font-bold uppercase tracking-widest text-violet-600">BACKER RESOURCES</div>
+                <h2 className="font-heading mt-1 text-[22px] sm:text-[25px] font-extrabold text-slate-900">Backers offering capital, reach & mentoring</h2>
+              </div>
+            </div>
+            {backerResources.length === 0 ? (
+              <div className="rounded-2xl border border-dashed border-violet-200 bg-violet-50/50 py-8 text-center text-sm text-slate-500">Backers post live offers here — ₹1L cheques, 1M-follower shoutouts, 1:1 mentoring. Join to request one.</div>
+            ) : (
+              <div className="flex gap-5 min-w-0 w-full max-w-full overflow-x-auto snap-x snap-mandatory pb-2 scrollbar-hide scroll-smooth" style={{scrollbarWidth:'none'}}>
+                {backerResources.slice(0,6).map((res) => (
+                  <article key={res.id} className="snap-start flex-none w-[85%] sm:w-[calc(50%-10px)] lg:w-[calc(33.333%-14px)] rounded-[24px] border border-violet-200 bg-white p-6 shadow-sm flex flex-col h-[240px] overflow-hidden">
+                    <div className="flex items-center gap-1.5 flex-wrap">
+                      <span className="rounded-full bg-violet-100 border border-violet-200 px-2.5 py-0.5 text-[10px] font-bold text-violet-700">{backerTypeMeta(res.backerType).icon} {backerTypeMeta(res.backerType).label}</span>
+                      {res.capacity ? <span className="rounded-full bg-amber-50 border border-amber-200 px-2.5 py-0.5 text-[10px] font-bold text-amber-700">{res.capacity}</span> : null}
+                    </div>
+                    <h3 className="font-heading mt-3 text-[16px] font-extrabold text-slate-800 line-clamp-2">{res.title}</h3>
+                    <p className="mt-1 text-[12px] font-medium text-slate-500 truncate">By {res.backerName}</p>
+                    <p className="mt-2 min-h-0 flex-1 overflow-hidden text-[13px] leading-5 text-slate-600 line-clamp-3">{res.offer}{res.details ? ` — ${res.details}` : ""}</p>
+                    <button onClick={() => { setAuthMode("register"); setAuthModalOpen(true); }} className="mt-3 w-full h-10 rounded-full bg-slate-900 text-white text-[12px] font-bold hover:bg-black transition">Join to request →</button>
+                  </article>
+                ))}
+              </div>
+            )}
+          </section>
+           <div className="mt-6 flex justify-center">
             <button
               onClick={() => { setAuthMode("register"); setAuthModalOpen(true); }}
               className="h-12 px-10 rounded-full bg-gradient-to-r from-indigo-600 to-violet-600 text-white font-bold text-[14px] hover:from-indigo-700 hover:to-violet-700 transition shadow-lg shadow-indigo-200"
@@ -1671,7 +1759,7 @@ export default function App() {
       {activeTab === "home" && currentUser && (
         <main className="mx-auto max-w-[1200px] px-4 sm:px-5 py-8 md:px-8 md:py-12">
           <div className="rounded-[24px] sm:rounded-[30px] border border-slate-200 bg-gradient-to-br from-white via-slate-50 to-slate-200 p-5 sm:p-7 shadow-sm md:p-10">
-            <div className="grid gap-8 lg:grid-cols-[1.3fr_.7fr] lg:items-end"><div><div className="inline-flex max-w-full flex-wrap items-center gap-1.5 rounded-full bg-indigo-50 border border-indigo-200 px-2.5 py-1 text-[10px] font-bold uppercase tracking-widest text-indigo-700 leading-4">University of Hyderabad<span className="hidden min-[420px]:inline"> • An initiative for UoH students</span></div><h1 className="font-heading home-calligraphy mt-3 text-[28px] leading-[1.1] font-extrabold tracking-tight text-slate-800 sm:text-[34px] md:text-[46px] text-balance">Good to see you, {currentUser.name.split(" ")[0]}.</h1><p className="mt-3 max-w-[650px] text-[15px] leading-6 text-slate-600">Your UoH community is actively connecting ideas, talent and support. Explore your dashboard for role-specific matches, or open Chats to continue a conversation.</p></div><div className="rounded-2xl border border-white/80 bg-white/70 p-5 shadow-sm"><div className="text-[11px] font-bold uppercase tracking-widest text-slate-500">MOTIVATION OF THE DAY</div><blockquote className="font-heading mt-3 text-[22px] font-bold leading-tight text-slate-800">“{dailyQuote.text}”</blockquote><div className="mt-2 text-[11px] text-slate-500 italic">— {dailyQuote.author}</div><div className="mt-3 h-1 w-12 rounded-full bg-slate-700" /></div></div>
+            <div className="grid gap-8 lg:grid-cols-[1.3fr_.7fr] lg:items-end"><div><div className="inline-flex max-w-full flex-wrap items-center gap-1.5 rounded-full bg-indigo-50 border border-indigo-200 px-2.5 py-1 text-[10px] font-bold uppercase tracking-widest text-indigo-700 leading-4">University of Hyderabad<span className="hidden min-[420px]:inline"> • Started at UoH, open to all</span></div><h1 className="font-heading home-calligraphy mt-3 text-[28px] leading-[1.1] font-extrabold tracking-tight text-slate-800 sm:text-[34px] md:text-[46px] text-balance">Good to see you, {currentUser.name.split(" ")[0]}.</h1><p className="mt-3 max-w-[650px] text-[15px] leading-6 text-slate-600">Your community is actively connecting ideas, talent and support. Explore your dashboard for role-specific matches, or open Chats to continue a conversation.</p></div><div className="rounded-2xl border border-white/80 bg-white/70 p-5 shadow-sm"><div className="text-[11px] font-bold uppercase tracking-widest text-slate-500">MOTIVATION OF THE DAY</div><blockquote className="font-heading mt-3 text-[22px] font-bold leading-tight text-slate-800">“{dailyQuote.text}”</blockquote><div className="mt-2 text-[11px] text-slate-500 italic">— {dailyQuote.author}</div><div className="mt-3 h-1 w-12 rounded-full bg-slate-700" /></div></div>
             <div className="mt-8 grid gap-4 sm:grid-cols-2 lg:grid-cols-4"><div className="rounded-2xl border border-slate-200 bg-white/80 p-5"><div className="text-[11px] font-bold uppercase tracking-wide text-slate-500">Live ideas</div><div className="font-heading mt-2 text-3xl font-extrabold text-slate-800">{ideas.length}</div><p className="mt-1 text-[11px] text-slate-500">Projects looking for momentum</p></div><div className="rounded-2xl border border-slate-200 bg-white/80 p-5"><div className="text-[11px] font-bold uppercase tracking-wide text-slate-500">Active people</div><div className="font-heading mt-2 text-3xl font-extrabold text-slate-800">{activePeopleCount}</div><p className="mt-1 text-[11px] text-slate-500">Unique people across the community</p></div><div className="rounded-2xl border border-slate-200 bg-white/80 p-5"><div className="text-[11px] font-bold uppercase tracking-wide text-slate-500">Connections made</div><div className="font-heading mt-2 text-3xl font-extrabold text-slate-800">{requests.filter((request) => request.status === "accepted").length}</div><p className="mt-1 text-[11px] text-slate-500">Conversations unlocked</p></div><div className="rounded-2xl border border-slate-200 bg-white/80 p-5"><div className="text-[11px] font-bold uppercase tracking-wide text-slate-500">Upcoming events</div><div className="font-heading mt-2 text-3xl font-extrabold text-slate-800">{events.length}</div><p className="mt-1 text-[11px] text-slate-500">Ways to meet the community</p></div></div>
           </div>
           <section className="mt-8"><div className="mb-4 flex items-end justify-between"><div><div className="text-[11px] font-bold uppercase tracking-widest text-slate-500">MARK YOUR CALENDAR</div><h2 className="font-heading mt-1 text-[22px] sm:text-[25px] font-extrabold text-slate-800" style={{color: '#0f172a'}}>Upcoming community events</h2></div><button onClick={() => setActiveTab("home")} className="text-xs font-bold text-slate-700 hover:underline">Go to Chats →</button></div><div className="grid gap-5 md:grid-cols-2">{events.map((event) => <article key={event.id} className="rounded-[24px] border border-slate-200 bg-white p-6 shadow-sm" style={{background: 'rgba(255,255,255,0.92)'}}><div className="flex items-center justify-between gap-3"><span className="rounded-full bg-slate-100 px-3 py-1 text-[10px] font-bold uppercase tracking-wide text-slate-600">{event.category}</span><span className="text-xs font-semibold text-slate-500">{event.date}</span></div><h3 className="font-heading mt-4 text-[19px] font-extrabold" style={{color: '#0f172a'}}>{event.title}</h3><p className="mt-2 text-[13px]" style={{color: '#475569'}}>{event.time} · {event.venue}</p><p className="mt-3 text-[13px] leading-5" style={{color: '#334155'}}>{event.desc}</p></article>)}</div></section>
@@ -1720,11 +1808,45 @@ export default function App() {
                       </button>
                     </div>
                   ) : null}
-                 </article>
-               ))}
-             </div>
-           </section>
-        </main>
+                  </article>
+                ))}
+              </div>
+            </section>
+          {/* Signed-in teaser — same resources with direct request */}
+          <section className="mt-10 min-w-0 max-w-full">
+            <div className="mb-4 flex items-end justify-between gap-4">
+              <div>
+                <div className="text-[11px] font-bold uppercase tracking-widest text-violet-600">BACKER RESOURCES</div>
+                <h2 className="font-heading mt-1 text-[22px] sm:text-[25px] font-extrabold text-slate-800">Live backer offers — request in one tap</h2>
+              </div>
+              <button onClick={() => setActiveTab("dashboard")} className="text-xs font-bold text-slate-700 hover:underline shrink-0">Open dashboard →</button>
+            </div>
+            {backerResources.length === 0 ? (
+              <div className="rounded-2xl border border-dashed border-violet-200 bg-white/70 py-8 text-center text-sm text-slate-500">No backer resources live yet — backers can post from their dashboard.</div>
+            ) : (
+              <div className="flex gap-5 min-w-0 w-full max-w-full overflow-x-auto snap-x snap-mandatory pb-2 scroll-smooth" style={{scrollbarWidth:'none'}}>
+                {backerResources.slice(0,6).map((res) => (
+                  <article key={res.id} className="snap-start flex-none w-[85%] sm:w-[calc(50%-10px)] lg:w-[calc(33.333%-14px)] rounded-[24px] border border-violet-200 bg-white/85 p-6 shadow-sm flex flex-col h-[240px] overflow-hidden">
+                    <div className="flex items-center gap-1.5 flex-wrap">
+                      <span className="rounded-full bg-violet-100 border border-violet-200 px-2.5 py-0.5 text-[10px] font-bold text-violet-700">{backerTypeMeta(res.backerType).icon} {backerTypeMeta(res.backerType).label}</span>
+                      {res.capacity ? <span className="rounded-full bg-amber-50 border border-amber-200 px-2.5 py-0.5 text-[10px] font-bold text-amber-700">{res.capacity}</span> : null}
+                    </div>
+                    <h3 className="font-heading mt-3 text-[16px] font-extrabold text-slate-800 line-clamp-2">{res.title}</h3>
+                    <p className="mt-1 text-[12px] font-medium text-slate-500 truncate">By {res.backerName}</p>
+                    <p className="mt-2 min-h-0 flex-1 overflow-hidden text-[13px] leading-5 text-slate-600 line-clamp-3">{res.offer}{res.details ? ` — ${res.details}` : ""}</p>
+                    {res.backerId === currentUser.id ? (
+                      <span className="mt-3 text-[11px] font-bold text-slate-400">Your listing</span>
+                    ) : canConnect(currentUser.role, "resource") ? (
+                      <button onClick={() => { setTargetConnectItem(res); setConnectModalOpen(true); }} className="mt-3 w-full h-10 rounded-full bg-slate-900 text-white text-[12px] font-bold hover:bg-black transition">Request →</button>
+                    ) : (
+                      <span className="mt-3 text-[11px] text-slate-400">Backers can't request</span>
+                    )}
+                  </article>
+                ))}
+              </div>
+            )}
+          </section>
+         </main>
       )}
 
       {/* ==========================================================================
@@ -2250,7 +2372,7 @@ export default function App() {
       {activeTab === "chats" && currentUser && (
         <section className="mx-auto max-w-[1200px] px-4 sm:px-5 py-8 md:px-8">
           <div className="rounded-[28px] border border-slate-200 bg-white p-6 shadow-sm">
-            <div className="mb-7 flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between"><div><div className="inline-flex items-center gap-1.5 rounded-full bg-indigo-50 border border-indigo-200 px-2.5 py-1 text-[10px] font-bold uppercase tracking-widest text-indigo-700">University of Hyderabad • Private</div><h1 className="font-heading mt-3 text-[24px] sm:text-[32px] font-extrabold text-slate-800 text-balance">Your interest-based chats</h1><p className="mt-1 text-[13.5px] text-slate-500">Only accepted connections can start a conversation. Keep it respectful — this is a UoH student community.</p></div><div className="rounded-2xl bg-amber-50 border border-amber-200 p-3 text-[11px] leading-4 text-amber-800 max-w-[320px]"><strong>Community note:</strong> Misuse of chat can lead to removal. Conversations are interest-based and require acceptance.</div></div>
+            <div className="mb-7 flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between"><div><div className="inline-flex items-center gap-1.5 rounded-full bg-indigo-50 border border-indigo-200 px-2.5 py-1 text-[10px] font-bold uppercase tracking-widest text-indigo-700">University of Hyderabad • Private</div><h1 className="font-heading mt-3 text-[24px] sm:text-[32px] font-extrabold text-slate-800 text-balance">Your interest-based chats</h1><p className="mt-1 text-[13.5px] text-slate-500">Only accepted connections can start a conversation. Keep it respectful — this is a Startify community.</p></div><div className="rounded-2xl bg-amber-50 border border-amber-200 p-3 text-[11px] leading-4 text-amber-800 max-w-[320px]"><strong>Community note:</strong> Misuse of chat can lead to removal. Conversations are interest-based and require acceptance.</div></div>
             {currentUser?.role === "backer" && currentUser?._backerPending && (
               <div className="mb-4 rounded-full border border-amber-200 bg-amber-50 px-4 py-2.5 text-center text-[12px] font-semibold text-amber-800">Backer approval pending — chat unlocks after admin approval.</div>
             )}
@@ -2353,7 +2475,65 @@ export default function App() {
             {currentUser?.role === "founder" && (
               <button onClick={()=> setIdeaModalOpen(true)} className="h-10 px-5 rounded-full bg-slate-900 text-white font-bold text-sm hover:bg-black shadow shrink-0">+ Post Idea</button>
             )}
+            {currentUser?.role === "backer" && (
+              <button onClick={()=> { setResourceForm({ title: "", offer: currentUser.backerOffer || "", capacity: currentUser.backerCapacity || "", lookingFor: "both", details: "" }); setResourceModalOpen(true); }} className="h-10 px-5 rounded-full bg-gradient-to-r from-indigo-600 to-violet-600 text-white font-bold text-sm hover:from-indigo-700 hover:to-violet-700 shadow shrink-0">+ Post Resource</button>
+            )}
           </div>
+
+          {/* Backer resources — backers post themselves as bookable resources, founders/talent request */}
+          {currentUser.role !== "admin" && (
+            <section className="mt-8 rounded-[24px] border border-violet-200 bg-gradient-to-br from-violet-50 via-white to-indigo-50 p-6">
+              <div className="border-b border-violet-100 pb-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                <div>
+                  <div className="text-[11px] font-bold uppercase tracking-widest text-violet-600">BACKER RESOURCES</div>
+                  <h2 className="font-heading mt-1 text-[22px] font-extrabold text-slate-800">{currentUser.role === "backer" ? "Your resource listings" : "Apply to a backer resource"}</h2>
+                  <p className="mt-1 text-[12px] text-slate-500">{currentUser.role === "backer" ? "Post what you offer — ₹1L to invest, 1M-follower shoutout, mentoring. Founders & talent will request you directly." : "No cold pitching — pick a live backer offer (capital, distribution, mentoring) and request it. The backer accepts → chat unlocks."}</p>
+                </div>
+                {currentUser.role === "backer" && (
+                  <button onClick={()=> { setResourceForm({ title: "", offer: currentUser.backerOffer || "", capacity: currentUser.backerCapacity || "", lookingFor: "both", details: "" }); setResourceModalOpen(true); }} className="h-9 px-4 rounded-full bg-slate-900 text-white text-xs font-bold hover:bg-black shrink-0">+ New resource</button>
+                )}
+              </div>
+              <div className="mt-4 space-y-3">
+                {backerResources.length === 0 ? (
+                  <div className="py-6 text-center text-sm text-slate-500">{currentUser.role === "backer" ? "No resources yet — post your first offer above (e.g. ₹1L micro-capital, reel shoutout to 1M followers)." : "No backer resources live yet — check back soon, or ask a backer to post one."}</div>
+                ) : (
+                  (showAllResources ? backerResources : backerResources.slice(0,3)).map((res) => {
+                    const isMine = res.backerId === currentUser.id;
+                    const reqCount = requests.filter(r => r.resourceId === res.id && r.status === "pending").length;
+                    return (
+                      <div key={res.id} className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 rounded-2xl border border-violet-100 bg-white p-4">
+                        <div className="min-w-0 flex-1">
+                          <div className="flex flex-wrap items-center gap-1.5">
+                            <span className="rounded-full bg-violet-100 border border-violet-200 px-2.5 py-0.5 text-[10px] font-bold text-violet-700">{backerTypeMeta(res.backerType).icon} {backerTypeMeta(res.backerType).label}</span>
+                            {res.capacity ? <span className="rounded-full bg-amber-50 border border-amber-200 px-2.5 py-0.5 text-[10px] font-bold text-amber-700">{res.capacity}</span> : null}
+                            <span className="rounded-full bg-slate-100 px-2.5 py-0.5 text-[10px] font-bold text-slate-600">For: {res.lookingFor === "both" ? "ideas + talent" : res.lookingFor}</span>
+                            {isMine && reqCount > 0 ? <span className="rounded-full bg-emerald-100 px-2.5 py-0.5 text-[10px] font-bold text-emerald-700">{reqCount} pending</span> : null}
+                          </div>
+                          <div className="mt-1.5 truncate font-heading font-bold text-slate-800">{res.title}</div>
+                          <div className="mt-0.5 text-[12px] text-slate-600 truncate">{res.offer}{res.details ? ` — ${res.details}` : ""}</div>
+                          <div className="mt-0.5 text-[11px] text-slate-500">By {res.backerName} • {res.createdDate}</div>
+                        </div>
+                        {isMine ? (
+                          <button onClick={() => handleResourceDelete(res.id)} className="shrink-0 rounded-full border border-slate-200 bg-white px-4 py-2 text-[11px] font-bold text-slate-500 hover:bg-slate-50">Remove</button>
+                        ) : canConnect(currentUser.role, "resource") ? (
+                          <button onClick={() => { setTargetConnectItem(res); setConnectModalOpen(true); }} className="w-full sm:w-auto shrink-0 rounded-full bg-slate-900 px-4 py-2 text-[11px] font-bold text-white hover:bg-slate-800 transition text-center">Request →</button>
+                        ) : (
+                          <span className="shrink-0 text-[11px] text-slate-400 px-3 py-1.5 rounded-full bg-white border border-slate-200 text-center">Backers can't request</span>
+                        )}
+                      </div>
+                    );
+                  })
+                )}
+              </div>
+              {backerResources.length > 3 && (
+                <div className="mt-3 flex justify-center">
+                  <button onClick={() => setShowAllResources(!showAllResources)} className="h-8 px-4 rounded-full bg-white border border-slate-200 text-xs font-semibold hover:bg-slate-50">
+                    {showAllResources ? "Show less" : `Show all ${backerResources.length} →`}
+                  </button>
+                </div>
+              )}
+            </section>
+          )}
 
           {currentUser?._backerPending && (
             <div className="mt-6 rounded-2xl border border-amber-200 bg-amber-50 p-4 flex items-start gap-3">
@@ -2734,7 +2914,7 @@ export default function App() {
                   <span className={`px-2.5 py-1 rounded-full text-xs font-bold border ${currentUser.role==="founder"?"bg-indigo-50 border-indigo-200 text-indigo-700":currentUser.role==="talent"?"bg-sky-50 border-sky-200 text-sky-700":currentUser.role==="backer"?"bg-violet-50 border-violet-200 text-violet-700":"bg-amber-50 border-amber-200 text-amber-700"}`}>{ROLE_META[currentUser.role]?.label || currentUser.role}</span>
                 </div>
                 <div className="mt-2 text-sm text-slate-600 break-all">{currentUser.email}</div>
-                <div className="mt-1 text-xs text-slate-500">Student ID: <strong className="text-slate-700">{currentUser.email.split("@")[0].toUpperCase()}</strong> • {currentUser.role==="backer"?"Any email allowed":"@uohyd.ac.in verified"}</div>
+                <div className="mt-1 text-xs text-slate-500">ID: <strong className="text-slate-700">{currentUser.studentId || currentUser.email.split("@")[0].toUpperCase()}</strong> • {currentUser.isUoH ? "UoH verified" : "Open member"}</div>
                 {(() => {
                   const about = getProfileAbout(currentUser.email) || currentUser.bio || "";
                   return (
@@ -3037,7 +3217,7 @@ export default function App() {
           </div>
 
           <div className="text-zinc-500 text-center md:text-left text-[11.5px]">
-            An initiative for <strong className="text-slate-600">University of Hyderabad</strong> students • <a href="/admin.html" className="underline decoration-slate-300 underline-offset-2 hover:text-slate-700">Admin</a>
+            Started at <strong className="text-slate-600">University of Hyderabad</strong> — open to all builders • <a href="/admin.html" className="underline decoration-slate-300 underline-offset-2 hover:text-slate-700">Admin</a>
           </div>
 
           <div className="flex items-center gap-6">
@@ -3155,22 +3335,56 @@ export default function App() {
 
               <div>
                 <label className="block text-[12px] font-semibold text-slate-600 mb-1">
-                  Email Address * {selectedRegisterRole === "backer" ? <span className="font-normal text-slate-500">— any email</span> : <span className="font-normal text-indigo-600">— @uohyd.ac.in</span>}
+                  Email Address * <span className="font-normal text-slate-500">— any email</span>
                 </label>
                 <input
                   required
                   type="email"
                   value={authForm.email}
                   onChange={(e) => setAuthForm({ ...authForm, email: e.target.value })}
-                  placeholder={selectedRegisterRole === "backer" ? "name@company.com (any domain)" : "name@uohyd.ac.in"}
+                  placeholder="name@company.com (any domain)"
                   className="w-full h-11 rounded-full bg-slate-50 border border-slate-200 px-4 text-[13px] text-slate-800 outline-none focus:border-indigo-300 focus:ring-2 focus:ring-indigo-100"
                 />
                 <p className="mt-1.5 text-[11px] leading-4 text-slate-500">
-                  {selectedRegisterRole === "backer"
-                    ? "Backers may be outside UoH — any verified email works."
-                    : "Founder & Builder accounts are UoH-only."}
+                  Open to everyone — UoH students get a verified badge below.
                 </p>
               </div>
+
+              {authMode === "register" && (
+                <div className="rounded-2xl border border-slate-200 bg-slate-50/60 p-4 space-y-3">
+                  <div>
+                    <label className="block text-[12px] font-semibold text-slate-700 mb-1.5">
+                      Are you part of University of Hyderabad? *
+                    </label>
+                    <div className="grid grid-cols-2 gap-1.5">
+                      {[[true, "Yes — UoH"], [false, "No — outside"]].map(([val, label]) => (
+                        <button
+                          key={label}
+                          type="button"
+                          onClick={() => setAuthForm({ ...authForm, isUoH: val })}
+                          className={`h-10 rounded-full border text-[12px] font-bold transition ${authForm.isUoH === val ? "bg-slate-900 text-white border-slate-900" : "bg-white text-slate-700 border-slate-200 hover:border-slate-400"}`}
+                        >
+                          {label}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                  {authForm.isUoH && (
+                    <div>
+                      <label className="block text-[12px] font-semibold text-slate-700 mb-1">
+                        UoH Registration ID *
+                      </label>
+                      <input
+                        required={authForm.isUoH}
+                        value={authForm.studentId}
+                        onChange={(e) => setAuthForm({ ...authForm, studentId: e.target.value })}
+                        placeholder="e.g. 23MCMT12 / UOH-2023-CS042"
+                        className="w-full h-11 rounded-full bg-white border border-slate-200 px-4 text-[13px] text-slate-800 outline-none focus:border-indigo-300 focus:ring-2 focus:ring-indigo-100"
+                      />
+                    </div>
+                  )}
+                </div>
+              )}
 
 
 
@@ -3444,6 +3658,109 @@ export default function App() {
         </div>
       )}
 
+      {/* MODAL 2B: POST BACKER RESOURCE */}
+      {resourceModalOpen && (
+        <div className="fixed inset-0 z-50 grid place-items-center p-4">
+          <div
+            className="absolute inset-0 bg-black/85 backdrop-blur-md"
+            onClick={() => setResourceModalOpen(false)}
+          />
+          <div className="relative w-full max-w-[480px] max-h-[90dvh] overflow-y-auto rounded-[28px] bg-white border border-slate-200 shadow-2xl p-5 sm:p-8 text-slate-800">
+            <div className="flex items-center justify-between border-b border-slate-200 pb-4">
+              <div>
+                <div className="font-heading font-extrabold text-[22px]">
+                  Post as a Resource
+                </div>
+                <div className="text-[12px] text-slate-500 mt-0.5">
+                  Posting as <strong>{currentUser?.name}</strong> • {backerTypeMeta(currentUser?.backerType).label || "Backer"} • live instantly
+                </div>
+              </div>
+              <button
+                onClick={() => setResourceModalOpen(false)}
+                className="h-8 w-8 rounded-full border border-slate-200 grid place-items-center text-slate-500 hover:text-slate-800"
+              >
+                ✕
+              </button>
+            </div>
+
+            <form onSubmit={handleResourceSubmit} className="mt-5 space-y-4">
+              <div>
+                <label className="block text-[12px] font-semibold text-slate-600 mb-1">
+                  Resource headline *
+                </label>
+                <input
+                  required
+                  value={resourceForm.title}
+                  onChange={(e) => setResourceForm({ ...resourceForm, title: e.target.value })}
+                  placeholder="e.g. ₹1L micro-capital for campus MVPs, Reel shoutout to 1M followers"
+                  className="w-full h-11 rounded-full bg-slate-50 border border-slate-200 px-4 text-[13px] text-slate-800 outline-none focus:border-violet-300 focus:ring-2 focus:ring-violet-100"
+                />
+              </div>
+
+              <div className="grid grid-cols-1 min-[420px]:grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-[12px] font-semibold text-slate-600 mb-1">
+                    What you offer *
+                  </label>
+                  <input
+                    required
+                    value={resourceForm.offer}
+                    onChange={(e) => setResourceForm({ ...resourceForm, offer: e.target.value })}
+                    placeholder="e.g. Seed cheque, 1 hr/week mentoring"
+                    className="w-full h-11 rounded-full bg-slate-50 border border-slate-200 px-4 text-[13px] text-slate-800 outline-none focus:border-slate-400"
+                  />
+                </div>
+                <div>
+                  <label className="block text-[12px] font-semibold text-slate-600 mb-1">
+                    Capacity
+                  </label>
+                  <input
+                    value={resourceForm.capacity}
+                    onChange={(e) => setResourceForm({ ...resourceForm, capacity: e.target.value })}
+                    placeholder="e.g. ₹1L · 2 slots · 1M reach"
+                    className="w-full h-11 rounded-full bg-slate-50 border border-slate-200 px-4 text-[13px] text-slate-800 outline-none focus:border-slate-400"
+                  />
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-[12px] font-semibold text-slate-600 mb-1">
+                  Who should apply?
+                </label>
+                <select
+                  value={resourceForm.lookingFor}
+                  onChange={(e) => setResourceForm({ ...resourceForm, lookingFor: e.target.value })}
+                  className="w-full h-11 rounded-full bg-slate-50 border border-slate-200 px-4 text-[13px] text-slate-800 outline-none focus:border-slate-400"
+                >
+                  <option value="both">Both — ideas + talent</option>
+                  <option value="ideas">Idea holders only</option>
+                  <option value="talent">Talent / builders only</option>
+                </select>
+              </div>
+
+              <div>
+                <label className="block text-[12px] font-semibold text-slate-600 mb-1">
+                  Details <span className="font-normal text-slate-400">(how to qualify, what you expect)</span>
+                </label>
+                <textarea
+                  value={resourceForm.details}
+                  onChange={(e) => setResourceForm({ ...resourceForm, details: e.target.value })}
+                  placeholder="e.g. Send your deck + 2-min demo. I reply in 48 hrs. One reel per month, product must fit campus audience..."
+                  className="w-full min-h-[90px] rounded-[20px] bg-slate-50 border border-slate-200 p-4 text-[13px] text-slate-800 outline-none focus:border-violet-300 focus:ring-2 focus:ring-violet-100"
+                />
+              </div>
+
+              <button
+                type="submit"
+                className="w-full h-12 rounded-full bg-gradient-to-r from-indigo-600 to-violet-600 text-white font-bold text-[14px] hover:from-indigo-700 hover:to-violet-700 transition"
+              >
+                Publish Resource →
+              </button>
+            </form>
+          </div>
+        </div>
+      )}
+
       {/* MODAL 3: SEND CONNECTION REQUEST */}
       {connectModalOpen && (
         <div className="fixed inset-0 z-50 grid place-items-center p-4">
@@ -3458,7 +3775,7 @@ export default function App() {
                   Send Connection Request
                 </div>
                 <div className="text-[12px] text-slate-500 mt-0.5">
-                  To: <strong>{targetConnectItem?.founder || targetConnectItem?.name}</strong> ({targetConnectItem?.title || targetConnectItem?.role})
+                  To: <strong>{targetConnectItem?.backerName || targetConnectItem?.founder || targetConnectItem?.name}</strong> ({targetConnectItem?.isResource ? `Resource: ${targetConnectItem?.title}` : (targetConnectItem?.title || targetConnectItem?.role)})
                 </div>
               </div>
               <button
@@ -3634,7 +3951,7 @@ export default function App() {
               {messages.filter((m) => m.requestId === activeChatRequest.id).length === 0 && (
                 <div className="text-center py-8">
                   <div className="inline-flex items-center gap-2 rounded-full bg-white border border-slate-200 px-3 py-1 text-xs text-slate-500">Only accepted connections can chat</div>
-                  <p className="mt-3 text-xs text-slate-500 px-6 leading-5">Be respectful. This is a University of Hyderabad student community — misuse can lead to removal. Start with a clear intro!</p>
+                  <p className="mt-3 text-xs text-slate-500 px-6 leading-5">Be respectful. This is a Startify community — misuse can lead to removal. Start with a clear intro!</p>
                 </div>
               )}
             </div>

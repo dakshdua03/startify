@@ -448,6 +448,40 @@ export const dbService = {
     return true;
   },
 
+  // ---- Backer resources (backer posts themselves as a resource, founders/talent apply) ----
+  async getResources() {
+    if (isFirebaseConfigured && db) {
+      try {
+        const snap = await getDocs(collection(db, "backer_resources"));
+        const data = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+        if (data.length) return data;
+      } catch (e) { console.warn("Firestore resources fetch error", e); }
+    }
+    try { return JSON.parse(localStorage.getItem("startify_backer_resources") || "[]"); } catch { return []; }
+  },
+  async saveResource(res) {
+    try {
+      const arr = JSON.parse(localStorage.getItem("startify_backer_resources") || "[]");
+      const idx = arr.findIndex(x => x.id === res.id);
+      if (idx >= 0) arr[idx] = res; else arr.unshift(res);
+      localStorage.setItem("startify_backer_resources", JSON.stringify(arr));
+    } catch {}
+    if (isFirebaseConfigured && db) {
+      try { await setDoc(doc(db, "backer_resources", res.id), sanitizeForFirestore({ ...res, updated_at: serverTimestamp() }), { merge: true }); } catch (e) { console.warn("Firestore resource save error", e); }
+    }
+    return true;
+  },
+  async deleteResource(id) {
+    try {
+      const arr = JSON.parse(localStorage.getItem("startify_backer_resources") || "[]");
+      localStorage.setItem("startify_backer_resources", JSON.stringify(arr.filter(x => x.id !== id)));
+    } catch {}
+    if (isFirebaseConfigured && db) {
+      try { await deleteDoc(doc(db, "backer_resources", id)); } catch (e) { console.warn("Firestore resource delete error", e); }
+    }
+    return true;
+  },
+
   // ---- Event RSVPs (doc id = eventId + email so one RSVP per user per event) ----
   async getRsvps() {
     if (isFirebaseConfigured && db) {
