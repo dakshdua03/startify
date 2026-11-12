@@ -141,10 +141,18 @@ export const dbService = {
       } catch (err) { console.warn("Firestore fetch ideas failed, using local", err); }
     }
     const local = (()=>{ try{ return JSON.parse(localStorage.getItem("startify_submitted_ideas")||"[]"); }catch{return [];} })();
-    // Handle soft-deleted demos (admin tombstones)
-    const deletedIds = new Set(local.filter(i=> i.deleted).map(i=>i.id));
+    const FAKE_IDEA_IDS = new Set([
+      "idea_1700000000000",
+      "idea_1700000000001",
+      "idea_1700000000002",
+      "idea_1700000000003",
+      "idea_1700000000004",
+      "idea_1700000000005",
+    ]);
+    // Handle soft-deleted demos (admin tombstones) and removed fake seeds
+    const deletedIds = new Set([...local.filter(i=> i.deleted).map(i=>i.id), ...FAKE_IDEA_IDS]);
     const filteredDefault = defaultIdeas.filter(i=> !deletedIds.has(i.id));
-    const filteredLocal = local.filter(i=> !i.deleted);
+    const filteredLocal = local.filter(i=> !i.deleted && !deletedIds.has(i.id));
     const filteredCloud = cloudIdeas.filter(i=> !i.deleted && !deletedIds.has(i.id));
     // Merge: default -> local -> cloud (cloud always takes ultimate priority)
     const map = new Map();
@@ -278,7 +286,7 @@ export const dbService = {
       localStorage.setItem("startify_requests", JSON.stringify(arr));
     } catch {}
     if (isFirebaseConfigured && db) {
-      try { await setDoc(doc(db, "requests", req.id), { ...req, updated_at: serverTimestamp(), created_at: req.created_at || serverTimestamp() }, { merge: true }); } catch (e) { console.warn("Firestore request save error", e); }
+      try { await setDoc(doc(db, "requests", req.id), sanitizeForFirestore({ ...req, updated_at: serverTimestamp(), created_at: req.created_at || serverTimestamp() }), { merge: true }); } catch (e) { console.warn("Firestore request save error", e); }
     }
     return true;
   },
@@ -307,7 +315,7 @@ export const dbService = {
       if (!arr.some(m => m.id === msg.id)) { arr.push(msg); localStorage.setItem("startify_messages", JSON.stringify(arr)); }
     } catch {}
     if (isFirebaseConfigured && db) {
-      try { await setDoc(doc(db, "messages", msg.id), { ...msg, created_at: msg.created_at || serverTimestamp() }, { merge: true }); } catch (e) { console.warn("Firestore message save error", e); }
+      try { await setDoc(doc(db, "messages", msg.id), sanitizeForFirestore({ ...msg, created_at: msg.created_at || serverTimestamp() }), { merge: true }); } catch (e) { console.warn("Firestore message save error", e); }
     }
     return true;
   },

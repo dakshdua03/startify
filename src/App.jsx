@@ -160,9 +160,7 @@ export const builderTypeMeta = (id) => {
   return { id: "", label: "", blurb: "", group: "" };
 };
 
-// ---- Fundraising helpers ----
-export const isFundingIdea = (idea) => (idea?.lookingFor || "team") === "funding";
-export const fmtINR = (n) => `₹${(Number(n) || 0).toLocaleString("en-IN")}`;
+// ---- Idea link helpers ----
 export const normalizeDemoUrl = (u) => {
   const t = (u || "").trim();
   if (!t) return "";
@@ -176,26 +174,6 @@ export const isValidDemoUrl = (u) => {
   } catch { return false; }
 };
 
-// Small shared bits for fundraising UI (no hooks — safe to call anywhere)
-export function FundingBar({ idea, raised, donorCount }) {
-  const goal = Number(idea.goalAmount) || 0;
-  const pct = goal > 0 ? Math.min(100, Math.round(((Number(raised) || 0) / goal) * 100)) : 0;
-  const funded = goal > 0 && (Number(raised) || 0) >= goal;
-  return (
-    <div className="rounded-2xl border border-slate-200 bg-slate-50 p-3">
-      <div className="flex items-center justify-between gap-2 text-[11px] font-bold">
-        <span className="text-slate-800">{fmtINR(raised)} raised</span>
-        <span className="font-semibold text-slate-500">of {fmtINR(goal)}</span>
-      </div>
-      <div className="mt-2 h-2 overflow-hidden rounded-full bg-slate-200">
-        <div className="h-full rounded-full bg-emerald-500 transition-all" style={{ width: `${pct}%` }} />
-      </div>
-      <div className="mt-1.5 text-[10px] font-semibold text-slate-500">
-        {pct}% funded{funded ? " ✓ Goal reached" : ""} · {donorCount || 0} donor{(donorCount || 0) === 1 ? "" : "s"}
-      </div>
-    </div>
-  );
-}
 export function DemoLink({ url, className }) {
   if (!url) return null;
   return (
@@ -211,16 +189,10 @@ export function DemoLink({ url, className }) {
   );
 }
 export function LookingForPill({ idea }) {
-  if (isFundingIdea(idea)) {
-    return (
-      <span className="rounded-full bg-emerald-50 border border-emerald-200 px-3 py-1 text-[10px] font-bold text-emerald-700 whitespace-nowrap">
-        💰 Seeking funds
-      </span>
-    );
-  }
+  const seeking = idea?.seeking && idea.seeking !== "Funding" ? idea.seeking : "Team";
   return (
     <span className="rounded-full bg-sky-50 border border-sky-200 px-3 py-1 text-[10px] font-bold text-sky-700 whitespace-nowrap">
-      👥 Seeking team
+      👥 Seeking: {seeking}
     </span>
   );
 }
@@ -290,7 +262,14 @@ export default function App() {
   // Modals
   const [authModalOpen, setAuthModalOpen] = useState(false);
   const [authMode, setAuthMode] = useState("signin"); // "signin" | "register"
-  const [selectedRegisterRole, setSelectedRegisterRole] = useState("founder"); // "founder" | "talent" | "backer"
+  const [selectedRegisterRoles, setSelectedRegisterRoles] = useState(["founder"]); // array of "founder" | "talent" | "backer"
+  const toggleRegisterRole = (role) => {
+    setSelectedRegisterRoles((prev) =>
+      prev.includes(role)
+        ? (prev.length > 1 ? prev.filter((r) => r !== role) : prev)
+        : [...prev, role]
+    );
+  };
   const [ideaModalOpen, setIdeaModalOpen] = useState(false);
   const [connectModalOpen, setConnectModalOpen] = useState(false);
   const [chatModalOpen, setChatModalOpen] = useState(false);
@@ -304,6 +283,8 @@ export default function App() {
   const [profileSkillsEditOpen, setProfileSkillsEditOpen] = useState(false);
   const [profileSkillsDraft, setProfileSkillsDraft] = useState("");
   const [profileRoleTitleDraft, setProfileRoleTitleDraft] = useState("");
+  const [profileBuilderTypeDraft, setProfileBuilderTypeDraft] = useState("");
+  const [profileBackerTypeDraft, setProfileBackerTypeDraft] = useState("");
   const [profileFocusDraft, setProfileFocusDraft] = useState("");
   const [showAllBuilders, setShowAllBuilders] = useState(false);
   const [showAllFunders, setShowAllFunders] = useState(false);
@@ -558,23 +539,9 @@ export default function App() {
     category: "Tech / AI",
     desc: "",
     seeking: "Tech Co-Founder",
-    lookingFor: "team", // "team" | "funding"
     level: "L1", // L1..L5
-    goalAmount: "",
     demoUrl: ""
   });
-
-  // Fundraising state
-  const [donations, setDonations] = useState([]);
-  const [donateModalOpen, setDonateModalOpen] = useState(false);
-  const [targetDonateIdea, setTargetDonateIdea] = useState(null);
-  const [donateAmount, setDonateAmount] = useState("");
-  const [donateLoading, setDonateLoading] = useState(false);
-  const donorsForIdea = (ideaId) => donations.filter((d) => d && d.ideaId === ideaId);
-  const raisedForIdea = (idea) => {
-    const fromDonations = donorsForIdea(idea.id).reduce((s, d) => s + (Number(d.amount) || 0), 0);
-    return Math.max(Number(idea.raisedAmount) || 0, fromDonations);
-  };
 
   const [connectForm, setConnectForm] = useState({ message: "" });
   const [chatInputText, setChatInputText] = useState("");
@@ -654,13 +621,6 @@ export default function App() {
     dbService.getMessages().then((cm) => { if (cm && Array.isArray(cm)) setMessages((prev) => {
       const map = new Map(); [...prev, ...cm].forEach(x=> map.set(x.id, x)); return Array.from(map.values());
     }); });
-    try {
-      const localDon = JSON.parse(localStorage.getItem("startify_donations") || "null");
-      if (localDon && Array.isArray(localDon) && localDon.length) setDonations((prev) => [...localDon, ...prev]);
-    } catch {}
-    dbService.getDonations().then((cd) => { if (cd && Array.isArray(cd)) setDonations((prev) => {
-      const map = new Map(); [...prev, ...cd].forEach(x=> map.set(x.id, x)); return Array.from(map.values());
-    }); });
     dbService.getRsvps().then((rv) => { if (rv && Array.isArray(rv) && rv.length) setRsvps(rv); });
     // Realtime: Firestore onSnapshot for chats so two devices sync without reload
     const unsubReq = dbService.subscribeRequests ? dbService.subscribeRequests((cloudReqs) => {
@@ -670,16 +630,12 @@ export default function App() {
     }) : () => {};
     const unsubMsg = dbService.subscribeMessages ? dbService.subscribeMessages((cloudMsgs) => {
       if (cloudMsgs && Array.isArray(cloudMsgs)) setMessages((prev) => {
-        const map = new Map(); [...prev, ...cloudMsgs].forEach(x=> map.set(x.id, x)); return Array.from(map.values());
+        const map = new Map(); [...prev, ...cloudMsgs].forEach(x=> map.set(x.id, x));
+        return Array.from(map.values()).sort((a, b) => String(a.id || "").localeCompare(String(b.id || "")));
       });
     }) : () => {};
     const unsubRsvp = dbService.subscribeRsvps ? dbService.subscribeRsvps((cloudRsvps) => {
       if (cloudRsvps && Array.isArray(cloudRsvps)) setRsvps(cloudRsvps);
-    }) : () => {};
-    const unsubDon = dbService.subscribeDonations ? dbService.subscribeDonations((cloudDon) => {
-      if (cloudDon && Array.isArray(cloudDon)) setDonations((prev) => {
-        const map = new Map(); [...prev, ...cloudDon].forEach(x=> map.set(x.id, x)); return Array.from(map.values());
-      });
     }) : () => {};
     // Live update when admin approves in another tab + chats arrive cross-tab
     const onStorage = (e) => {
@@ -720,7 +676,7 @@ export default function App() {
     document.addEventListener("visibilitychange", onVisible);
     // Heal rows written before the rename fix (old snapshot names)
     backfillNamesFromProfiles();
-    return () => { window.removeEventListener("storage", onStorage); document.removeEventListener("visibilitychange", onVisible); unsubReq(); unsubMsg(); unsubRsvp(); unsubDon(); };
+    return () => { window.removeEventListener("storage", onStorage); document.removeEventListener("visibilitychange", onVisible); unsubReq(); unsubMsg(); unsubRsvp(); };
   }, []);
 
   useEffect(() => {
@@ -741,9 +697,6 @@ export default function App() {
       localStorage.setItem("startify_messages", JSON.stringify(userMsgs));
     } catch {}
   }, [messages]);
-  useEffect(() => {
-    try { localStorage.setItem("startify_donations", JSON.stringify(donations)); } catch {}
-  }, [donations]);
 
   // --- Password auth helpers (localStorage) ---
   const getCredentials = () => {
@@ -813,10 +766,10 @@ export default function App() {
 
   // Sign In / Registration Handler — open to all; UoH membership optional with registration ID
   const isUoHEmail = (email) => email.trim().toLowerCase().endsWith("@uohyd.ac.in");
-  const completeRegistration = (newUser, targetRole) => {
+  const completeRegistration = (newUser, targetRole, { silent = false } = {}) => {
     // Persist to unified profile store so same-email switching works (local + Firestore)
     const derivedSid = (newUser.studentId || newUser.email.split("@")[0]).toUpperCase();
-    const normalized={ id:newUser.id, name:newUser.name, email:newUser.email.toLowerCase(), role:newUser.role, studentId: derivedSid, isUoH: Boolean(newUser.isUoH), roleTitle:newUser.roleTitle||"", skills:newUser.skills||"", focus:newUser.focus||"", bio:newUser.bio||"", backerType:newUser.backerType||"", backerOffer:newUser.backerOffer||"", backerCapacity:newUser.backerCapacity||"", createdAt:new Date().toISOString() };
+    const normalized={ id:newUser.id, name:newUser.name, email:newUser.email.toLowerCase(), role:newUser.role, studentId: derivedSid, isUoH: Boolean(newUser.isUoH), roleTitle:newUser.roleTitle||"", skills:newUser.skills||"", builderType:newUser.builderType||"", focus:newUser.focus||"", bio:newUser.bio||"", backerType:newUser.backerType||"", backerOffer:newUser.backerOffer||"", backerCapacity:newUser.backerCapacity||"", createdAt:new Date().toISOString() };
     try {
       const key="startify_user_profiles";
       const existing=JSON.parse(localStorage.getItem(key)||"[]");
@@ -836,18 +789,20 @@ export default function App() {
         focus: newUser.focus,
         bio: newUser.bio,
         studentId: newUser.studentId,
-        backerType: newUser.backerType || "mentorship",
+        backerType: newUser.backerType || "",
         backerOffer: newUser.backerOffer || "",
         backerCapacity: newUser.backerCapacity || "",
         status: "pending_admin_approval",
         createdAt: new Date().toISOString(),
       };
       setPendingBackers((prev) => [pending, ...prev]);
-      dbService.saveRegistration({ name: newUser.name, email: newUser.email, role: "funder", ideaOrSkills: `[${backerTypeMeta(newUser.backerType).label}] ${newUser.backerOffer || newUser.focus || newUser.bio || "Backer"}${newUser.backerCapacity ? ` (${newUser.backerCapacity})` : ""}`, contact: "", registeredAt: new Date().toISOString().slice(0,10), status: "pending_admin_approval" });
-      showToast(`Backer account "${newUser.name}" is pending admin approval. You'll be visible after approval.`);
-      const pendingUser = { ...newUser, _backerPending: true };
-      setCurrentUser(pendingUser);
-      setActiveTab("home");
+      dbService.saveRegistration({ name: newUser.name, email: newUser.email, role: "funder", ideaOrSkills: `${newUser.backerType ? `[${backerTypeMeta(newUser.backerType).label}] ` : ""}${newUser.backerOffer || newUser.focus || newUser.bio || "Backer"}${newUser.backerCapacity ? ` (${newUser.backerCapacity})` : ""}`, contact: "", registeredAt: new Date().toISOString().slice(0,10), status: "pending_admin_approval" });
+      if (!silent) {
+        showToast(`Backer account "${newUser.name}" is pending admin approval. Complete your profile anytime!`);
+        const pendingUser = { ...newUser, _backerPending: true };
+        setCurrentUser(pendingUser);
+        setActiveTab("home");
+      }
     } else {
       if (targetRole === "talent") {
         const newBuilder = {
@@ -864,18 +819,23 @@ export default function App() {
         dbService.saveBuilder(newBuilder);
       }
       dbService.saveRegistration({ name: newUser.name, email: newUser.email, role: targetRole==="talent"?"builder":"founder", ideaOrSkills: targetRole==="talent"? (authForm.skills||"Talent") : "Founder", contact:"", registeredAt: new Date().toISOString().slice(0,10), status:"verified" });
-      setCurrentUser(newUser);
-      setActiveTab("home");
-      showToast(`Registered as ${targetRole.toUpperCase()}! Welcome, ${newUser.name}.`);
+      if (!silent) {
+        setCurrentUser(newUser);
+        setActiveTab("home");
+        showToast(`Registered as ${targetRole.toUpperCase()}! Complete your profile anytime.`);
+      }
     }
-    setAuthModalOpen(false);
-    setAuthForm({ name: "", email: "", password: "", roleTitle: "", skills: "", focus: "", bio: "", backerType: "mentorship", backerOffer: "", backerCapacity: "", isUoH: false, studentId: "" });
-    setResetMode(false);
+    if (!silent) {
+      setAuthModalOpen(false);
+      setAuthForm({ name: "", email: "", password: "", roleTitle: "", skills: "", focus: "", bio: "", backerType: "", backerOffer: "", backerCapacity: "", isUoH: false, studentId: "" });
+      setResetMode(false);
+    }
   };
 
   const handleAuthSubmit = async (e) => {
     e.preventDefault();
-    const targetRole = selectedRegisterRole;
+    const targetRoles = selectedRegisterRoles.length > 0 ? selectedRegisterRoles : ["founder"];
+    const targetRole = targetRoles[0];
     const email = authForm.email.trim();
     const password = authForm.password.trim();
     if (!password || password.length < 6) {
@@ -896,10 +856,12 @@ export default function App() {
             showToast("Please enter your University of Hyderabad registration ID.");
             return;
           }
+          let rolesToCreate = targetRoles;
           try {
             const profiles = JSON.parse(localStorage.getItem("startify_user_profiles") || "[]");
-            if (profiles.some(p => p.email.toLowerCase()===email.toLowerCase() && p.role===targetRole)) {
-              showToast("An account with this email and role already exists. Please Sign In.");
+            rolesToCreate = targetRoles.filter(r => !profiles.some(p => p.email.toLowerCase()===email.toLowerCase() && p.role===r));
+            if (rolesToCreate.length === 0) {
+              showToast("An account with this email and selected role(s) already exists. Please Sign In.");
               return;
             }
           } catch {}
@@ -918,7 +880,7 @@ export default function App() {
                 if (inMsg.includes("verify your email")) {
                   // Email exists but unverified — allow adding role, user must still verify
                 } else {
-                  showToast("This email is already registered with a different password. Sign In first, then add another role from the name popup.");
+                  showToast("This email is already registered with a different password. Sign In first, then add another role from Profile.");
                   return;
                 }
               }
@@ -926,23 +888,27 @@ export default function App() {
               throw signUpErr;
             }
           }
-          const pendingUser = {
-            id: `user_${Date.now()}`,
-            name: authForm.name.trim(),
-            email,
-            role: targetRole,
-            studentId: (authForm.isUoH && authForm.studentId.trim()) ? authForm.studentId.trim().toUpperCase() : email.split("@")[0].toUpperCase(),
-            isUoH: Boolean(authForm.isUoH),
-            roleTitle: authForm.roleTitle,
-            skills: authForm.skills,
-            focus: authForm.focus,
-            bio: authForm.bio,
-            backerType: targetRole === "backer" ? (authForm.backerType || "mentorship") : undefined,
-            backerOffer: targetRole === "backer" ? authForm.backerOffer.trim() : undefined,
-            backerCapacity: targetRole === "backer" ? authForm.backerCapacity.trim() : undefined
-          };
-          completeRegistration(pendingUser, targetRole);
-          showToast(`✓ Verification link sent to ${email} — click it to activate, then Sign In.`);
+          const baseTs = Date.now();
+          rolesToCreate.forEach((r, idx) => {
+            const pendingUser = {
+              id: `user_${baseTs + idx}`,
+              name: authForm.name.trim(),
+              email,
+              role: r,
+              studentId: (authForm.isUoH && authForm.studentId.trim()) ? authForm.studentId.trim().toUpperCase() : email.split("@")[0].toUpperCase(),
+              isUoH: Boolean(authForm.isUoH),
+              roleTitle: "",
+              skills: "",
+              builderType: "",
+              focus: "",
+              bio: "",
+              backerType: "",
+              backerOffer: "",
+              backerCapacity: ""
+            };
+            completeRegistration(pendingUser, r, { silent: idx > 0 });
+          });
+          showToast(`✓ Verification link sent to ${email} — click it to activate, then Sign In & complete your profile.`);
           setAuthMode("signin");
           return;
         } else {
@@ -1068,17 +1034,32 @@ export default function App() {
       }
       showToast("No account found for this email. Switch to Create Account."); return;
     }
-    if (authMode === "register") {
+      if (authMode === "register") {
       if (!authForm.name.trim()) { showToast("Please enter your full name."); return; }
+      let rolesToCreate = targetRoles;
       try {
         const profiles = JSON.parse(localStorage.getItem("startify_user_profiles") || "[]");
-        if (profiles.some(p => p.email.toLowerCase()===email.toLowerCase() && p.role===targetRole)) { showToast("An account with this email and role already exists. Please Sign In."); return; }
+        rolesToCreate = targetRoles.filter(r => !profiles.some(p => p.email.toLowerCase()===email.toLowerCase() && p.role===r));
+        if (rolesToCreate.length === 0) { showToast("An account with this email and selected role(s) already exists. Please Sign In."); return; }
       } catch {}
       if (hasStoredPassword && !checkCredential(email, password)) { showToast("An account with this email already uses a different password."); return; }
       if (authForm.isUoH && !authForm.studentId.trim()) { showToast("Please enter your University of Hyderabad registration ID."); return; }
       const derivedStudentId = (authForm.isUoH && authForm.studentId.trim()) ? authForm.studentId.trim().toUpperCase() : email.split("@")[0].toUpperCase();
-      const pendingUser = { id: `user_${Date.now()}`, name: authForm.name.trim(), email, role: targetRole, studentId: derivedStudentId, isUoH: Boolean(authForm.isUoH), roleTitle: authForm.roleTitle, skills: authForm.skills, focus: authForm.focus, bio: authForm.bio, backerType: targetRole === "backer" ? (authForm.backerType || "mentorship") : undefined, backerOffer: targetRole === "backer" ? (authForm.backerOffer || "").trim() : undefined, backerCapacity: targetRole === "backer" ? (authForm.backerCapacity || "").trim() : undefined };
-      completeRegistration(pendingUser, targetRole);
+      const baseTs = Date.now();
+      let firstUser = null;
+      rolesToCreate.forEach((r, idx) => {
+        const pendingUser = { id: `user_${baseTs + idx}`, name: authForm.name.trim(), email, role: r, studentId: derivedStudentId, isUoH: Boolean(authForm.isUoH), roleTitle: "", skills: "", builderType: "", focus: "", bio: "", backerType: "", backerOffer: "", backerCapacity: "" };
+        if (idx === 0) firstUser = pendingUser;
+        completeRegistration(pendingUser, r, { silent: true });
+      });
+      if (firstUser) {
+        setCurrentUser(firstUser);
+        setActiveTab("profile");
+      }
+      setAuthModalOpen(false);
+      setAuthForm({ name: "", email: "", password: "", roleTitle: "", skills: "", focus: "", bio: "", backerType: "", backerOffer: "", backerCapacity: "", isUoH: false, studentId: "" });
+      setResetMode(false);
+      showToast(`Registered (${rolesToCreate.map(r => ROLE_META[r]?.label || r).join(", ")})! Complete your profile below.`);
     }
   };
 
@@ -1091,17 +1072,7 @@ export default function App() {
       setIdeaModalOpen(false);
       return;
     }
-    const lookingFor = newIdeaForm.lookingFor === "funding" ? "funding" : "team";
-    const goalAmount = Math.floor(Number(newIdeaForm.goalAmount) || 0);
-    if (lookingFor === "funding" && goalAmount < 100) {
-      showToast("Set a funding goal of at least ₹100.");
-      return;
-    }
     const demoUrl = normalizeDemoUrl(newIdeaForm.demoUrl);
-    if (lookingFor === "funding" && !isValidDemoUrl(newIdeaForm.demoUrl)) {
-      showToast("Add a valid demo / prototype link (https://...). Funders need to see it.");
-      return;
-    }
     if (demoUrl && !isValidDemoUrl(newIdeaForm.demoUrl)) {
       showToast("That demo link doesn't look valid — check it once.");
       return;
@@ -1118,10 +1089,10 @@ export default function App() {
       verifiedStudent: true,
       studentId: currentUser.email.split("@")[0].toUpperCase(),
       desc: newIdeaForm.desc,
-      seeking: lookingFor === "funding" ? "Funding" : newIdeaForm.seeking,
-      lookingFor,
+      seeking: newIdeaForm.seeking,
+      lookingFor: "team",
       level: newIdeaForm.level || "L1",
-      goalAmount: lookingFor === "funding" ? goalAmount : 0,
+      goalAmount: 0,
       raisedAmount: 0,
       demoUrl,
       status: "Pending Review",
@@ -1132,7 +1103,7 @@ export default function App() {
     setIdeas([newIdea, ...ideas]);
     setIdeaModalOpen(false);
     showToast(`✓ Idea "${newIdeaForm.title}" sent for admin review.`);
-    setNewIdeaForm({ title: "", category: "Tech / AI", desc: "", seeking: "Tech Co-Founder", lookingFor: "team", level: "L1", goalAmount: "", demoUrl: "" });
+    setNewIdeaForm({ title: "", category: "Tech / AI", desc: "", seeking: "Tech Co-Founder", level: "L1", demoUrl: "" });
   };
 
   // Backer posts themselves as a resource (live instantly) — founders/talent apply via requests
@@ -1175,60 +1146,6 @@ export default function App() {
     setBackerResources(backerResources.filter(r => r.id !== id));
     dbService.deleteResource(id);
     showToast("Resource removed.");
-  };
-
-  // Donate to a funding idea (any logged-in user; Razorpay or demo simulator)
-  const handleDonateSubmit = (e) => {
-    e.preventDefault();
-    const idea = targetDonateIdea;
-    if (!currentUser || !idea) return;
-    if (isOwnIdea(idea)) {
-      showToast("You can't donate to your own idea.");
-      return;
-    }
-    const amount = Math.floor(Number(donateAmount) || 0);
-    if (amount < 10) {
-      showToast("Minimum donation is ₹10.");
-      return;
-    }
-    setDonateLoading(true);
-    processRazorpayPayment({
-      title: `Donation: ${idea.title}`,
-      amountInINR: amount,
-      userName: currentUser.name,
-      userEmail: currentUser.email,
-      userContact: "",
-      onSuccess: (payment) => {
-        const donation = {
-          id: `don_${Date.now()}`,
-          ideaId: idea.id,
-          ideaTitle: idea.title,
-          donorId: currentUser.id,
-          donorName: currentUser.name,
-          donorEmail: currentUser.email.toLowerCase(),
-          amount,
-          paymentId: payment.paymentId || "",
-          createdAt: new Date().toISOString()
-        };
-        dbService.saveDonation(donation);
-        setDonations((prev) => [donation, ...prev]);
-        const updatedIdea = { ...idea, raisedAmount: (Number(idea.raisedAmount) || 0) + amount };
-        setIdeas((prev) => prev.map((i) => (i.id === idea.id ? updatedIdea : i)));
-        dbService.saveIdea(updatedIdea);
-        try {
-          const stored = JSON.parse(localStorage.getItem("startify_submitted_ideas") || "[]");
-          localStorage.setItem("startify_submitted_ideas", JSON.stringify(stored.map((i) => (i.id === idea.id ? updatedIdea : i))));
-        } catch {}
-        setDonateLoading(false);
-        setDonateModalOpen(false);
-        setDonateAmount("");
-        showToast(`✓ Thank you! You donated ${fmtINR(amount)} to "${idea.title}".`);
-      },
-      onFailure: (msg) => {
-        setDonateLoading(false);
-        showToast(msg || "Donation failed. Try again.");
-      }
-    });
   };
 
   const handleApproveIdea = (ideaId) => {
@@ -1510,9 +1427,9 @@ export default function App() {
   const dashboardGroups = currentUser?.role === "founder"
     ? [{ title: "Skilled talent", subtitle: "People ready to build alongside you", items: visibleBuilders, kind: "builder" }, { title: "Backers & mentors", subtitle: "People who can fund and guide you", items: visibleFunders, kind: "backer" }]
     : currentUser?.role === "backer"
-      ? [{ title: "Founders & ideas", subtitle: "Early-stage opportunities to explore", items: ideas.filter((i) => !isOwnIdea(i) && !isFundingIdea(i)), kind: "idea" }, { title: "Talent & skills", subtitle: "People with capabilities behind strong teams", items: visibleBuilders, kind: "builder" }]
+      ? [{ title: "Founders & ideas", subtitle: "Early-stage opportunities to explore", items: ideas.filter((i) => !isOwnIdea(i)), kind: "idea" }, { title: "Talent & skills", subtitle: "People with capabilities behind strong teams", items: visibleBuilders, kind: "builder" }]
       : currentUser?.role === "talent"
-        ? [{ title: "Founders & ideas", subtitle: "Teams looking for a builder like you", items: ideas.filter((i) => !isOwnIdea(i) && !isFundingIdea(i)), kind: "idea" }]
+        ? [{ title: "Founders & ideas", subtitle: "Teams looking for a builder like you", items: ideas.filter((i) => !isOwnIdea(i)), kind: "idea" }]
         : currentUser?.role === "admin"
           ? [{ title: "Founders & ideas", subtitle: "All live ideas", items: ideas, kind: "idea" }, { title: "Talent & skills", subtitle: "All builders", items: builders, kind: "builder" }]
           : [{ title: "Founders & ideas", subtitle: "Teams looking for collaborators", items: ideas, kind: "idea" }, { title: "Backers", subtitle: "Backers and mentors in the network", items: funders, kind: "backer" }];
@@ -1622,7 +1539,7 @@ export default function App() {
                 <div className="text-[11px] font-bold uppercase tracking-widest text-slate-500">WHY STARTIFY</div>
                 <ul className="mt-3 space-y-2.5">
                   {[
-                    "Verified community (UoH + open)",
+                    "Open to everyone — UoH & beyond",
                     "Direct founder → talent connect",
                     "Chat after acceptance",
                     /* Add more features here — one string per line */
@@ -1649,7 +1566,7 @@ export default function App() {
                 </div>
                 <div className="space-y-4">
                   {[
-                    ["Founder", "Post and manage ideas", "Meet verified builders and campus backers.", "founder", "bg-white border-slate-200 hover:border-slate-300 hover:shadow-md shadow-sm"],
+                    ["Founder", "Post and manage ideas", "Meet builders and backers.", "founder", "bg-white border-slate-200 hover:border-slate-300 hover:shadow-md shadow-sm"],
                     ["Talent", "Build with ambitious teams", "Discover founder ideas that need your skills.", "talent", "bg-white border-slate-200 hover:border-sky-300 hover:shadow-md shadow-sm"],
                     ["Backer", "Back promising people", "Browse ideas and the talent behind them.", "backer", "bg-white border-slate-200 hover:border-violet-300 hover:shadow-md shadow-sm"],
                   ].map(([title, label, detail, role, cls]) => (
@@ -1701,17 +1618,11 @@ export default function App() {
                   <div className="flex items-center gap-2 flex-wrap">
                     <span className="rounded-full bg-slate-100 px-3 py-1 text-[10px] font-bold text-slate-600">{idea.category}</span>
                     <span className="rounded-full bg-amber-50 border border-amber-200 px-3 py-1 text-[10px] font-bold text-amber-700 whitespace-nowrap">{ideaLevelMeta(idea.level).badge}</span>
-                    {isFundingIdea(idea) ? <LookingForPill idea={idea} /> : null}
                     {idea.demoUrl ? <DemoLink url={idea.demoUrl} className="text-[11px] font-bold text-indigo-600 hover:underline whitespace-nowrap" /> : null}
                   </div>
                   <h3 className="font-heading mt-3 text-[18px] font-extrabold text-slate-800 line-clamp-2">{idea.title}</h3>
                   <p className="mt-1 text-[12px] font-medium text-slate-500 truncate">By {idea.founder}</p>
                   <p className="mt-3 min-h-0 flex-1 overflow-y-auto text-[13px] leading-5 text-slate-600" style={{scrollbarWidth:'thin'}}>{idea.desc}</p>
-                  {isFundingIdea(idea) ? (
-                    <div className="mt-3">
-                      <FundingBar idea={idea} raised={raisedForIdea(idea)} donorCount={donorsForIdea(idea.id).length} />
-                    </div>
-                  ) : null}
                  </article>
                ))}
              </div>
@@ -1787,27 +1698,11 @@ export default function App() {
                   <div className="flex items-center gap-2 flex-wrap">
                     <span className="rounded-full bg-slate-100 px-3 py-1 text-[10px] font-bold text-slate-600">{idea.category}</span>
                     <span className="rounded-full bg-amber-50 border border-amber-200 px-3 py-1 text-[10px] font-bold text-amber-700 whitespace-nowrap">{ideaLevelMeta(idea.level).badge}</span>
-                    {isFundingIdea(idea) ? <LookingForPill idea={idea} /> : null}
                     {idea.demoUrl ? <DemoLink url={idea.demoUrl} className="text-[11px] font-bold text-indigo-600 hover:underline whitespace-nowrap" /> : null}
                   </div>
                   <h3 className="font-heading mt-4 text-[20px] font-extrabold text-slate-800 line-clamp-2">{idea.title}</h3>
                   <p className="mt-1 text-[12px] font-medium text-slate-500 truncate">By {idea.founder}</p>
                   <p className="mt-3 min-h-0 flex-1 overflow-y-auto text-[13px] leading-5 text-slate-600" style={{scrollbarWidth:'thin'}}>{idea.desc}</p>
-                  {isFundingIdea(idea) ? (
-                    <div className="mt-3">
-                      <FundingBar idea={idea} raised={raisedForIdea(idea)} donorCount={donorsForIdea(idea.id).length} />
-                    </div>
-                  ) : null}
-                  {isFundingIdea(idea) ? (
-                    <div className="mt-auto pt-3">
-                      <button
-                        onClick={() => { setTargetDonateIdea(idea); setDonateAmount(""); setDonateModalOpen(true); }}
-                        className="w-full h-10 rounded-full bg-slate-900 text-white text-[12.5px] font-bold hover:bg-black transition"
-                      >
-                        Donate →
-                      </button>
-                    </div>
-                  ) : null}
                   </article>
                 ))}
               </div>
@@ -1955,23 +1850,6 @@ export default function App() {
                   </div>
                 </div>
 
-                {isFundingIdea(idea) ? (
-                  <div className="mt-6 pt-5 border-t border-slate-200 space-y-3">
-                    <FundingBar idea={idea} raised={raisedForIdea(idea)} donorCount={donorsForIdea(idea.id).length} />
-                    <button
-                      onClick={() =>
-                        requireAuth(() => {
-                          setTargetDonateIdea(idea);
-                          setDonateAmount("");
-                          setDonateModalOpen(true);
-                        })
-                      }
-                      className="w-full h-10 rounded-full bg-slate-900 text-white text-[12.5px] font-bold hover:bg-black transition"
-                    >
-                      Donate →
-                    </button>
-                  </div>
-                ) : (
                 <div className="mt-6 pt-5 border-t border-slate-200 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
                   {allowed ? (
                     <button
@@ -1989,7 +1867,6 @@ export default function App() {
                     <span className="text-[11px] px-3 py-1.5 rounded-full bg-slate-50 border border-slate-200 text-slate-500">Connect available to Talent & Backers</span>
                   )}
                 </div>
-                )}
               </div>
             );})}
           </div>
@@ -2476,7 +2353,7 @@ export default function App() {
               <button onClick={()=> setIdeaModalOpen(true)} className="h-10 px-5 rounded-full bg-slate-900 text-white font-bold text-sm hover:bg-black shadow shrink-0">+ Post Idea</button>
             )}
             {currentUser?.role === "backer" && (
-              <button onClick={()=> { setResourceForm({ title: "", offer: currentUser.backerOffer || "", capacity: currentUser.backerCapacity || "", lookingFor: "both", details: "" }); setResourceModalOpen(true); }} className="h-10 px-5 rounded-full bg-gradient-to-r from-indigo-600 to-violet-600 text-white font-bold text-sm hover:from-indigo-700 hover:to-violet-700 shadow shrink-0">+ Post Resource</button>
+              <button onClick={()=> { setResourceForm({ title: "", offer: "", capacity: "", lookingFor: "both", details: "" }); setResourceModalOpen(true); }} className="h-10 px-5 rounded-full bg-gradient-to-r from-indigo-600 to-violet-600 text-white font-bold text-sm hover:from-indigo-700 hover:to-violet-700 shadow shrink-0">+ Post Resource</button>
             )}
           </div>
 
@@ -2490,7 +2367,7 @@ export default function App() {
                   <p className="mt-1 text-[12px] text-slate-500">{currentUser.role === "backer" ? "Post what you offer — ₹1L to invest, 1M-follower shoutout, mentoring. Founders & talent will request you directly." : "No cold pitching — pick a live backer offer (capital, distribution, mentoring) and request it. The backer accepts → chat unlocks."}</p>
                 </div>
                 {currentUser.role === "backer" && (
-                  <button onClick={()=> { setResourceForm({ title: "", offer: currentUser.backerOffer || "", capacity: currentUser.backerCapacity || "", lookingFor: "both", details: "" }); setResourceModalOpen(true); }} className="h-9 px-4 rounded-full bg-slate-900 text-white text-xs font-bold hover:bg-black shrink-0">+ New resource</button>
+                  <button onClick={()=> { setResourceForm({ title: "", offer: "", capacity: "", lookingFor: "both", details: "" }); setResourceModalOpen(true); }} className="h-9 px-4 rounded-full bg-slate-900 text-white text-xs font-bold hover:bg-black shrink-0">+ New resource</button>
                 )}
               </div>
               <div className="mt-4 space-y-3">
@@ -2549,7 +2426,7 @@ export default function App() {
               const allowed = canConnect(currentUser.role, group.kind);
               return <section key={group.title} className="rounded-[24px] border border-slate-200 bg-white p-6">
               <div className="border-b border-slate-200 pb-4"><div className="text-[11px] font-bold uppercase tracking-widest text-slate-500">DISCOVER</div><h2 className="font-heading mt-1 text-[26px] font-extrabold text-slate-800">{group.title}</h2><p className="mt-1 text-[12px] text-slate-500">{group.subtitle} {group.kind === "backer" && currentUser.role === "talent" ? "· not needed for builders" : ""}</p></div>
-              <div className="mt-4 space-y-3">{group.items.length === 0 ? <div className="py-6 text-center text-sm text-slate-500">Nothing to show here for your role right now.</div> : (group.kind === "builder" ? (showAllBuilders ? group.items : group.items.slice(0,3)) : group.kind === "backer" ? (showAllFunders ? group.items : group.items.slice(0,3)) : (showAllIdeas ? group.items : group.items.slice(0,3))).map((person) => { const isIdea = Boolean(person.title); const name = person.name || person.title; const detail = isIdea ? `${person.category} · ${person.founder}${isFundingIdea(person) ? ` · 💰 ${fmtINR(raisedForIdea(person))}/${fmtINR(person.goalAmount)}` : ""}` : (group.kind === "backer" && person.backerType ? `${backerTypeMeta(person.backerType).label}${person.backerOffer ? ` · ${person.backerOffer}` : ""}` : (person.role || person.focus)); return <div key={person.id} className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 rounded-2xl border border-slate-200 bg-slate-50 p-4"><div className="min-w-0 flex-1"><div className="truncate font-heading font-bold text-slate-800">{name}</div><div className="mt-0.5 truncate text-[11.5px] text-slate-500">{detail}</div></div>{allowed ? <button onClick={() => { setTargetConnectItem(person); setConnectModalOpen(true); }} className="w-full sm:w-auto shrink-0 rounded-full border border-slate-200 bg-slate-900 px-4 py-2 text-[11px] font-bold text-white hover:bg-slate-800 transition text-center">Connect</button> : <span className="shrink-0 text-[11px] text-slate-400 px-3 py-1.5 rounded-full bg-white border border-slate-200 text-center">Via ideas</span>}</div>; })}</div>
+              <div className="mt-4 space-y-3">{group.items.length === 0 ? <div className="py-6 text-center text-sm text-slate-500">Nothing to show here for your role right now.</div> : (group.kind === "builder" ? (showAllBuilders ? group.items : group.items.slice(0,3)) : group.kind === "backer" ? (showAllFunders ? group.items : group.items.slice(0,3)) : (showAllIdeas ? group.items : group.items.slice(0,3))).map((person) => { const isIdea = Boolean(person.title); const name = person.name || person.title; const detail = isIdea ? `${person.category} · ${person.founder}` : (group.kind === "backer" && person.backerType ? `${backerTypeMeta(person.backerType).label}${person.backerOffer ? ` · ${person.backerOffer}` : ""}` : (person.role || person.focus)); return <div key={person.id} className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 rounded-2xl border border-slate-200 bg-slate-50 p-4"><div className="min-w-0 flex-1"><div className="truncate font-heading font-bold text-slate-800">{name}</div><div className="mt-0.5 truncate text-[11.5px] text-slate-500">{detail}</div></div>{allowed ? <button onClick={() => { setTargetConnectItem(person); setConnectModalOpen(true); }} className="w-full sm:w-auto shrink-0 rounded-full border border-slate-200 bg-slate-900 px-4 py-2 text-[11px] font-bold text-white hover:bg-slate-800 transition text-center">Connect</button> : <span className="shrink-0 text-[11px] text-slate-400 px-3 py-1.5 rounded-full bg-white border border-slate-200 text-center">Via ideas</span>}</div>; })}</div>
               {group.items.length > 3 && (
                 <div className="mt-3 flex justify-center">
                   <button onClick={() => {
@@ -2849,7 +2726,7 @@ export default function App() {
                         <div>
                           <div className="font-bold text-slate-800 text-[14px]">{idea.title}</div>
                           <div className="text-[11.5px] text-slate-500 mt-0.5">
-                            Category: {idea.category} • {isFundingIdea(idea) ? `Goal ${fmtINR(idea.goalAmount)} • Raised ${fmtINR(raisedForIdea(idea))} (${donorsForIdea(idea.id).length} donors)` : `Seeking: ${idea.seeking}`}
+                            Category: {idea.category} • Seeking: {idea.seeking && idea.seeking !== "Funding" ? idea.seeking : "Team"}
                           </div>
                         </div>
                         <span className="px-2.5 py-1 rounded-full bg-slate-100 border border-slate-200 text-[10.5px] text-slate-600 font-medium">
@@ -2916,6 +2793,101 @@ export default function App() {
                 <div className="mt-2 text-sm text-slate-600 break-all">{currentUser.email}</div>
                 <div className="mt-1 text-xs text-slate-500">ID: <strong className="text-slate-700">{currentUser.studentId || currentUser.email.split("@")[0].toUpperCase()}</strong> • {currentUser.isUoH ? "UoH verified" : "Open member"}</div>
                 {(() => {
+                  const sameProfiles = getSameEmailProfiles(currentUser.email);
+                  const allRoles = ["founder", "talent", "backer"];
+                  const missingRoles = allRoles.filter(r => !sameProfiles.some(p => p.role === r));
+                  return (
+                    <div className="mt-3 flex flex-wrap items-center gap-1.5">
+                      <span className="text-[11px] font-bold uppercase tracking-wider text-slate-400 mr-1">Roles:</span>
+                      {sameProfiles.map((p) => {
+                        const active = currentUser.role === p.role;
+                        return (
+                          <button
+                            key={p.role}
+                            onClick={() => {
+                              if (active) return;
+                              const aboutVal = getProfileAbout(p.email) || p.bio || "";
+                              setCurrentUser({ id: p.id || p.email, name: p.name || currentUser.name, email: p.email, role: p.role, bio: aboutVal, roleTitle: p.roleTitle, skills: p.skills, builderType: p.builderType, focus: p.focus, backerType: p.backerType, backerOffer: p.backerOffer, studentId: p.studentId || currentUser.studentId, isUoH: p.isUoH ?? currentUser.isUoH });
+                              showToast(`Switched to ${ROLE_META[p.role]?.label || p.role}`);
+                            }}
+                            className={`h-7 px-3 rounded-full text-[11px] font-bold border transition ${active ? "bg-slate-900 text-white border-slate-900" : "bg-white text-slate-700 border-slate-200 hover:border-slate-400"}`}
+                          >
+                            {active ? "✓ " : ""}{ROLE_META[p.role]?.label || p.role}
+                          </button>
+                        );
+                      })}
+                      {missingRoles.map((r) => (
+                        <button
+                          key={r}
+                          onClick={() => {
+                            const newRoleProfile = {
+                              id: `user_${Date.now()}`,
+                              name: currentUser.name,
+                              email: currentUser.email.toLowerCase(),
+                              role: r,
+                              studentId: currentUser.studentId || currentUser.email.split("@")[0].toUpperCase(),
+                              isUoH: Boolean(currentUser.isUoH),
+                              bio: currentUser.bio || "",
+                              roleTitle: "",
+                              skills: "",
+                              builderType: "",
+                              focus: "",
+                              backerType: "",
+                              backerOffer: "",
+                              backerCapacity: ""
+                            };
+                            completeRegistration(newRoleProfile, r, { silent: true });
+                            setCurrentUser(newRoleProfile);
+                            showToast(`✓ Added ${ROLE_META[r]?.label || r} role — complete your profile below.`);
+                          }}
+                          className="h-7 px-2.5 rounded-full text-[11px] font-semibold border border-dashed border-slate-300 text-slate-600 hover:border-slate-500 hover:text-slate-900"
+                        >
+                          + Add {ROLE_META[r]?.label || r}
+                        </button>
+                      ))}
+                    </div>
+                  );
+                })()}
+                {(() => {
+                  const about = getProfileAbout(currentUser.email) || currentUser.bio || "";
+                  const needsType = (currentUser.role === "talent" && !currentUser.builderType) || (currentUser.role === "backer" && !currentUser.backerType);
+                  const needsAbout = !about;
+                  if (!needsType && !needsAbout) return null;
+                  return (
+                    <div className="mt-4 rounded-2xl border border-amber-200 bg-amber-50 p-3.5 flex flex-wrap items-center justify-between gap-2">
+                      <div>
+                        <div className="text-xs font-bold text-amber-900">Complete your profile</div>
+                        <div className="text-[11px] text-amber-800 mt-0.5">
+                          {needsType ? `Pick your ${currentUser.role === "talent" ? "Builder type & skills" : "Backer type & focus"}` : ""}
+                          {needsType && needsAbout ? " and " : ""}
+                          {needsAbout ? "add a short bio" : ""} so others know how to collaborate with you.
+                        </div>
+                      </div>
+                      <button
+                        onClick={() => {
+                          if (needsType) {
+                            if (currentUser.role === "talent") {
+                              setProfileRoleTitleDraft(currentUser.roleTitle || "");
+                              setProfileSkillsDraft(currentUser.skills || "");
+                              setProfileBuilderTypeDraft(currentUser.builderType || "");
+                            } else {
+                              setProfileFocusDraft(currentUser.focus || "");
+                              setProfileBackerTypeDraft(currentUser.backerType || "");
+                            }
+                            setProfileSkillsEditOpen(true);
+                          } else {
+                            setProfileAboutDraft(about);
+                            setProfileEditOpen(true);
+                          }
+                        }}
+                        className="h-8 px-3.5 rounded-full bg-amber-900 text-white text-[11px] font-bold hover:bg-amber-950 shrink-0"
+                      >
+                        Complete now →
+                      </button>
+                    </div>
+                  );
+                })()}
+                {(() => {
                   const about = getProfileAbout(currentUser.email) || currentUser.bio || "";
                   return (
                     <div className="mt-4">
@@ -2927,17 +2899,31 @@ export default function App() {
                 })()}
                 {currentUser.role === "talent" && (
                   <div className="mt-4 p-4 rounded-xl bg-slate-50 border border-slate-200">
-                    <div className="text-xs font-bold uppercase tracking-widest text-slate-500">Skills & Role</div>
-                    <div className="mt-1 text-sm font-semibold text-slate-800">{currentUser.roleTitle || "Builder"}</div>
+                    <div className="text-xs font-bold uppercase tracking-widest text-slate-500">Builder Type & Skills</div>
+                    <div className="mt-1.5 flex flex-wrap items-center gap-2">
+                      <span className="text-sm font-semibold text-slate-800">{currentUser.roleTitle || "Builder"}</span>
+                      {builderTypeMeta(currentUser.builderType).label ? (
+                        <span className="rounded-full bg-sky-100 border border-sky-200 px-2.5 py-0.5 text-[11px] font-bold text-sky-700">🛠️ {builderTypeMeta(currentUser.builderType).label}</span>
+                      ) : (
+                        <span className="rounded-full bg-amber-100 border border-amber-200 px-2.5 py-0.5 text-[11px] font-semibold text-amber-800">Type not set</span>
+                      )}
+                    </div>
                     <div className="text-sm text-slate-600 mt-1 break-words">{currentUser.skills || "No skills added"}</div>
-                    <button onClick={()=>{ setProfileRoleTitleDraft(currentUser.roleTitle||""); setProfileSkillsDraft(currentUser.skills||""); setProfileSkillsEditOpen(true); }} className="mt-3 h-8 px-3 rounded-full bg-white border border-slate-200 text-xs font-bold">Edit skills</button>
+                    <button onClick={()=>{ setProfileRoleTitleDraft(currentUser.roleTitle||""); setProfileSkillsDraft(currentUser.skills||""); setProfileBuilderTypeDraft(currentUser.builderType||""); setProfileSkillsEditOpen(true); }} className="mt-3 h-8 px-3 rounded-full bg-white border border-slate-200 text-xs font-bold">{currentUser.builderType ? "Edit builder profile" : "Set builder type & skills"}</button>
                   </div>
                 )}
                 {currentUser.role === "backer" && (
                   <div className="mt-4 p-4 rounded-xl bg-slate-50 border border-slate-200">
-                    <div className="text-xs font-bold uppercase tracking-widest text-slate-500">Focus</div>
-                    <div className="text-sm text-slate-600 mt-1 break-words">{currentUser.focus || "No focus set"}</div>
-                    <button onClick={()=>{ setProfileFocusDraft(currentUser.focus||""); setProfileSkillsEditOpen(true); }} className="mt-3 h-8 px-3 rounded-full bg-white border border-slate-200 text-xs font-bold">Edit focus</button>
+                    <div className="text-xs font-bold uppercase tracking-widest text-slate-500">Backer Type & Focus</div>
+                    <div className="mt-1.5">
+                      {currentUser.backerType ? (
+                        <span className="inline-block rounded-full bg-violet-100 border border-violet-200 px-2.5 py-0.5 text-[11px] font-bold text-violet-700">{backerTypeMeta(currentUser.backerType).icon} {backerTypeMeta(currentUser.backerType).label}</span>
+                      ) : (
+                        <span className="inline-block rounded-full bg-amber-100 border border-amber-200 px-2.5 py-0.5 text-[11px] font-semibold text-amber-800">Backer type not set</span>
+                      )}
+                    </div>
+                    <div className="text-sm text-slate-600 mt-1.5 break-words">{currentUser.focus || "No focus set"}</div>
+                    <button onClick={()=>{ setProfileFocusDraft(currentUser.focus||""); setProfileBackerTypeDraft(currentUser.backerType||""); setProfileSkillsEditOpen(true); }} className="mt-3 h-8 px-3 rounded-full bg-white border border-slate-200 text-xs font-bold">{currentUser.backerType ? "Edit backer profile" : "Set backer type & focus"}</button>
                   </div>
                 )}
                 {currentUser.role === "founder" && (
@@ -2952,7 +2938,7 @@ export default function App() {
                         <div key={idea.id} className="p-3 rounded-xl bg-white border border-slate-200 flex items-center justify-between gap-2">
                           <div className="min-w-0">
                             <div className="font-bold text-slate-800 text-[13px] truncate">{idea.title}</div>
-                            <div className="text-[11px] text-slate-500">{idea.category} • {isFundingIdea(idea) ? `💰 ${fmtINR(raisedForIdea(idea))}/${fmtINR(idea.goalAmount)}` : `Seeking: ${idea.seeking}`}</div>
+                            <div className="text-[11px] text-slate-500">{idea.category} • Seeking: {idea.seeking && idea.seeking !== "Funding" ? idea.seeking : "Team"}</div>
                           </div>
                           <span className="px-2 py-1 rounded-full bg-slate-100 border border-slate-200 text-[10px] text-slate-600 font-medium whitespace-nowrap">{idea.status}</span>
                         </div>
@@ -3018,37 +3004,49 @@ export default function App() {
               <div className="mt-4 rounded-2xl border border-slate-200 bg-white p-4">
                 {currentUser.role === "talent" ? (
                   <>
-                    <div className="text-sm font-bold">Edit skills</div>
-                    <input value={profileRoleTitleDraft} onChange={e=> setProfileRoleTitleDraft(e.target.value)} placeholder="Role title" className="mt-2 w-full h-10 rounded-xl border border-slate-200 bg-slate-50 px-3 text-sm" />
-                    <input value={profileSkillsDraft} onChange={e=> setProfileSkillsDraft(e.target.value)} placeholder="Skills" className="mt-2 w-full h-10 rounded-xl border border-slate-200 bg-slate-50 px-3 text-sm" />
+                    <div className="text-sm font-bold">Builder type & skills</div>
+                    <select value={profileBuilderTypeDraft} onChange={e=> setProfileBuilderTypeDraft(e.target.value)} className="mt-2 w-full h-10 rounded-xl border border-slate-200 bg-slate-50 px-3 text-sm outline-none">
+                      <option value="">Select builder type…</option>
+                      {BUILDER_GROUPS.map((g) => (
+                        <optgroup key={g.group} label={`${g.group} — ${g.blurb}`}>
+                          {g.types.map((t) => <option key={t.id} value={t.id}>{t.label} — {t.blurb}</option>)}
+                        </optgroup>
+                      ))}
+                    </select>
+                    <input value={profileRoleTitleDraft} onChange={e=> setProfileRoleTitleDraft(e.target.value)} placeholder="Role title (e.g. Full-Stack Engineer)" className="mt-2 w-full h-10 rounded-xl border border-slate-200 bg-slate-50 px-3 text-sm" />
+                    <input value={profileSkillsDraft} onChange={e=> setProfileSkillsDraft(e.target.value)} placeholder="Skills (e.g. React, Node.js, Figma)" className="mt-2 w-full h-10 rounded-xl border border-slate-200 bg-slate-50 px-3 text-sm" />
                     <div className="mt-3 flex justify-end gap-2">
                       <button onClick={()=> setProfileSkillsEditOpen(false)} className="h-9 px-4 rounded-full border">Cancel</button>
                       <button onClick={()=>{
                         try{
                           const emailLower=currentUser.email.toLowerCase();
-                          setBuilders(prev=> prev.map(b=> (b.id===currentUser.id || (b.email && b.email.toLowerCase()===emailLower)) ? {...b, role: profileRoleTitleDraft.trim()||b.role, skills: profileSkillsDraft.trim()||b.skills } : b));
+                          setBuilders(prev=> prev.map(b=> (b.id===currentUser.id || (b.email && b.email.toLowerCase()===emailLower)) ? {...b, role: profileRoleTitleDraft.trim()||b.role, skills: profileSkillsDraft.trim()||b.skills, builderType: profileBuilderTypeDraft||b.builderType } : b));
                           try{
                             const buildersLS=JSON.parse(localStorage.getItem("startify_admin_builders")||"[]");
                             const bIdx=buildersLS.findIndex(b=> b.id===currentUser.id || (b.email && b.email.toLowerCase()===emailLower));
-                            if(bIdx>=0){ buildersLS[bIdx].role=profileRoleTitleDraft.trim()||buildersLS[bIdx].role; buildersLS[bIdx].skills=profileSkillsDraft.trim()||buildersLS[bIdx].skills; localStorage.setItem("startify_admin_builders", JSON.stringify(buildersLS)); dbService.saveBuilder(buildersLS[bIdx]); }
+                            if(bIdx>=0){ buildersLS[bIdx].role=profileRoleTitleDraft.trim()||buildersLS[bIdx].role; buildersLS[bIdx].skills=profileSkillsDraft.trim()||buildersLS[bIdx].skills; buildersLS[bIdx].builderType=profileBuilderTypeDraft||buildersLS[bIdx].builderType; localStorage.setItem("startify_admin_builders", JSON.stringify(buildersLS)); dbService.saveBuilder(buildersLS[bIdx]); }
                           }catch{}
                           const arr=JSON.parse(localStorage.getItem("startify_user_profiles")||"[]");
                           const pIdx=arr.findIndex(p=> p.email.toLowerCase()===emailLower && p.role===currentUser.role);
                           let profileToSave = null;
-                          if(pIdx>=0){ arr[pIdx].roleTitle=profileRoleTitleDraft.trim(); arr[pIdx].skills=profileSkillsDraft.trim(); localStorage.setItem("startify_user_profiles", JSON.stringify(arr)); profileToSave=arr[pIdx]; }
-                          else { profileToSave={ id: currentUser.id||currentUser.email, name: currentUser.name, email: emailLower, role: currentUser.role, roleTitle: profileRoleTitleDraft.trim(), skills: profileSkillsDraft.trim(), bio: currentUser.bio||"", createdAt: new Date().toISOString() }; }
-                          if(profileToSave) dbService.saveProfile({ ...profileToSave, roleTitle: profileRoleTitleDraft.trim(), skills: profileSkillsDraft.trim() });
-                          setCurrentUser({...currentUser, roleTitle: profileRoleTitleDraft.trim(), skills: profileSkillsDraft.trim()});
+                          if(pIdx>=0){ arr[pIdx].roleTitle=profileRoleTitleDraft.trim(); arr[pIdx].skills=profileSkillsDraft.trim(); arr[pIdx].builderType=profileBuilderTypeDraft; localStorage.setItem("startify_user_profiles", JSON.stringify(arr)); profileToSave=arr[pIdx]; }
+                          else { profileToSave={ id: currentUser.id||currentUser.email, name: currentUser.name, email: emailLower, role: currentUser.role, roleTitle: profileRoleTitleDraft.trim(), skills: profileSkillsDraft.trim(), builderType: profileBuilderTypeDraft, bio: currentUser.bio||"", createdAt: new Date().toISOString() }; }
+                          if(profileToSave) dbService.saveProfile({ ...profileToSave, roleTitle: profileRoleTitleDraft.trim(), skills: profileSkillsDraft.trim(), builderType: profileBuilderTypeDraft });
+                          setCurrentUser({...currentUser, roleTitle: profileRoleTitleDraft.trim(), skills: profileSkillsDraft.trim(), builderType: profileBuilderTypeDraft});
                           setProfileSkillsEditOpen(false);
-                          showToast("✓ Skills updated");
+                          showToast("✓ Builder profile updated");
                         }catch{ showToast("Failed"); }
                       }} className="h-9 px-5 rounded-full bg-slate-900 text-white text-sm font-bold">Save</button>
                     </div>
                   </>
                 ) : currentUser.role === "backer" ? (
                   <>
-                    <div className="text-sm font-bold">Edit focus</div>
-                    <input value={profileFocusDraft} onChange={e=> setProfileFocusDraft(e.target.value)} className="mt-2 w-full h-10 rounded-xl border border-slate-200 bg-slate-50 px-3 text-sm" />
+                    <div className="text-sm font-bold">Backer type & focus</div>
+                    <select value={profileBackerTypeDraft} onChange={e=> setProfileBackerTypeDraft(e.target.value)} className="mt-2 w-full h-10 rounded-xl border border-slate-200 bg-slate-50 px-3 text-sm outline-none">
+                      <option value="">Select backer type…</option>
+                      {BACKER_TYPES.map((t) => <option key={t.id} value={t.id}>{t.icon} {t.label} — {t.blurb}</option>)}
+                    </select>
+                    <input value={profileFocusDraft} onChange={e=> setProfileFocusDraft(e.target.value)} placeholder="Focus areas (e.g. EdTech, AI, SaaS)" className="mt-2 w-full h-10 rounded-xl border border-slate-200 bg-slate-50 px-3 text-sm" />
                     <div className="mt-3 flex justify-end gap-2">
                       <button onClick={()=> setProfileSkillsEditOpen(false)} className="h-9 px-4 rounded-full border">Cancel</button>
                       <button onClick={()=>{
@@ -3056,12 +3054,12 @@ export default function App() {
                           const arr=JSON.parse(localStorage.getItem("startify_user_profiles")||"[]");
                           const idx=arr.findIndex(p=> p.email.toLowerCase()===currentUser.email.toLowerCase() && p.role===currentUser.role);
                           let profileToSave = null;
-                          if(idx>=0){ arr[idx].focus=profileFocusDraft.trim(); localStorage.setItem("startify_user_profiles", JSON.stringify(arr)); profileToSave=arr[idx]; }
-                          else { profileToSave={ id: currentUser.id||currentUser.email, name: currentUser.name, email: currentUser.email.toLowerCase(), role: currentUser.role, focus: profileFocusDraft.trim(), bio: currentUser.bio||"", createdAt: new Date().toISOString() }; }
-                          if(profileToSave) dbService.saveProfile({ ...profileToSave, focus: profileFocusDraft.trim() });
-                          setCurrentUser({...currentUser, focus: profileFocusDraft.trim()});
+                          if(idx>=0){ arr[idx].focus=profileFocusDraft.trim(); arr[idx].backerType=profileBackerTypeDraft; localStorage.setItem("startify_user_profiles", JSON.stringify(arr)); profileToSave=arr[idx]; }
+                          else { profileToSave={ id: currentUser.id||currentUser.email, name: currentUser.name, email: currentUser.email.toLowerCase(), role: currentUser.role, focus: profileFocusDraft.trim(), backerType: profileBackerTypeDraft, bio: currentUser.bio||"", createdAt: new Date().toISOString() }; }
+                          if(profileToSave) dbService.saveProfile({ ...profileToSave, focus: profileFocusDraft.trim(), backerType: profileBackerTypeDraft });
+                          setCurrentUser({...currentUser, focus: profileFocusDraft.trim(), backerType: profileBackerTypeDraft});
                           setProfileSkillsEditOpen(false);
-                          showToast("✓ Focus updated");
+                          showToast("✓ Backer profile updated");
                         }catch{ showToast("Failed"); }
                       }} className="h-9 px-5 rounded-full bg-slate-900 text-white text-sm font-bold">Save</button>
                     </div>
@@ -3292,28 +3290,31 @@ export default function App() {
               {authMode === "register" && (
                 <div>
                   <label className="block text-[12px] font-semibold text-slate-700 mb-1.5">
-                    Choose your role — <span className="font-normal text-slate-500">one role per student</span> *
+                    Choose your role(s) — <span className="font-normal text-slate-500">select one or more</span> *
                   </label>
                   <div className="grid grid-cols-1 min-[420px]:grid-cols-3 gap-1.5 sm:gap-2">
                     {[
                       ["founder", "Founder", "Post ideas"],
                       ["talent", "Builder", "Lend your skills"],
                       ["backer", "Backer", "Mentor & back"],
-                    ].map(([role, label, sub]) => (
+                    ].map(([role, label, sub]) => {
+                      const active = selectedRegisterRoles.includes(role);
+                      return (
                       <button
                         key={role}
                         type="button"
-                        onClick={() => setSelectedRegisterRole(role)}
+                        onClick={() => toggleRegisterRole(role)}
                         className={`p-2.5 sm:p-4 rounded-2xl border text-center transition flex flex-col items-center justify-center gap-1 min-h-[68px] sm:min-h-[74px] w-full max-w-full overflow-hidden ${
-                          selectedRegisterRole === role
+                          active
                             ? "bg-slate-900 border-slate-900 shadow-lg scale-[1.02]"
                             : "bg-slate-50 border-slate-300 hover:border-slate-400 hover:bg-white shadow-sm"
                         }`}
                       >
-                        <span style={{ color: selectedRegisterRole === role ? "#fff" : "#0f172a" }} className="text-[11px] sm:text-[13px] font-bold leading-none break-words">{label}</span>
-                        <span style={{ color: selectedRegisterRole === role ? "rgba(255,255,255,0.85)" : "#475569" }} className="text-[9px] sm:text-[11px] leading-none break-words font-medium">{sub}</span>
+                        <span style={{ color: active ? "#fff" : "#0f172a" }} className="text-[11px] sm:text-[13px] font-bold leading-none break-words">{active ? "✓ " : ""}{label}</span>
+                        <span style={{ color: active ? "rgba(255,255,255,0.85)" : "#475569" }} className="text-[9px] sm:text-[11px] leading-none break-words font-medium">{sub}</span>
                       </button>
-                    ))}
+                      );
+                    })}
                   </div>
                 </div>
               )}
@@ -3410,67 +3411,13 @@ export default function App() {
                 )}
               </div>
 
-              {authMode === "register" && selectedRegisterRole === "backer" && (
-                <div className="rounded-2xl border border-violet-200 bg-violet-50/60 p-4 space-y-3">
-                  <div>
-                    <label className="block text-[12px] font-semibold text-slate-700 mb-1.5">
-                      What kind of backer are you? *
-                    </label>
-                    <div className="grid grid-cols-1 min-[420px]:grid-cols-2 gap-1.5">
-                      {BACKER_TYPES.map((t) => (
-                        <button
-                          key={t.id}
-                          type="button"
-                          onClick={() => setAuthForm({ ...authForm, backerType: t.id })}
-                          className={`p-2.5 rounded-xl border text-left transition ${
-                            authForm.backerType === t.id
-                              ? "bg-slate-900 text-white border-slate-900 shadow"
-                              : "bg-white text-slate-800 border-slate-200 hover:border-violet-300"
-                          }`}
-                        >
-                          <div className="text-[12px] font-bold leading-tight">{t.icon} {t.label}</div>
-                          <div className={`mt-0.5 text-[10.5px] leading-4 ${authForm.backerType === t.id ? "text-white/75" : "text-slate-500"}`}>{t.blurb}</div>
-                        </button>
-                      ))}
-                    </div>
-                  </div>
-                  <div>
-                    <label className="block text-[12px] font-semibold text-slate-700 mb-1">
-                      What do you offer? *
-                    </label>
-                    <input
-                      required
-                      value={authForm.backerOffer}
-                      onChange={(e) => setAuthForm({ ...authForm, backerOffer: e.target.value })}
-                      placeholder="e.g. 1 hr/week product reviews + alumni intros"
-                      className="w-full h-11 rounded-full bg-white border border-slate-200 px-4 text-[13px] text-slate-800 outline-none focus:border-violet-300 focus:ring-2 focus:ring-violet-100"
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-[12px] font-semibold text-slate-700 mb-1">
-                      Capacity / commitment
-                    </label>
-                    <input
-                      value={authForm.backerCapacity}
-                      onChange={(e) => setAuthForm({ ...authForm, backerCapacity: e.target.value })}
-                      placeholder="e.g. 1 hr/week · ₹50k · AWS credits · 500 students reach"
-                      className="w-full h-11 rounded-full bg-white border border-slate-200 px-4 text-[13px] text-slate-800 outline-none focus:border-violet-300 focus:ring-2 focus:ring-violet-100"
-                    />
-                  </div>
-                </div>
-              )}
-
               <button
                 type="submit"
                 disabled={authLoading}
                 className="w-full h-12 rounded-full bg-slate-900 text-white font-bold text-[14px] hover:bg-black transition shadow-md disabled:opacity-50"
               >
-                {authLoading ? "Please wait..." : authMode === "signin" ? "Sign In & Continue →" : `Create ${selectedRegisterRole.toUpperCase()} Account →`}
+                {authLoading ? "Please wait..." : authMode === "signin" ? "Sign In & Continue →" : `Create Account (${selectedRegisterRoles.map(r => ROLE_META[r]?.label || r).join(" + ")}) →`}
               </button>
-              <div className="rounded-2xl border border-slate-900 bg-white p-3 flex items-start gap-2.5 shadow-sm">
-                <span className="h-6 w-6 rounded-full bg-emerald-500 text-white grid place-items-center text-[11px] shrink-0">✓</span>
-                <div className="text-[11px] leading-4 text-slate-900"><strong className="text-black">Verified community</strong> — connect and collaborate with confidence.</div>
-              </div>
               <p className="text-center text-[11px] text-slate-400">Be respectful — misuse leads to removal. Ecosystem workflow guides every collaboration.</p>
             </form>
             </div>
@@ -3519,32 +3466,6 @@ export default function App() {
 
               <div>
                 <label className="block text-[12px] font-semibold text-slate-600 mb-1">
-                  What are you looking for? *
-                </label>
-                <div className="grid grid-cols-2 gap-2 p-1 bg-slate-100 rounded-full border border-slate-200 text-xs font-semibold text-center">
-                  <button
-                    type="button"
-                    onClick={() => setNewIdeaForm({ ...newIdeaForm, lookingFor: "team" })}
-                    className={`py-2 rounded-full transition ${
-                      newIdeaForm.lookingFor !== "funding" ? "bg-slate-900 text-white font-bold shadow-sm" : "text-slate-500"
-                    }`}
-                  >
-                    👥 Team
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => setNewIdeaForm({ ...newIdeaForm, lookingFor: "funding" })}
-                    className={`py-2 rounded-full transition ${
-                      newIdeaForm.lookingFor === "funding" ? "bg-slate-900 text-white font-bold shadow-sm" : "text-slate-500"
-                    }`}
-                  >
-                    💰 Funding
-                  </button>
-                </div>
-              </div>
-
-              <div>
-                <label className="block text-[12px] font-semibold text-slate-600 mb-1">
                   What level is this idea at? *
                 </label>
                 <div className="space-y-1.5">
@@ -3566,31 +3487,11 @@ export default function App() {
                 </div>
               </div>
 
-              {newIdeaForm.lookingFor === "funding" && (
-                <div>
-                  <label className="block text-[12px] font-semibold text-slate-600 mb-1">
-                    Funding goal (₹) *
-                  </label>
-                  <input
-                    required
-                    type="number"
-                    min="100"
-                    step="100"
-                    value={newIdeaForm.goalAmount}
-                    onChange={(e) => setNewIdeaForm({ ...newIdeaForm, goalAmount: e.target.value })}
-                    placeholder="e.g. 50000"
-                    className="w-full h-11 rounded-full bg-slate-50 border border-slate-200 px-4 text-[13px] text-slate-800 outline-none focus:border-slate-400"
-                  />
-                  <p className="mt-1.5 text-[11px] leading-4 text-slate-500">Anyone on Startify can donate toward this goal once approved.</p>
-                </div>
-              )}
-
               <div>
                 <label className="block text-[12px] font-semibold text-slate-600 mb-1">
-                  Demo / prototype link {newIdeaForm.lookingFor === "funding" ? "*" : <span className="font-normal text-slate-400">(optional)</span>}
+                  Demo / prototype link <span className="font-normal text-slate-400">(optional)</span>
                 </label>
                 <input
-                  required={newIdeaForm.lookingFor === "funding"}
                   type="url"
                   value={newIdeaForm.demoUrl}
                   onChange={(e) => setNewIdeaForm({ ...newIdeaForm, demoUrl: e.target.value })}
@@ -3615,7 +3516,6 @@ export default function App() {
                   </select>
                 </div>
 
-                {newIdeaForm.lookingFor !== "funding" && (
                 <div>
                   <label className="block text-[12px] font-semibold text-slate-600 mb-1">
                     Seeking Role
@@ -3631,7 +3531,6 @@ export default function App() {
                     <option>Pre-Seed Backer</option>
                   </select>
                 </div>
-                )}
               </div>
 
               <div>
@@ -3807,77 +3706,6 @@ export default function App() {
                 Send Request →
               </button>
             </form>
-          </div>
-        </div>
-      )}
-
-      {/* MODAL 3B: DONATE TO A FUNDING IDEA (any logged-in user) */}
-      {donateModalOpen && targetDonateIdea && (
-        <div className="fixed inset-0 z-50 grid place-items-center p-4">
-          <div
-            className="absolute inset-0 bg-black/85 backdrop-blur-md"
-            onClick={() => setDonateModalOpen(false)}
-          />
-          <div className="relative w-full max-w-[440px] max-h-[90dvh] overflow-y-auto rounded-[28px] bg-white border border-slate-200 shadow-2xl p-5 sm:p-8 text-slate-800">
-            <div className="flex items-center justify-between border-b border-slate-200 pb-4">
-              <div className="min-w-0">
-                <div className="font-heading font-extrabold text-[20px] truncate">
-                  Donate to {targetDonateIdea.title}
-                </div>
-                <div className="text-[12px] text-slate-500 mt-0.5">
-                  By {targetDonateIdea.founder} • Donating as <strong>{currentUser?.name}</strong>
-                </div>
-              </div>
-              <button
-                onClick={() => setDonateModalOpen(false)}
-                className="h-8 w-8 shrink-0 rounded-full border border-slate-200 grid place-items-center text-slate-500 hover:text-slate-800"
-              >
-                ✕
-              </button>
-            </div>
-
-            <div className="mt-5 space-y-4">
-              <FundingBar idea={targetDonateIdea} raised={raisedForIdea(targetDonateIdea)} donorCount={donorsForIdea(targetDonateIdea.id).length} />
-              <div>
-                <label className="block text-[12px] font-semibold text-slate-600 mb-1">
-                  Amount (₹) *
-                </label>
-                <div className="flex flex-wrap gap-2 mb-2">
-                  {[100, 500, 1000, 5000].map((amt) => (
-                    <button
-                      key={amt}
-                      type="button"
-                      onClick={() => setDonateAmount(String(amt))}
-                      className={`h-9 px-4 rounded-full text-[12px] font-bold border transition ${
-                        donateAmount === String(amt)
-                          ? "bg-slate-900 text-white border-slate-900"
-                          : "bg-white text-slate-700 border-slate-200 hover:border-slate-400"
-                      }`}
-                    >
-                      {fmtINR(amt)}
-                    </button>
-                  ))}
-                </div>
-                <input
-                  required
-                  type="number"
-                  min="10"
-                  step="10"
-                  value={donateAmount}
-                  onChange={(e) => setDonateAmount(e.target.value)}
-                  placeholder="Custom amount (min ₹10)"
-                  className="w-full h-11 rounded-full bg-slate-50 border border-slate-200 px-4 text-[13px] text-slate-800 outline-none focus:border-slate-400"
-                />
-              </div>
-              <button
-                onClick={handleDonateSubmit}
-                disabled={donateLoading}
-                className="w-full h-12 rounded-full bg-slate-900 text-white font-bold text-[14px] hover:bg-slate-800 transition disabled:opacity-50"
-              >
-                {donateLoading ? "Processing..." : `Donate ${donateAmount ? fmtINR(donateAmount) : ""} →`}
-              </button>
-              <p className="text-center text-[11px] text-slate-400">Secured via Razorpay. 100% goes to the founder.</p>
-            </div>
           </div>
         </div>
       )}
