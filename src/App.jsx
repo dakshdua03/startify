@@ -289,6 +289,10 @@ export default function App() {
   const [showAllBuilders, setShowAllBuilders] = useState(false);
   const [showAllFunders, setShowAllFunders] = useState(false);
   const [showAllIdeas, setShowAllIdeas] = useState(false);
+  const [homeIdeaCategory, setHomeIdeaCategory] = useState("All");
+  const [homeIdeaSearch, setHomeIdeaSearch] = useState("");
+  const [contactForm, setContactForm] = useState({ name: "", email: "", message: "" });
+  const [contactSent, setContactSent] = useState(false);
   const ideasScrollRef = useRef(null);
   const ideasScrollRefSignedIn = useRef(null);
   const catScrollRef = useRef(null);
@@ -1460,14 +1464,22 @@ export default function App() {
 
           {/* Header Action — Profile adjacent to Sign out on top, tab bar moved to bottom */}
 
-          <div className="hidden md:flex items-center gap-3 shrink-0">
+          <div className="hidden md:flex items-center gap-2.5 shrink-0">
             {!currentUser ? (
-              <button
-                onClick={() => { setAuthMode("signin"); setAuthModalOpen(true); }}
-                className="h-10 px-5 rounded-full border border-slate-200 bg-white text-slate-700 font-semibold text-[12.5px] hover:bg-slate-50 shadow-sm transition whitespace-nowrap"
-              >
-                Sign in
-              </button>
+              <>
+                <button
+                  onClick={() => { setAuthMode("signin"); setAuthModalOpen(true); }}
+                  className="h-10 px-5 rounded-full border-2 border-slate-900 bg-white text-slate-900 font-bold text-[13px] hover:bg-slate-100 shadow-sm transition whitespace-nowrap"
+                >
+                  Log in
+                </button>
+                <button
+                  onClick={() => { setSelectedRegisterRoles(["founder"]); setAuthMode("register"); setAuthModalOpen(true); }}
+                  className="h-10 px-6 rounded-full bg-gradient-to-r from-indigo-600 to-violet-600 text-white font-extrabold text-[13px] hover:from-indigo-700 hover:to-violet-700 shadow-md shadow-indigo-200 transition whitespace-nowrap"
+                >
+                  Sign up →
+                </button>
+              </>
             ) : (
               <div className="flex items-center gap-2 whitespace-nowrap">
                 <button
@@ -1495,12 +1507,33 @@ export default function App() {
             )}
           </div>
 
-          {/* Mobile: name itself is profile button + Sign out on top */}
-          <div className="md:hidden flex items-center gap-2 shrink-0">
-            {currentUser && <><button onClick={() => { setPopupEditId(null); setProfilePopupOpen(true); }} title="Switch profile / quick edit" className="h-9 px-3 rounded-full bg-white border border-slate-200 text-slate-800 text-xs font-bold whitespace-nowrap max-w-[110px] truncate">{currentUser.name.split(" ")[0]}</button><button onClick={() => { setCurrentUser(null); setActiveTab("home"); showToast("Signed out"); }} className="h-9 px-3 rounded-full bg-slate-900 text-white text-xs font-bold whitespace-nowrap">Sign out</button></>}
+          {/* Mobile: bold Log in + Sign up for visitors; profile + Sign out when signed in */}
+          <div className="md:hidden flex items-center gap-1.5 shrink-0">
+            {!currentUser ? (
+              <>
+                <button
+                  onClick={() => { setAuthMode("signin"); setAuthModalOpen(true); }}
+                  className="h-9 px-3 rounded-full border-2 border-slate-900 bg-white text-slate-900 text-xs font-bold whitespace-nowrap"
+                >
+                  Log in
+                </button>
+                <button
+                  onClick={() => { setSelectedRegisterRoles(["founder"]); setAuthMode("register"); setAuthModalOpen(true); }}
+                  className="h-9 px-3.5 rounded-full bg-gradient-to-r from-indigo-600 to-violet-600 text-white text-xs font-extrabold shadow-sm whitespace-nowrap"
+                >
+                  Sign up
+                </button>
+              </>
+            ) : (
+              <>
+                <button onClick={() => { setPopupEditId(null); setProfilePopupOpen(true); }} title="Switch profile / quick edit" className="h-9 px-3 rounded-full bg-white border border-slate-200 text-slate-800 text-xs font-bold whitespace-nowrap max-w-[110px] truncate">{currentUser.name.split(" ")[0]}</button>
+                <button onClick={() => { setCurrentUser(null); setActiveTab("home"); showToast("Signed out"); }} className="h-9 px-3 rounded-full bg-slate-900 text-white text-xs font-bold whitespace-nowrap">Sign out</button>
+              </>
+            )}
             <button
               onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
-              className="h-10 w-10 rounded-full border border-slate-200 bg-white grid place-items-center text-slate-700 shadow-sm shrink-0"
+              className="h-9 w-9 rounded-full border border-slate-200 bg-white grid place-items-center text-slate-700 shadow-sm shrink-0"
+              aria-label="Toggle menu"
             >
               {mobileMenuOpen ? "✕" : "☰"}
             </button>
@@ -1516,7 +1549,7 @@ export default function App() {
               {showTalentTab && <button onClick={() => { setActiveTab("talent"); setMobileMenuOpen(false); }} className={`block w-full text-left py-2 px-3 rounded-xl ${activeTab === "talent" ? "bg-slate-900 text-white" : "text-slate-700"}`}>Skilled Talent</button>}
               {showBackersTab && <button onClick={() => { setActiveTab("backers"); setMobileMenuOpen(false); }} className={`block w-full text-left py-2 px-3 rounded-xl ${activeTab === "backers" ? "bg-slate-900 text-white" : "text-slate-700"}`}>Backers Hub</button>}
               {showEventsTab && <button onClick={() => { setActiveTab("events"); setMobileMenuOpen(false); }} className={`block w-full text-left py-2 px-3 rounded-xl ${activeTab === "events" ? "bg-slate-900 text-white" : "text-slate-700"}`}>Events & Meetups</button>}
-              <button onClick={() => { setActiveTab("chats"); setMobileMenuOpen(false); }} className={`block w-full text-left py-2 px-3 rounded-xl font-bold ${activeTab === "chats" ? "bg-slate-900 text-white" : "text-slate-700"}`}>Chats {myIncomingRequests.filter(r=>r.status==="pending").length>0 && <span className="ml-1 inline-block h-2 w-2 rounded-full bg-emerald-500"></span>} {myAcceptedConnections.length>0 && <span className="ml-1 text-xs bg-slate-200 px-1.5 py-0.5 rounded-full">{myAcceptedConnections.length}</span>}</button>
+              <button onClick={() => { setActiveTab("dashboard"); setMobileMenuOpen(false); }} className={`block w-full text-left py-2 px-3 rounded-xl font-bold ${activeTab === "dashboard" ? "bg-slate-900 text-white" : "text-slate-700"}`}>Dashboard & Chats {myIncomingRequests.filter(r=>r.status==="pending").length>0 && <span className="ml-1 inline-block h-2 w-2 rounded-full bg-emerald-500"></span>} {myAcceptedConnections.length>0 && <span className="ml-1 text-xs bg-slate-200 text-slate-800 px-1.5 py-0.5 rounded-full">{myAcceptedConnections.length}</span>}</button>
               <button onClick={() => { setActiveTab("profile"); setMobileMenuOpen(false); }} className={`block w-full text-left py-2 px-3 rounded-xl ${activeTab === "profile" ? "bg-slate-900 text-white" : "text-slate-700"}`}>Profile</button>
             </>}
             {!currentUser && <button onClick={() => { setAuthMode("register"); setAuthModalOpen(true); setMobileMenuOpen(false); }} className="block w-full text-left py-2 px-3 rounded-xl bg-slate-900 text-white font-bold">Join Startify →</button>}
@@ -1524,112 +1557,201 @@ export default function App() {
         )}
       </nav>
 
-      {/* PUBLIC ENTRY: intentionally no ideas feed until the visitor chooses a role and joins. */}
-      {activeTab === "home" && !currentUser && (
-        <main className="mx-auto max-w-[1200px] px-4 sm:px-5 md:px-8 py-8 md:py-12 lg:py-16">
-          <div className="grid lg:grid-cols-[1.15fr_.85fr] gap-6 md:gap-10 items-start lg:items-stretch">
-            <div className="flex flex-col min-w-0">
-              <div className="inline-flex items-center gap-2 rounded-full border border-indigo-200 bg-indigo-50 px-3.5 py-1.5 text-xs text-indigo-700 font-bold shadow-sm">
-                <span className="h-2 w-2 rounded-full bg-indigo-600 animate-pulse" /> Connect • Build • Launch
-              </div>
-              <h1 className="font-heading mt-5 max-w-[720px] text-[32px] leading-[1.08] font-extrabold tracking-tight sm:text-[42px] md:text-[58px] text-slate-900 text-balance">
-                Find the people who can <span className="bg-gradient-to-r from-indigo-600 to-violet-600 bg-clip-text text-transparent">move your idea forward.</span>
-              </h1>
-              <div className="mt-6 rounded-[20px] bg-white border border-slate-200 shadow-sm p-5 md:p-6 max-w-[620px]">
-                <div className="text-[11px] font-bold uppercase tracking-widest text-slate-500">WHY STARTIFY</div>
-                <ul className="mt-3 space-y-2.5">
-                  {[
-                    "Open to everyone — UoH & beyond",
-                    "Direct founder → talent connect",
-                    "Chat after acceptance",
-                    /* Add more features here — one string per line */
-                  ].map((feature) => (
-                    <li key={feature} className="flex items-start gap-2.5 text-[14px] font-medium text-slate-700">
-                      <span className="mt-0.5 grid h-5 w-5 shrink-0 place-items-center rounded-full bg-emerald-100 text-[11px] font-bold text-emerald-700">✓</span>
-                      {feature}
-                    </li>
-                  ))}
-                </ul>
-              </div>
-              {/* Our belief — white card like the rest, no blue */}
-              <div className="mt-8 flex-1 rounded-[20px] bg-white p-5 md:p-6 border border-slate-200 shadow-sm overflow-hidden relative flex flex-col">
-                <div className="relative flex-1 flex flex-col justify-center">
-                  <blockquote className="font-heading mt-3 text-[20px] sm:text-[22px] md:text-[26px] font-extrabold leading-tight tracking-tight text-slate-900">“If you can think it, you can build it.”</blockquote>
-                  <p className="mt-2 text-[13px] leading-6 text-slate-600">A platform that connects ideas with people, and people with purpose — where every idea gets space to be built, tested, and launched.</p>
+      {/* PUBLIC ENTRY: Bold auth CTAs + Shining Ideas first + How to use below + Contact Me at bottom */}
+      {activeTab === "home" && !currentUser && (() => {
+        const publicIdeas = [...ideas]
+          .filter((i) => i && i.status !== "Rejected")
+          .sort((a, b) => {
+            const getTime = (x) =>
+              x.created_at?.seconds
+                ? x.created_at.seconds * 1000
+                : x.created_at?.toMillis
+                  ? x.created_at.toMillis()
+                  : Date.parse(x.createdDate || 0) || Number((x.id || "").split("_")[1] || 0);
+            return getTime(b) - getTime(a);
+          });
+        const homeCategories = ["All", ...Array.from(new Set(publicIdeas.map((i) => i.category).filter(Boolean)))];
+        const homeFilteredIdeas = publicIdeas.filter((idea) => {
+          const matchesCat = homeIdeaCategory === "All" || idea.category === homeIdeaCategory;
+          const q = homeIdeaSearch.trim().toLowerCase();
+          const matchesQ =
+            !q ||
+            (idea.title || "").toLowerCase().includes(q) ||
+            (idea.desc || "").toLowerCase().includes(q) ||
+            (idea.founder || "").toLowerCase().includes(q) ||
+            (idea.category || "").toLowerCase().includes(q);
+          return matchesCat && matchesQ;
+        });
+
+        const handleHomeContactSubmit = (e) => {
+          e.preventDefault();
+          if (!contactForm.name.trim() || !contactForm.email.trim() || !contactForm.message.trim()) {
+            showToast("Please fill in your name, email/contact, and message.");
+            return;
+          }
+          try {
+            const existing = JSON.parse(localStorage.getItem("startify_contact_inquiries") || "[]");
+            existing.unshift({
+              id: `contact_${Date.now()}`,
+              ...contactForm,
+              createdAt: new Date().toISOString(),
+            });
+            localStorage.setItem("startify_contact_inquiries", JSON.stringify(existing));
+          } catch {}
+          setContactSent(true);
+          showToast("Message sent! Daksh will get back to you soon.");
+        };
+
+        return (
+        <main className="mx-auto max-w-[1200px] px-4 sm:px-5 md:px-8 py-8 md:py-12">
+          {/* 1. HERO — Bold one-click Sign Up & Log In right on arrival */}
+          <section className="rounded-[28px] border border-slate-200 bg-white p-6 sm:p-8 md:p-10 shadow-sm">
+            <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-6">
+              <div className="max-w-[700px]">
+                <div className="inline-flex items-center gap-2 rounded-full border border-indigo-200 bg-indigo-50 px-3.5 py-1.5 text-xs text-indigo-700 font-bold shadow-sm">
+                  <span className="h-2 w-2 rounded-full bg-indigo-600 animate-pulse" /> Connect • Build • Launch
                 </div>
+                <h1 className="font-heading mt-4 text-[30px] leading-[1.08] font-extrabold tracking-tight sm:text-[42px] md:text-[52px] text-slate-900 text-balance">
+                  Find the people who can <span className="bg-gradient-to-r from-indigo-600 to-violet-600 bg-clip-text text-transparent">move your idea forward.</span>
+                </h1>
+                <p className="mt-3 text-[15px] leading-6 text-slate-600 max-w-[600px]">
+                  Explore live startup ideas from UoH & beyond, team up with builders, or back promising founders — start in one click.
+                </p>
+                <div className="mt-6 flex flex-wrap items-center gap-3">
+                  <button
+                    onClick={() => { setSelectedRegisterRoles(["founder"]); setAuthMode("register"); setAuthModalOpen(true); }}
+                    className="h-12 px-7 rounded-full bg-gradient-to-r from-indigo-600 to-violet-600 text-white font-extrabold text-[15px] hover:from-indigo-700 hover:to-violet-700 transition shadow-lg shadow-indigo-200 whitespace-nowrap"
+                  >
+                    Sign up free →
+                  </button>
+                  <button
+                    onClick={() => { setAuthMode("signin"); setAuthModalOpen(true); }}
+                    className="h-12 px-7 rounded-full border-2 border-slate-900 bg-white text-slate-900 font-bold text-[15px] hover:bg-slate-100 transition shadow-sm whitespace-nowrap"
+                  >
+                    Log in
+                  </button>
+                  <button
+                    onClick={() => { setSelectedRegisterRoles(["founder"]); setAuthMode("register"); setAuthModalOpen(true); }}
+                    className="h-12 px-5 rounded-full border border-slate-200 bg-slate-50 text-slate-800 font-semibold text-[14px] hover:bg-slate-100 transition whitespace-nowrap"
+                  >
+                    + Post an idea
+                  </button>
+                </div>
+              </div>
+
+              <div className="flex flex-row lg:flex-col gap-3 shrink-0 flex-wrap">
+                <a href="#shining-ideas" className="rounded-2xl border border-slate-200 bg-slate-50 hover:bg-white hover:border-indigo-300 px-4 py-3 transition flex items-center justify-between gap-4 min-w-[180px]">
+                  <div>
+                    <div className="text-[11px] font-bold uppercase tracking-wider text-indigo-600">Live now</div>
+                    <div className="font-heading text-lg font-extrabold text-slate-900">{publicIdeas.length} Shining Ideas</div>
+                  </div>
+                  <span className="text-slate-400 font-bold">↓</span>
+                </a>
+                <a href="#how-it-works" className="rounded-2xl border border-slate-200 bg-slate-50 hover:bg-white hover:border-slate-300 px-4 py-3 transition flex items-center justify-between gap-4 min-w-[180px]">
+                  <div>
+                    <div className="text-[11px] font-bold uppercase tracking-wider text-slate-500">Guide</div>
+                    <div className="font-heading text-sm font-bold text-slate-800">How Startify works</div>
+                  </div>
+                  <span className="text-slate-400 font-bold">↓</span>
+                </a>
+                <a href="#contact-me" className="rounded-2xl border border-slate-200 bg-slate-50 hover:bg-white hover:border-emerald-300 px-4 py-3 transition flex items-center justify-between gap-4 min-w-[180px]">
+                  <div>
+                    <div className="text-[11px] font-bold uppercase tracking-wider text-emerald-600">Questions?</div>
+                    <div className="font-heading text-sm font-bold text-slate-800">Contact me</div>
+                  </div>
+                  <span className="text-slate-400 font-bold">↓</span>
+                </a>
               </div>
             </div>
-            <div className="flex flex-col gap-4 w-full max-w-full overflow-hidden">
-              <div className="role-choice-panel rounded-[28px] border border-slate-200 bg-white p-5 sm:p-7 shadow-sm flex flex-col w-full max-w-full overflow-hidden">
-                <div className="mb-4">
-                  <div className="text-xs font-bold uppercase tracking-[.16em] text-slate-500">Choose how you participate</div>
-                </div>
-                <div className="space-y-4">
-                  {[
-                    ["Founder", "Post and manage ideas", "Meet builders and backers.", "founder", "bg-white border-slate-200 hover:border-slate-300 hover:shadow-md shadow-sm"],
-                    ["Talent", "Build with ambitious teams", "Discover founder ideas that need your skills.", "talent", "bg-white border-slate-200 hover:border-sky-300 hover:shadow-md shadow-sm"],
-                    ["Backer", "Back promising people", "Browse ideas and the talent behind them.", "backer", "bg-white border-slate-200 hover:border-violet-300 hover:shadow-md shadow-sm"],
-                  ].map(([title, label, detail, role, cls]) => (
-                    <button key={role} onClick={() => { setSelectedRegisterRole(role); setAuthMode("register"); setAuthModalOpen(true); }} className={`group w-full rounded-2xl border p-4 sm:p-5 text-left transition ${cls}`}>
-                      <div className="min-w-0"><div className="font-heading text-[16px] font-bold text-slate-800">{title} <span className="ml-1 text-[12px] font-medium text-slate-500">— {label}</span></div><p className="mt-1 text-[13px] leading-5 text-slate-600">{detail}</p></div>
-                    </button>
-                  ))}
-                </div>
-              </div>
-              {/* Ecosystem workflow — separate card: compact & horizontal */}
-              <div className="flex-1 rounded-[28px] border border-slate-200 bg-white p-4 sm:p-5 shadow-sm w-full max-w-full overflow-hidden flex flex-col">
-                <div className="text-xs font-bold uppercase tracking-widest text-slate-500">Ecosystem workflow</div>
-                <div className="mt-3 grid grid-cols-1 sm:grid-cols-3 gap-3 sm:gap-4 flex-1 content-center">
-                  {[
-                    ["→", "Create account", "Pick a role — Founder, Builder or Backer."],
-                    ["→", "Send a request", "Pitch an idea or offer your skills."],
-                    ["→", "Get accepted & chat", "Chat unlocks after acceptance."],
-                  ].map(([n, t, d]) => (
-                    <div key={t} className="flex gap-2.5 text-xs sm:text-[13px] items-start"><span className="grid h-8 w-8 shrink-0 place-items-center rounded-xl text-sm font-bold text-black bg-white border border-slate-200 shadow-sm">{n}</span><div className="min-w-0"><div className="font-semibold text-slate-800 leading-tight">{t}</div><div className="text-slate-500 leading-4 text-[11px] sm:text-xs mt-0.5">{d}</div></div></div>
-                  ))}
-                </div>
-              </div>
-            </div>
-          </div>
-          {/* Ideas on home — one merged row, team + funding together */}
-          <section className="mt-8 min-w-0 max-w-full">
-            <div className="mb-4 flex items-end justify-between gap-4">
+          </section>
+
+          {/* 2. SHINING IDEAS ABOVE — Interactive showcase with search, category filters & direct action */}
+          <section id="shining-ideas" className="mt-8 min-w-0 max-w-full">
+            <div className="mb-4 flex flex-col sm:flex-row sm:items-end justify-between gap-4">
               <div>
-                <h2 className="font-heading mt-1 text-[22px] sm:text-[25px] font-extrabold text-slate-900">Ideas gaining momentum</h2>
+                <div className="text-[11px] font-bold uppercase tracking-widest text-indigo-600">SHINING IDEAS • LIVE ON STARTIFY</div>
+                <h2 className="font-heading mt-1 text-[24px] sm:text-[28px] font-extrabold text-slate-900">Ideas gaining momentum</h2>
               </div>
-              <div className="hidden sm:flex items-center gap-2 shrink-0">
-                <button onClick={()=> ideasScrollRef.current?.scrollBy({left:-320, behavior:'smooth'})} className="h-9 w-9 rounded-full bg-white border border-slate-200 grid place-items-center text-slate-700 hover:bg-slate-900 hover:text-white transition" aria-label="Previous">‹</button>
-                <button onClick={()=> ideasScrollRef.current?.scrollBy({left:320, behavior:'smooth'})} className="h-9 w-9 rounded-full bg-slate-900 text-white grid place-items-center hover:bg-black transition" aria-label="Next">›</button>
+              <div className="flex items-center gap-2 shrink-0">
+                <button
+                  onClick={() => { setSelectedRegisterRoles(["founder"]); setAuthMode("register"); setAuthModalOpen(true); }}
+                  className="h-9 px-4 rounded-full bg-slate-900 text-white text-xs font-bold hover:bg-black transition whitespace-nowrap"
+                >
+                  + Post your idea
+                </button>
+                <div className="hidden sm:flex items-center gap-1.5">
+                  <button onClick={() => ideasScrollRef.current?.scrollBy({ left: -340, behavior: "smooth" })} className="h-9 w-9 rounded-full bg-white border border-slate-200 grid place-items-center text-slate-700 hover:bg-slate-900 hover:text-white transition" aria-label="Previous">‹</button>
+                  <button onClick={() => ideasScrollRef.current?.scrollBy({ left: 340, behavior: "smooth" })} className="h-9 w-9 rounded-full bg-slate-900 text-white grid place-items-center hover:bg-black transition" aria-label="Next">›</button>
+                </div>
               </div>
             </div>
+
+            {/* Interactive search + category pills */}
+            <div className="mb-5 flex flex-col sm:flex-row gap-3 sm:items-center justify-between">
+              <div className="flex items-center gap-2 overflow-x-auto pb-1 scrollbar-hide" style={{ scrollbarWidth: "none" }}>
+                {homeCategories.map((cat) => (
+                  <button
+                    key={cat}
+                    onClick={() => setHomeIdeaCategory(cat)}
+                    className={`px-3.5 py-1.5 rounded-full text-xs font-bold whitespace-nowrap transition border ${
+                      homeIdeaCategory === cat
+                        ? "bg-slate-900 text-white border-slate-900 shadow-sm"
+                        : "bg-white text-slate-700 border-slate-200 hover:border-slate-400"
+                    }`}
+                  >
+                    {cat}
+                  </button>
+                ))}
+              </div>
+              <input
+                type="text"
+                value={homeIdeaSearch}
+                onChange={(e) => setHomeIdeaSearch(e.target.value)}
+                placeholder="Search ideas, founders, or topics..."
+                className="h-9 w-full sm:w-[260px] rounded-full border border-slate-200 bg-white px-4 text-xs text-slate-800 placeholder:text-slate-400 focus:outline-none focus:border-indigo-400 shadow-sm"
+              />
+            </div>
+
             <div className="flex items-center justify-between sm:hidden mb-3 gap-2">
               <div className="flex gap-2">
-                <button onClick={()=> ideasScrollRef.current?.scrollBy({left:-320, behavior:'smooth'})} className="h-8 w-8 rounded-full bg-white border border-slate-200 grid place-items-center text-slate-700">‹</button>
-                <button onClick={()=> ideasScrollRef.current?.scrollBy({left:320, behavior:'smooth'})} className="h-8 w-8 rounded-full bg-slate-900 text-white grid place-items-center">›</button>
+                <button onClick={() => ideasScrollRef.current?.scrollBy({ left: -320, behavior: "smooth" })} className="h-8 w-8 rounded-full bg-white border border-slate-200 grid place-items-center text-slate-700">‹</button>
+                <button onClick={() => ideasScrollRef.current?.scrollBy({ left: 320, behavior: "smooth" })} className="h-8 w-8 rounded-full bg-slate-900 text-white grid place-items-center">›</button>
               </div>
               <span className="text-[11px] text-slate-500">Swipe →</span>
             </div>
-             <div ref={ideasScrollRef} className="flex gap-5 min-w-0 w-full max-w-full overflow-x-auto snap-x snap-mandatory pb-2 scrollbar-hide scroll-smooth" style={{scrollbarWidth:'none'}}>
-               {[...ideas].filter(i=> i && i.status !== "Rejected").sort((a,b)=> {
-                 const getTime = (x)=> x.created_at?.seconds ? x.created_at.seconds*1000 : (x.created_at?.toMillis ? x.created_at.toMillis() : Date.parse(x.createdDate||0) || Number((x.id||'').split('_')[1]||0));
-                 return getTime(b) - getTime(a);
-               }).slice(0,12).map((idea) => (
-                  <article key={idea.id} className="snap-start flex-none w-[85%] sm:w-[calc(50%-10px)] lg:w-[calc(33.333%-14px)] rounded-[24px] border border-slate-200 bg-white p-6 shadow-sm flex flex-col h-[352px] overflow-hidden">
+
+            <div ref={ideasScrollRef} className="flex gap-5 min-w-0 w-full max-w-full overflow-x-auto snap-x snap-mandatory pb-2 scrollbar-hide scroll-smooth" style={{ scrollbarWidth: "none" }}>
+              {homeFilteredIdeas.slice(0, 12).map((idea) => (
+                <article key={idea.id} className="snap-start flex-none w-[85%] sm:w-[calc(50%-10px)] lg:w-[calc(33.333%-14px)] rounded-[24px] border border-slate-200 bg-white p-6 shadow-sm hover:shadow-md hover:border-indigo-200 transition flex flex-col h-[370px] overflow-hidden">
                   <div className="flex items-center gap-2 flex-wrap">
                     <span className="rounded-full bg-slate-100 px-3 py-1 text-[10px] font-bold text-slate-600">{idea.category}</span>
                     <span className="rounded-full bg-amber-50 border border-amber-200 px-3 py-1 text-[10px] font-bold text-amber-700 whitespace-nowrap">{ideaLevelMeta(idea.level).badge}</span>
                     {idea.demoUrl ? <DemoLink url={idea.demoUrl} className="text-[11px] font-bold text-indigo-600 hover:underline whitespace-nowrap" /> : null}
                   </div>
-                  <h3 className="font-heading mt-3 text-[18px] font-extrabold text-slate-800 line-clamp-2">{idea.title}</h3>
+                  <h3 className="font-heading mt-3 text-[18px] font-extrabold text-slate-900 line-clamp-2">{idea.title}</h3>
                   <p className="mt-1 text-[12px] font-medium text-slate-500 truncate">By {idea.founder}</p>
-                  <p className="mt-3 min-h-0 flex-1 overflow-y-auto text-[13px] leading-5 text-slate-600" style={{scrollbarWidth:'thin'}}>{idea.desc}</p>
-                 </article>
-               ))}
-             </div>
-              {ideas.length === 0 && <div className="mt-4 rounded-2xl border border-dashed border-slate-200 bg-white py-8 text-center text-sm text-slate-500">No ideas yet — be the first to post!</div>}
-            </section>
-          {/* Backer resources teaser — motivates join: capital, shoutouts, mentoring up for grabs */}
-          <section className="mt-8 min-w-0 max-w-full">
+                  <div className="mt-2">
+                    <LookingForPill idea={idea} />
+                  </div>
+                  <p className="mt-3 min-h-0 flex-1 overflow-y-auto text-[13px] leading-5 text-slate-600" style={{ scrollbarWidth: "thin" }}>{idea.desc}</p>
+                  <button
+                    onClick={() => { setSelectedRegisterRoles(["talent"]); setAuthMode("register"); setAuthModalOpen(true); }}
+                    className="mt-4 w-full h-10 rounded-full bg-slate-900 text-white text-xs font-bold hover:bg-indigo-600 transition shrink-0"
+                  >
+                    Connect & collaborate →
+                  </button>
+                </article>
+              ))}
+            </div>
+            {homeFilteredIdeas.length === 0 && (
+              <div className="mt-4 rounded-2xl border border-dashed border-slate-200 bg-white py-8 text-center text-sm text-slate-500">
+                {ideas.length === 0 ? "No ideas yet — be the first to post!" : "No ideas match that filter."}
+              </div>
+            )}
+          </section>
+
+          {/* 3. BACKER RESOURCES TEASER */}
+          <section className="mt-10 min-w-0 max-w-full">
             <div className="mb-4 flex items-end justify-between gap-4">
               <div>
                 <div className="text-[11px] font-bold uppercase tracking-widest text-violet-600">BACKER RESOURCES</div>
@@ -1637,10 +1759,10 @@ export default function App() {
               </div>
             </div>
             {backerResources.length === 0 ? (
-              <div className="rounded-2xl border border-dashed border-violet-200 bg-violet-50/50 py-8 text-center text-sm text-slate-500">Backers post live offers here — ₹1L cheques, 1M-follower shoutouts, 1:1 mentoring. Join to request one.</div>
+              <div className="rounded-2xl border border-dashed border-violet-200 bg-violet-50/50 py-8 text-center text-sm text-slate-500">Backers post live offers here — ₹1L cheques, 1M-follower shoutouts, 1:1 mentoring. Sign up to request one.</div>
             ) : (
-              <div className="flex gap-5 min-w-0 w-full max-w-full overflow-x-auto snap-x snap-mandatory pb-2 scrollbar-hide scroll-smooth" style={{scrollbarWidth:'none'}}>
-                {backerResources.slice(0,6).map((res) => (
+              <div className="flex gap-5 min-w-0 w-full max-w-full overflow-x-auto snap-x snap-mandatory pb-2 scrollbar-hide scroll-smooth" style={{ scrollbarWidth: "none" }}>
+                {backerResources.slice(0, 6).map((res) => (
                   <article key={res.id} className="snap-start flex-none w-[85%] sm:w-[calc(50%-10px)] lg:w-[calc(33.333%-14px)] rounded-[24px] border border-violet-200 bg-white p-6 shadow-sm flex flex-col h-[240px] overflow-hidden">
                     <div className="flex items-center gap-1.5 flex-wrap">
                       <span className="rounded-full bg-violet-100 border border-violet-200 px-2.5 py-0.5 text-[10px] font-bold text-violet-700">{backerTypeMeta(res.backerType).icon} {backerTypeMeta(res.backerType).label}</span>
@@ -1649,79 +1771,405 @@ export default function App() {
                     <h3 className="font-heading mt-3 text-[16px] font-extrabold text-slate-800 line-clamp-2">{res.title}</h3>
                     <p className="mt-1 text-[12px] font-medium text-slate-500 truncate">By {res.backerName}</p>
                     <p className="mt-2 min-h-0 flex-1 overflow-hidden text-[13px] leading-5 text-slate-600 line-clamp-3">{res.offer}{res.details ? ` — ${res.details}` : ""}</p>
-                    <button onClick={() => { setAuthMode("register"); setAuthModalOpen(true); }} className="mt-3 w-full h-10 rounded-full bg-slate-900 text-white text-[12px] font-bold hover:bg-black transition">Join to request →</button>
+                    <button onClick={() => { setSelectedRegisterRoles(["founder"]); setAuthMode("register"); setAuthModalOpen(true); }} className="mt-3 w-full h-10 rounded-full bg-slate-900 text-white text-[12px] font-bold hover:bg-black transition">Sign up to request →</button>
                   </article>
                 ))}
               </div>
             )}
           </section>
-           <div className="mt-6 flex justify-center">
-            <button
-              onClick={() => { setAuthMode("register"); setAuthModalOpen(true); }}
-              className="h-12 px-10 rounded-full bg-gradient-to-r from-indigo-600 to-violet-600 text-white font-bold text-[14px] hover:from-indigo-700 hover:to-violet-700 transition shadow-lg shadow-indigo-200"
-            >
-              Join Startify →
-            </button>
-          </div>
-        </main>
-      )}
 
-      {/* Signed-in Home is the shared community overview for every role. */}
-      {activeTab === "home" && currentUser && (
-        <main className="mx-auto max-w-[1200px] px-4 sm:px-5 py-8 md:px-8 md:py-12">
-          <div className="rounded-[24px] sm:rounded-[30px] border border-slate-200 bg-gradient-to-br from-white via-slate-50 to-slate-200 p-5 sm:p-7 shadow-sm md:p-10">
-            <div className="grid gap-8 lg:grid-cols-[1.3fr_.7fr] lg:items-end"><div><div className="inline-flex max-w-full flex-wrap items-center gap-1.5 rounded-full bg-indigo-50 border border-indigo-200 px-2.5 py-1 text-[10px] font-bold uppercase tracking-widest text-indigo-700 leading-4">University of Hyderabad<span className="hidden min-[420px]:inline"> • Started at UoH, open to all</span></div><h1 className="font-heading home-calligraphy mt-3 text-[28px] leading-[1.1] font-extrabold tracking-tight text-slate-800 sm:text-[34px] md:text-[46px] text-balance">Good to see you, {currentUser.name.split(" ")[0]}.</h1><p className="mt-3 max-w-[650px] text-[15px] leading-6 text-slate-600">Your community is actively connecting ideas, talent and support. Explore your dashboard for role-specific matches, or open Chats to continue a conversation.</p></div><div className="rounded-2xl border border-white/80 bg-white/70 p-5 shadow-sm"><div className="text-[11px] font-bold uppercase tracking-widest text-slate-500">MOTIVATION OF THE DAY</div><blockquote className="font-heading mt-3 text-[22px] font-bold leading-tight text-slate-800">“{dailyQuote.text}”</blockquote><div className="mt-2 text-[11px] text-slate-500 italic">— {dailyQuote.author}</div><div className="mt-3 h-1 w-12 rounded-full bg-slate-700" /></div></div>
-            <div className="mt-8 grid gap-4 sm:grid-cols-2 lg:grid-cols-4"><div className="rounded-2xl border border-slate-200 bg-white/80 p-5"><div className="text-[11px] font-bold uppercase tracking-wide text-slate-500">Live ideas</div><div className="font-heading mt-2 text-3xl font-extrabold text-slate-800">{ideas.length}</div><p className="mt-1 text-[11px] text-slate-500">Projects looking for momentum</p></div><div className="rounded-2xl border border-slate-200 bg-white/80 p-5"><div className="text-[11px] font-bold uppercase tracking-wide text-slate-500">Active people</div><div className="font-heading mt-2 text-3xl font-extrabold text-slate-800">{activePeopleCount}</div><p className="mt-1 text-[11px] text-slate-500">Unique people across the community</p></div><div className="rounded-2xl border border-slate-200 bg-white/80 p-5"><div className="text-[11px] font-bold uppercase tracking-wide text-slate-500">Connections made</div><div className="font-heading mt-2 text-3xl font-extrabold text-slate-800">{requests.filter((request) => request.status === "accepted").length}</div><p className="mt-1 text-[11px] text-slate-500">Conversations unlocked</p></div><div className="rounded-2xl border border-slate-200 bg-white/80 p-5"><div className="text-[11px] font-bold uppercase tracking-wide text-slate-500">Upcoming events</div><div className="font-heading mt-2 text-3xl font-extrabold text-slate-800">{events.length}</div><p className="mt-1 text-[11px] text-slate-500">Ways to meet the community</p></div></div>
-          </div>
-          <section className="mt-8"><div className="mb-4 flex items-end justify-between"><div><div className="text-[11px] font-bold uppercase tracking-widest text-slate-500">MARK YOUR CALENDAR</div><h2 className="font-heading mt-1 text-[22px] sm:text-[25px] font-extrabold text-slate-800" style={{color: '#0f172a'}}>Upcoming community events</h2></div><button onClick={() => setActiveTab("home")} className="text-xs font-bold text-slate-700 hover:underline">Go to Chats →</button></div><div className="grid gap-5 md:grid-cols-2">{events.map((event) => <article key={event.id} className="rounded-[24px] border border-slate-200 bg-white p-6 shadow-sm" style={{background: 'rgba(255,255,255,0.92)'}}><div className="flex items-center justify-between gap-3"><span className="rounded-full bg-slate-100 px-3 py-1 text-[10px] font-bold uppercase tracking-wide text-slate-600">{event.category}</span><span className="text-xs font-semibold text-slate-500">{event.date}</span></div><h3 className="font-heading mt-4 text-[19px] font-extrabold" style={{color: '#0f172a'}}>{event.title}</h3><p className="mt-2 text-[13px]" style={{color: '#475569'}}>{event.time} · {event.venue}</p><p className="mt-3 text-[13px] leading-5" style={{color: '#334155'}}>{event.desc}</p></article>)}</div></section>
-          <section className="mt-10 min-w-0 max-w-full">
-            <div className="mb-4 flex items-end justify-between gap-4">
-              <div>
-                <h2 className="font-heading mt-1 text-[22px] sm:text-[25px] font-extrabold text-slate-800">What the community is building</h2>
-              </div>
-              <div className="hidden sm:flex items-center gap-2 shrink-0">
-                <button onClick={()=> ideasScrollRefSignedIn.current?.scrollBy({left:-320, behavior:'smooth'})} className="h-9 w-9 rounded-full bg-white border border-slate-200 grid place-items-center text-slate-700 hover:bg-slate-900 hover:text-white" aria-label="Prev">‹</button>
-                <button onClick={()=> ideasScrollRefSignedIn.current?.scrollBy({left:320, behavior:'smooth'})} className="h-9 w-9 rounded-full bg-slate-900 text-white grid place-items-center hover:bg-black" aria-label="Next">›</button>
+          {/* 4. HOW TO USE THE PLATFORM (DOWN!) */}
+          <section id="how-it-works" className="mt-12 space-y-6">
+            <div>
+              <div className="text-[11px] font-bold uppercase tracking-widest text-slate-500">HOW TO USE STARTIFY</div>
+              <h2 className="font-heading mt-1 text-[22px] sm:text-[26px] font-extrabold text-slate-900">How the platform works</h2>
+            </div>
+
+            {/* 3-step workflow */}
+            <div className="rounded-[28px] border border-slate-200 bg-white p-5 sm:p-7 shadow-sm">
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
+                {[
+                  ["1", "Create your account", "Sign up in 30 seconds and pick your role — Founder, Talent (Builder), or Backer."],
+                  ["2", "Post or send a request", "Pitch your startup idea, offer your skills to a team, or request backer support."],
+                  ["3", "Get accepted & chat", "Once your connection request is accepted, direct chat unlocks to start building."],
+                ].map(([n, t, d]) => (
+                  <div key={t} className="flex gap-3.5 items-start">
+                    <span className="grid h-9 w-9 shrink-0 place-items-center rounded-xl text-sm font-extrabold text-white bg-slate-900 shadow-sm">{n}</span>
+                    <div className="min-w-0">
+                      <div className="font-heading font-bold text-slate-900 text-[15px]">{t}</div>
+                      <p className="text-slate-600 text-[13px] leading-5 mt-1">{d}</p>
+                    </div>
+                  </div>
+                ))}
               </div>
             </div>
+
+            <div className="grid lg:grid-cols-[1.1fr_.9fr] gap-6 items-stretch">
+              {/* Choose how you participate */}
+              <div className="role-choice-panel rounded-[28px] border border-slate-200 bg-white p-5 sm:p-7 shadow-sm flex flex-col">
+                <div className="mb-4 text-xs font-bold uppercase tracking-[.16em] text-slate-500">Choose how you participate</div>
+                <div className="space-y-3.5">
+                  {[
+                    ["Founder", "Post and manage ideas", "Meet builders and backers who can help you launch.", "founder", "bg-slate-50 border-slate-200 hover:border-indigo-300 hover:bg-white hover:shadow-md"],
+                    ["Talent", "Build with ambitious teams", "Discover founder ideas that need your coding, design, or growth skills.", "talent", "bg-slate-50 border-slate-200 hover:border-sky-300 hover:bg-white hover:shadow-md"],
+                    ["Backer", "Back promising people", "Browse ideas, mentor founders, and offer capital or reach.", "backer", "bg-slate-50 border-slate-200 hover:border-violet-300 hover:bg-white hover:shadow-md"],
+                  ].map(([title, label, detail, role, cls]) => (
+                    <button
+                      key={role}
+                      onClick={() => { setSelectedRegisterRoles([role]); setAuthMode("register"); setAuthModalOpen(true); }}
+                      className={`group w-full rounded-2xl border p-4 text-left transition flex items-center justify-between gap-4 ${cls}`}
+                    >
+                      <div className="min-w-0">
+                        <div className="font-heading text-[16px] font-bold text-slate-900">{title} <span className="ml-1 text-[12px] font-medium text-slate-500">— {label}</span></div>
+                        <p className="mt-1 text-[13px] leading-5 text-slate-600">{detail}</p>
+                      </div>
+                      <span className="shrink-0 text-xs font-bold text-indigo-600 group-hover:translate-x-0.5 transition">Join →</span>
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              {/* Why Startify + Our belief */}
+              <div className="flex flex-col gap-5">
+                <div className="rounded-[24px] bg-white border border-slate-200 shadow-sm p-5 sm:p-6">
+                  <div className="text-[11px] font-bold uppercase tracking-widest text-slate-500">WHY STARTIFY</div>
+                  <ul className="mt-3 space-y-2.5">
+                    {[
+                      "Open to everyone — UoH & beyond",
+                      "Direct founder → talent connect",
+                      "Chat unlocks after acceptance",
+                    ].map((feature) => (
+                      <li key={feature} className="flex items-start gap-2.5 text-[14px] font-medium text-slate-700">
+                        <span className="mt-0.5 grid h-5 w-5 shrink-0 place-items-center rounded-full bg-emerald-100 text-[11px] font-bold text-emerald-700">✓</span>
+                        {feature}
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+
+                <div className="flex-1 rounded-[24px] bg-white p-5 sm:p-6 border border-slate-200 shadow-sm flex flex-col justify-center">
+                  <blockquote className="font-heading text-[20px] sm:text-[23px] font-extrabold leading-tight tracking-tight text-slate-900">“If you can think it, you can build it.”</blockquote>
+                  <p className="mt-2 text-[13px] leading-6 text-slate-600">A platform that connects ideas with people, and people with purpose — where every idea gets space to be built, tested, and launched.</p>
+                </div>
+              </div>
+            </div>
+          </section>
+
+          {/* 5. CONTACT ME SECTION AT THE BOTTOM */}
+          <section id="contact-me" className="mt-12 rounded-[28px] border border-slate-200 bg-white p-6 sm:p-8 shadow-sm">
+            <div className="grid lg:grid-cols-[1fr_1.1fr] gap-8 items-start">
+              <div>
+                <div className="text-[11px] font-bold uppercase tracking-widest text-emerald-600">CONTACT ME</div>
+                <h2 className="font-heading mt-1 text-[24px] sm:text-[28px] font-extrabold text-slate-900">Want to reach out directly?</h2>
+                <p className="mt-2 text-[14px] leading-6 text-slate-600">
+                  Built by <strong className="text-slate-900">Daksh Dua</strong> (UoH Accelerator Lead). Whether you have an idea, feedback on the platform, or want to collaborate — drop a message here or ping me directly.
+                </p>
+
+                <div className="mt-6 space-y-3">
+                  <a
+                    href="mailto:startifyuoh@gmail.com"
+                    className="flex items-center justify-between rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 hover:bg-white hover:border-slate-300 transition"
+                  >
+                    <div>
+                      <div className="text-[11px] font-bold uppercase tracking-wider text-slate-500">Email</div>
+                      <div className="text-sm font-bold text-slate-900">startifyuoh@gmail.com</div>
+                    </div>
+                    <span className="text-xs font-bold text-indigo-600">Email →</span>
+                  </a>
+
+                  <a
+                    href="https://instagram.com/dakshdua03"
+                    target="_blank"
+                    rel="noreferrer"
+                    className="flex items-center justify-between rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 hover:bg-white hover:border-slate-300 transition"
+                  >
+                    <div>
+                      <div className="text-[11px] font-bold uppercase tracking-wider text-slate-500">Instagram</div>
+                      <div className="text-sm font-bold text-slate-900">@dakshdua03</div>
+                    </div>
+                    <span className="text-xs font-bold text-indigo-600">Message →</span>
+                  </a>
+
+                  <a
+                    href={MAIN_WHATSAPP_LINK}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="flex items-center justify-between rounded-2xl border border-emerald-200 bg-emerald-50/70 px-4 py-3 hover:bg-emerald-50 transition"
+                  >
+                    <div>
+                      <div className="text-[11px] font-bold uppercase tracking-wider text-emerald-700">Community</div>
+                      <div className="text-sm font-bold text-emerald-950">Startify WhatsApp Group</div>
+                    </div>
+                    <span className="text-xs font-bold text-emerald-700">Join →</span>
+                  </a>
+                </div>
+              </div>
+
+              <div className="rounded-2xl border border-slate-200 bg-slate-50 p-5 sm:p-6">
+                <div className="font-heading text-[17px] font-extrabold text-slate-900">Send a quick message</div>
+                <p className="text-xs text-slate-500 mt-1">No account needed — leave your details and I’ll reply.</p>
+                {contactSent ? (
+                  <div className="mt-5 rounded-2xl border border-emerald-200 bg-emerald-50 p-5 text-emerald-900">
+                    <div className="font-heading font-bold text-base">Message received!</div>
+                    <p className="text-xs mt-1 text-emerald-800">Thanks for reaching out, {contactForm.name}. You can also open your email app to send it directly.</p>
+                    <div className="mt-4 flex flex-wrap gap-2">
+                      <a
+                        href={`mailto:startifyuoh@gmail.com?subject=${encodeURIComponent(`Startify Contact from ${contactForm.name}`)}&body=${encodeURIComponent(`${contactForm.message}\n\nFrom: ${contactForm.name} (${contactForm.email})`)}`}
+                        className="h-9 px-4 rounded-full bg-emerald-600 text-white text-xs font-bold grid place-items-center hover:bg-emerald-700 transition"
+                      >
+                        Open in Email App →
+                      </a>
+                      <button
+                        type="button"
+                        onClick={() => { setContactForm({ name: "", email: "", message: "" }); setContactSent(false); }}
+                        className="h-9 px-4 rounded-full border border-emerald-300 bg-white text-emerald-900 text-xs font-bold hover:bg-emerald-100 transition"
+                      >
+                        Send another
+                      </button>
+                    </div>
+                  </div>
+                ) : (
+                  <form onSubmit={handleHomeContactSubmit} className="mt-4 space-y-3">
+                    <input
+                      type="text"
+                      value={contactForm.name}
+                      onChange={(e) => setContactForm((p) => ({ ...p, name: e.target.value }))}
+                      placeholder="Your name *"
+                      className="w-full h-10 rounded-xl border border-slate-200 bg-white px-3.5 text-sm text-slate-900 placeholder:text-slate-400 focus:outline-none focus:border-indigo-400"
+                    />
+                    <input
+                      type="text"
+                      value={contactForm.email}
+                      onChange={(e) => setContactForm((p) => ({ ...p, email: e.target.value }))}
+                      placeholder="Your email or phone *"
+                      className="w-full h-10 rounded-xl border border-slate-200 bg-white px-3.5 text-sm text-slate-900 placeholder:text-slate-400 focus:outline-none focus:border-indigo-400"
+                    />
+                    <textarea
+                      rows={3}
+                      value={contactForm.message}
+                      onChange={(e) => setContactForm((p) => ({ ...p, message: e.target.value }))}
+                      placeholder="What would you like to talk about? *"
+                      className="w-full rounded-xl border border-slate-200 bg-white p-3.5 text-sm text-slate-900 placeholder:text-slate-400 focus:outline-none focus:border-indigo-400 resize-none"
+                    />
+                    <button
+                      type="submit"
+                      className="w-full h-11 rounded-full bg-slate-900 text-white text-sm font-bold hover:bg-black transition shadow-sm"
+                    >
+                      Send Message →
+                    </button>
+                  </form>
+                )}
+              </div>
+            </div>
+          </section>
+        </main>
+        );
+      })()}
+
+      {/* Signed-in Home — same theme: quick actions + shining ideas first + backer offers + community pulse & events below */}
+      {activeTab === "home" && currentUser && (() => {
+        const signedInIdeas = [...ideas]
+          .filter((i) => i && i.status !== "Rejected")
+          .sort((a, b) => {
+            const getTime = (x) =>
+              x.created_at?.seconds
+                ? x.created_at.seconds * 1000
+                : x.created_at?.toMillis
+                  ? x.created_at.toMillis()
+                  : Date.parse(x.createdDate || 0) || Number((x.id || "").split("_")[1] || 0);
+            return getTime(b) - getTime(a);
+          });
+        const signedInCategories = ["All", ...Array.from(new Set(signedInIdeas.map((i) => i.category).filter(Boolean)))];
+        const signedInFilteredIdeas = signedInIdeas.filter((idea) => {
+          const matchesCat = homeIdeaCategory === "All" || idea.category === homeIdeaCategory;
+          const q = homeIdeaSearch.trim().toLowerCase();
+          const matchesQ =
+            !q ||
+            (idea.title || "").toLowerCase().includes(q) ||
+            (idea.desc || "").toLowerCase().includes(q) ||
+            (idea.founder || "").toLowerCase().includes(q) ||
+            (idea.category || "").toLowerCase().includes(q);
+          return matchesCat && matchesQ;
+        });
+        const pendingIncomingCount = myIncomingRequests.filter((r) => r.status === "pending").length;
+
+        return (
+        <main className="mx-auto max-w-[1200px] px-4 sm:px-5 py-8 md:px-8 md:py-10">
+          {/* 1. COMPACT WELCOME HERO + ONE-CLICK ACTIONS */}
+          <section className="rounded-[28px] border border-slate-200 bg-white p-6 sm:p-8 shadow-sm">
+            <div className="grid gap-6 lg:grid-cols-[1.35fr_.65fr] lg:items-center">
+              <div>
+                <div className="flex flex-wrap items-center gap-2">
+                  <span className="inline-flex items-center gap-1.5 rounded-full bg-indigo-50 border border-indigo-200 px-3 py-1 text-[10px] font-bold uppercase tracking-widest text-indigo-700">
+                    {ROLE_META[currentUser.role]?.label || currentUser.role}
+                  </span>
+                  <span className="text-[11px] font-semibold text-slate-500">University of Hyderabad • Open to all</span>
+                </div>
+                <h1 className="font-heading mt-3 text-[28px] leading-[1.1] font-extrabold tracking-tight text-slate-900 sm:text-[36px] md:text-[44px] text-balance">
+                  Good to see you, <span className="bg-gradient-to-r from-indigo-600 to-violet-600 bg-clip-text text-transparent">{currentUser.name.split(" ")[0]}.</span>
+                </h1>
+                <p className="mt-2.5 max-w-[620px] text-[14.5px] leading-6 text-slate-600">
+                  Jump right into live ideas, connect with builders and backers, or check your messages.
+                </p>
+                <div className="mt-5 flex flex-wrap items-center gap-2.5">
+                  {currentUser.role === "founder" && (
+                    <button
+                      onClick={() => setIdeaModalOpen(true)}
+                      className="h-11 px-6 rounded-full bg-gradient-to-r from-indigo-600 to-violet-600 text-white font-extrabold text-sm hover:from-indigo-700 hover:to-violet-700 transition shadow-md shadow-indigo-200 whitespace-nowrap"
+                    >
+                      + Post an Idea
+                    </button>
+                  )}
+                  {currentUser.role === "backer" && (
+                    <button
+                      onClick={() => setResourceModalOpen(true)}
+                      className="h-11 px-6 rounded-full bg-gradient-to-r from-indigo-600 to-violet-600 text-white font-extrabold text-sm hover:from-indigo-700 hover:to-violet-700 transition shadow-md shadow-indigo-200 whitespace-nowrap"
+                    >
+                      + Post Backer Offer
+                    </button>
+                  )}
+                  <button
+                    onClick={() => setActiveTab("dashboard")}
+                    className={`h-11 px-6 rounded-full font-bold text-sm transition flex items-center gap-2 whitespace-nowrap ${
+                      currentUser.role === "talent" || currentUser.role === "admin"
+                        ? "bg-gradient-to-r from-indigo-600 to-violet-600 text-white hover:from-indigo-700 hover:to-violet-700 shadow-md shadow-indigo-200 font-extrabold"
+                        : "border-2 border-slate-900 bg-white text-slate-900 hover:bg-slate-100"
+                    }`}
+                  >
+                    <span>Dashboard & Chats</span>
+                    {pendingIncomingCount > 0 && (
+                      <span className="px-2 py-0.5 rounded-full bg-emerald-500 text-white text-[11px] font-extrabold">
+                        {pendingIncomingCount}
+                      </span>
+                    )}
+                  </button>
+                </div>
+              </div>
+
+              <div className="rounded-2xl border border-slate-200 bg-slate-50 p-5">
+                <div className="text-[11px] font-bold uppercase tracking-widest text-slate-500">MOTIVATION OF THE DAY</div>
+                <blockquote className="font-heading mt-2.5 text-[19px] sm:text-[21px] font-bold leading-snug text-slate-900">“{dailyQuote.text}”</blockquote>
+                <div className="mt-2 text-[11px] text-slate-500 italic">— {dailyQuote.author}</div>
+                <div className="mt-3 h-1 w-10 rounded-full bg-indigo-600" />
+              </div>
+            </div>
+          </section>
+
+          {/* 2. SHINING IDEAS FIRST — Interactive filter, search & direct Connect */}
+          <section className="mt-8 min-w-0 max-w-full">
+            <div className="mb-4 flex flex-col sm:flex-row sm:items-end justify-between gap-4">
+              <div>
+                <div className="text-[11px] font-bold uppercase tracking-widest text-indigo-600">SHINING IDEAS • LIVE ON STARTIFY</div>
+                <h2 className="font-heading mt-1 text-[23px] sm:text-[26px] font-extrabold text-slate-900">What the community is building</h2>
+              </div>
+              <div className="flex items-center gap-2 shrink-0">
+                {showIdeasTab && (
+                  <button
+                    onClick={() => setActiveTab("ideas")}
+                    className="h-9 px-4 rounded-full border border-slate-200 bg-white text-slate-800 text-xs font-bold hover:bg-slate-50 transition whitespace-nowrap"
+                  >
+                    Full Ideas Board →
+                  </button>
+                )}
+                <div className="hidden sm:flex items-center gap-1.5">
+                  <button onClick={() => ideasScrollRefSignedIn.current?.scrollBy({ left: -340, behavior: "smooth" })} className="h-9 w-9 rounded-full bg-white border border-slate-200 grid place-items-center text-slate-700 hover:bg-slate-900 hover:text-white transition" aria-label="Prev">‹</button>
+                  <button onClick={() => ideasScrollRefSignedIn.current?.scrollBy({ left: 340, behavior: "smooth" })} className="h-9 w-9 rounded-full bg-slate-900 text-white grid place-items-center hover:bg-black transition" aria-label="Next">›</button>
+                </div>
+              </div>
+            </div>
+
+            <div className="mb-5 flex flex-col sm:flex-row gap-3 sm:items-center justify-between">
+              <div className="flex items-center gap-2 overflow-x-auto pb-1 scrollbar-hide" style={{ scrollbarWidth: "none" }}>
+                {signedInCategories.map((cat) => (
+                  <button
+                    key={cat}
+                    onClick={() => setHomeIdeaCategory(cat)}
+                    className={`px-3.5 py-1.5 rounded-full text-xs font-bold whitespace-nowrap transition border ${
+                      homeIdeaCategory === cat
+                        ? "bg-slate-900 text-white border-slate-900 shadow-sm"
+                        : "bg-white text-slate-700 border-slate-200 hover:border-slate-400"
+                    }`}
+                  >
+                    {cat}
+                  </button>
+                ))}
+              </div>
+              <input
+                type="text"
+                value={homeIdeaSearch}
+                onChange={(e) => setHomeIdeaSearch(e.target.value)}
+                placeholder="Search ideas, founders, or topics..."
+                className="h-9 w-full sm:w-[260px] rounded-full border border-slate-200 bg-white px-4 text-xs text-slate-800 placeholder:text-slate-400 focus:outline-none focus:border-indigo-400 shadow-sm"
+              />
+            </div>
+
             <div className="flex sm:hidden items-center gap-2 mb-3">
-              <button onClick={()=> ideasScrollRefSignedIn.current?.scrollBy({left:-320, behavior:'smooth'})} className="h-8 w-8 rounded-full bg-white border border-slate-200 grid place-items-center">‹</button>
-              <button onClick={()=> ideasScrollRefSignedIn.current?.scrollBy({left:320, behavior:'smooth'})} className="h-8 w-8 rounded-full bg-slate-900 text-white grid place-items-center">›</button>
+              <button onClick={() => ideasScrollRefSignedIn.current?.scrollBy({ left: -320, behavior: "smooth" })} className="h-8 w-8 rounded-full bg-white border border-slate-200 grid place-items-center">‹</button>
+              <button onClick={() => ideasScrollRefSignedIn.current?.scrollBy({ left: 320, behavior: "smooth" })} className="h-8 w-8 rounded-full bg-slate-900 text-white grid place-items-center">›</button>
               <span className="text-[11px] text-slate-500">Swipe →</span>
             </div>
-             <div ref={ideasScrollRefSignedIn} className="flex gap-5 min-w-0 w-full max-w-full overflow-x-auto snap-x snap-mandatory pb-2 scroll-smooth" style={{scrollbarWidth:'none'}}>
-               {[...ideas].filter(i=> i && i.status !== "Rejected").sort((a,b)=> {
-                 const getTime = (x)=> x.created_at?.seconds ? x.created_at.seconds*1000 : (x.created_at?.toMillis ? x.created_at.toMillis() : Date.parse(x.createdDate||0) || Number((x.id||'').split('_')[1]||0));
-                 return getTime(b) - getTime(a);
-               }).slice(0,12).map((idea) => (
-                 <article key={idea.id} className="snap-start flex-none w-[85%] sm:w-[calc(50%-10px)] lg:w-[calc(33.333%-14px)] rounded-[24px] border border-slate-200 bg-white/85 p-6 shadow-sm flex flex-col h-[352px] overflow-hidden">
+
+            <div ref={ideasScrollRefSignedIn} className="flex gap-5 min-w-0 w-full max-w-full overflow-x-auto snap-x snap-mandatory pb-2 scroll-smooth" style={{ scrollbarWidth: "none" }}>
+              {signedInFilteredIdeas.slice(0, 12).map((idea) => (
+                <article key={idea.id} className="snap-start flex-none w-[85%] sm:w-[calc(50%-10px)] lg:w-[calc(33.333%-14px)] rounded-[24px] border border-slate-200 bg-white p-6 shadow-sm hover:shadow-md hover:border-indigo-200 transition flex flex-col h-[370px] overflow-hidden">
                   <div className="flex items-center gap-2 flex-wrap">
                     <span className="rounded-full bg-slate-100 px-3 py-1 text-[10px] font-bold text-slate-600">{idea.category}</span>
                     <span className="rounded-full bg-amber-50 border border-amber-200 px-3 py-1 text-[10px] font-bold text-amber-700 whitespace-nowrap">{ideaLevelMeta(idea.level).badge}</span>
                     {idea.demoUrl ? <DemoLink url={idea.demoUrl} className="text-[11px] font-bold text-indigo-600 hover:underline whitespace-nowrap" /> : null}
                   </div>
-                  <h3 className="font-heading mt-4 text-[20px] font-extrabold text-slate-800 line-clamp-2">{idea.title}</h3>
+                  <h3 className="font-heading mt-3 text-[18px] font-extrabold text-slate-900 line-clamp-2">{idea.title}</h3>
                   <p className="mt-1 text-[12px] font-medium text-slate-500 truncate">By {idea.founder}</p>
-                  <p className="mt-3 min-h-0 flex-1 overflow-y-auto text-[13px] leading-5 text-slate-600" style={{scrollbarWidth:'thin'}}>{idea.desc}</p>
-                  </article>
-                ))}
+                  <div className="mt-2">
+                    <LookingForPill idea={idea} />
+                  </div>
+                  <p className="mt-3 min-h-0 flex-1 overflow-y-auto text-[13px] leading-5 text-slate-600" style={{ scrollbarWidth: "thin" }}>{idea.desc}</p>
+                  {isOwnIdea(idea) ? (
+                    <button
+                      onClick={() => setActiveTab("dashboard")}
+                      className="mt-4 w-full h-10 rounded-full border border-slate-200 bg-slate-50 text-slate-700 text-xs font-bold hover:bg-slate-100 transition shrink-0"
+                    >
+                      Your idea • Manage →
+                    </button>
+                  ) : canConnect(currentUser.role, "idea") ? (
+                    <button
+                      onClick={() => { setTargetConnectItem(idea); setConnectModalOpen(true); }}
+                      className="mt-4 w-full h-10 rounded-full bg-slate-900 text-white text-xs font-bold hover:bg-indigo-600 transition shrink-0"
+                    >
+                      Connect & collaborate →
+                    </button>
+                  ) : (
+                    <button
+                      onClick={() => setActiveTab("dashboard")}
+                      className="mt-4 w-full h-10 rounded-full border border-slate-200 bg-slate-50 text-slate-700 text-xs font-bold hover:bg-slate-100 transition shrink-0"
+                    >
+                      View in Dashboard →
+                    </button>
+                  )}
+                </article>
+              ))}
+            </div>
+            {signedInFilteredIdeas.length === 0 && (
+              <div className="mt-4 rounded-2xl border border-dashed border-slate-200 bg-white py-8 text-center text-sm text-slate-500">
+                {ideas.length === 0 ? "No ideas posted yet — share the first one!" : "No ideas match that filter."}
               </div>
-            </section>
-          {/* Signed-in teaser — same resources with direct request */}
+            )}
+          </section>
+
+          {/* 3. LIVE BACKER OFFERS */}
           <section className="mt-10 min-w-0 max-w-full">
             <div className="mb-4 flex items-end justify-between gap-4">
               <div>
                 <div className="text-[11px] font-bold uppercase tracking-widest text-violet-600">BACKER RESOURCES</div>
-                <h2 className="font-heading mt-1 text-[22px] sm:text-[25px] font-extrabold text-slate-800">Live backer offers — request in one tap</h2>
+                <h2 className="font-heading mt-1 text-[22px] sm:text-[25px] font-extrabold text-slate-900">Live backer offers — request in one tap</h2>
               </div>
               <button onClick={() => setActiveTab("dashboard")} className="text-xs font-bold text-slate-700 hover:underline shrink-0">Open dashboard →</button>
             </div>
             {backerResources.length === 0 ? (
-              <div className="rounded-2xl border border-dashed border-violet-200 bg-white/70 py-8 text-center text-sm text-slate-500">No backer resources live yet — backers can post from their dashboard.</div>
+              <div className="rounded-2xl border border-dashed border-violet-200 bg-white py-8 text-center text-sm text-slate-500">No backer resources live yet — backers can post from their dashboard.</div>
             ) : (
-              <div className="flex gap-5 min-w-0 w-full max-w-full overflow-x-auto snap-x snap-mandatory pb-2 scroll-smooth" style={{scrollbarWidth:'none'}}>
-                {backerResources.slice(0,6).map((res) => (
-                  <article key={res.id} className="snap-start flex-none w-[85%] sm:w-[calc(50%-10px)] lg:w-[calc(33.333%-14px)] rounded-[24px] border border-violet-200 bg-white/85 p-6 shadow-sm flex flex-col h-[240px] overflow-hidden">
+              <div className="flex gap-5 min-w-0 w-full max-w-full overflow-x-auto snap-x snap-mandatory pb-2 scroll-smooth" style={{ scrollbarWidth: "none" }}>
+                {backerResources.slice(0, 6).map((res) => (
+                  <article key={res.id} className="snap-start flex-none w-[85%] sm:w-[calc(50%-10px)] lg:w-[calc(33.333%-14px)] rounded-[24px] border border-violet-200 bg-white p-6 shadow-sm flex flex-col h-[240px] overflow-hidden">
                     <div className="flex items-center gap-1.5 flex-wrap">
                       <span className="rounded-full bg-violet-100 border border-violet-200 px-2.5 py-0.5 text-[10px] font-bold text-violet-700">{backerTypeMeta(res.backerType).icon} {backerTypeMeta(res.backerType).label}</span>
                       {res.capacity ? <span className="rounded-full bg-amber-50 border border-amber-200 px-2.5 py-0.5 text-[10px] font-bold text-amber-700">{res.capacity}</span> : null}
@@ -1741,8 +2189,74 @@ export default function App() {
               </div>
             )}
           </section>
-         </main>
-      )}
+
+          {/* 4. COMMUNITY PULSE & UPCOMING EVENTS (BELOW!) */}
+          <section className="mt-10 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+            <button onClick={() => setActiveTab(showIdeasTab ? "ideas" : "dashboard")} className="text-left rounded-2xl border border-slate-200 bg-white p-5 shadow-sm hover:border-indigo-300 transition">
+              <div className="text-[11px] font-bold uppercase tracking-wide text-slate-500">Live ideas</div>
+              <div className="font-heading mt-2 text-3xl font-extrabold text-slate-900">{ideas.length}</div>
+              <p className="mt-1 text-[11px] text-slate-500">Projects looking for momentum</p>
+            </button>
+            <button onClick={() => setActiveTab(showTalentTab ? "talent" : "dashboard")} className="text-left rounded-2xl border border-slate-200 bg-white p-5 shadow-sm hover:border-indigo-300 transition">
+              <div className="text-[11px] font-bold uppercase tracking-wide text-slate-500">Active people</div>
+              <div className="font-heading mt-2 text-3xl font-extrabold text-slate-900">{activePeopleCount}</div>
+              <p className="mt-1 text-[11px] text-slate-500">Unique people across the community</p>
+            </button>
+            <button onClick={() => setActiveTab("dashboard")} className="text-left rounded-2xl border border-slate-200 bg-white p-5 shadow-sm hover:border-indigo-300 transition">
+              <div className="text-[11px] font-bold uppercase tracking-wide text-slate-500">Connections made</div>
+              <div className="font-heading mt-2 text-3xl font-extrabold text-slate-900">{requests.filter((request) => request.status === "accepted").length}</div>
+              <p className="mt-1 text-[11px] text-slate-500">Conversations unlocked</p>
+            </button>
+            <button onClick={() => setActiveTab("events")} className="text-left rounded-2xl border border-slate-200 bg-white p-5 shadow-sm hover:border-indigo-300 transition">
+              <div className="text-[11px] font-bold uppercase tracking-wide text-slate-500">Upcoming events</div>
+              <div className="font-heading mt-2 text-3xl font-extrabold text-slate-900">{events.length}</div>
+              <p className="mt-1 text-[11px] text-slate-500">Ways to meet the community</p>
+            </button>
+          </section>
+
+          <section className="mt-8">
+            <div className="mb-4 flex items-end justify-between gap-4">
+              <div>
+                <div className="text-[11px] font-bold uppercase tracking-widest text-slate-500">MARK YOUR CALENDAR</div>
+                <h2 className="font-heading mt-1 text-[22px] sm:text-[25px] font-extrabold text-slate-900">Upcoming community events</h2>
+              </div>
+              <button onClick={() => setActiveTab("events")} className="text-xs font-bold text-indigo-600 hover:underline shrink-0">View all events →</button>
+            </div>
+            {events.length === 0 ? (
+              <div className="rounded-2xl border border-dashed border-slate-200 bg-white py-8 text-center text-sm text-slate-500">No upcoming events scheduled right now.</div>
+            ) : (
+              <div className="grid gap-5 md:grid-cols-2">
+                {events.map((event) => (
+                  <article key={event.id} className="rounded-[24px] border border-slate-200 bg-white p-6 shadow-sm">
+                    <div className="flex items-center justify-between gap-3">
+                      <span className="rounded-full bg-slate-100 px-3 py-1 text-[10px] font-bold uppercase tracking-wide text-slate-600">{event.category}</span>
+                      <span className="text-xs font-semibold text-slate-500">{event.date}</span>
+                    </div>
+                    <h3 className="font-heading mt-4 text-[19px] font-extrabold text-slate-900">{event.title}</h3>
+                    <p className="mt-2 text-[13px] text-slate-600">{event.time} · {event.venue}</p>
+                    <p className="mt-3 text-[13px] leading-5 text-slate-600">{event.desc}</p>
+                  </article>
+                ))}
+              </div>
+            )}
+          </section>
+
+          {/* 5. SUPPORT & CONTACT STRIP AT THE BOTTOM */}
+          <section className="mt-10 rounded-[24px] border border-slate-200 bg-white p-5 sm:p-6 shadow-sm flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+            <div>
+              <div className="text-[11px] font-bold uppercase tracking-widest text-emerald-600">NEED HELP OR FEEDBACK?</div>
+              <div className="font-heading text-[18px] font-extrabold text-slate-900 mt-0.5">Reach out to Daksh Dua</div>
+              <p className="text-xs text-slate-500 mt-0.5">Questions about your idea, team matching, or backer approval?</p>
+            </div>
+            <div className="flex flex-wrap items-center gap-2.5 shrink-0">
+              <a href="mailto:startifyuoh@gmail.com" className="h-9 px-4 rounded-full border border-slate-200 bg-slate-50 text-slate-800 text-xs font-bold grid place-items-center hover:bg-slate-100 transition">Email</a>
+              <a href="https://instagram.com/dakshdua03" target="_blank" rel="noreferrer" className="h-9 px-4 rounded-full border border-slate-200 bg-slate-50 text-slate-800 text-xs font-bold grid place-items-center hover:bg-slate-100 transition">@dakshdua03</a>
+              <a href={MAIN_WHATSAPP_LINK} target="_blank" rel="noreferrer" className="h-9 px-4 rounded-full bg-emerald-500 text-white text-xs font-bold grid place-items-center hover:bg-emerald-600 transition">WhatsApp Group</a>
+            </div>
+          </section>
+        </main>
+        );
+      })()}
 
       {/* ==========================================================================
          TAB 1: IDEAS BOARD (FRONT PAGE SHOWCASE)
@@ -1903,7 +2417,7 @@ export default function App() {
             <button
               onClick={() => {
                 setAuthMode("register");
-                setSelectedRegisterRole("talent");
+                setSelectedRegisterRoles(["talent"]);
                 setAuthModalOpen(true);
               }}
               className="h-10 px-5 rounded-full border border-slate-900 bg-slate-900 text-white font-semibold text-[13px] hover:bg-black transition shadow"
@@ -2001,7 +2515,7 @@ export default function App() {
             <button
               onClick={() => {
                 setAuthMode("register");
-                setSelectedRegisterRole("backer");
+                setSelectedRegisterRoles(["backer"]);
                 setAuthModalOpen(true);
               }}
               className="h-10 px-5 rounded-full border border-slate-900 bg-slate-900 text-white font-semibold text-[13px] hover:bg-black transition shadow"
@@ -2245,79 +2759,8 @@ export default function App() {
         </section>
       )}
 
-      {/* A separate inbox keeps interest-based conversations away from discovery. */}
-      {activeTab === "chats" && currentUser && (
-        <section className="mx-auto max-w-[1200px] px-4 sm:px-5 py-8 md:px-8">
-          <div className="rounded-[28px] border border-slate-200 bg-white p-6 shadow-sm">
-            <div className="mb-7 flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between"><div><div className="inline-flex items-center gap-1.5 rounded-full bg-indigo-50 border border-indigo-200 px-2.5 py-1 text-[10px] font-bold uppercase tracking-widest text-indigo-700">University of Hyderabad • Private</div><h1 className="font-heading mt-3 text-[24px] sm:text-[32px] font-extrabold text-slate-800 text-balance">Your interest-based chats</h1><p className="mt-1 text-[13.5px] text-slate-500">Only accepted connections can start a conversation. Keep it respectful — this is a Startify community.</p></div><div className="rounded-2xl bg-amber-50 border border-amber-200 p-3 text-[11px] leading-4 text-amber-800 max-w-[320px]"><strong>Community note:</strong> Misuse of chat can lead to removal. Conversations are interest-based and require acceptance.</div></div>
-            {currentUser?.role === "backer" && currentUser?._backerPending && (
-              <div className="mb-4 rounded-full border border-amber-200 bg-amber-50 px-4 py-2.5 text-center text-[12px] font-semibold text-amber-800">Backer approval pending — chat unlocks after admin approval.</div>
-            )}
-            <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-              {myAcceptedConnections.map((req) => {
-                const partnerName = req.senderId === currentUser.id ? req.receiverName : req.senderName;
-                const partnerRole = req.senderId === currentUser.id ? req.receiverRole || "partner" : req.senderRole;
-                const latest = messages.filter((m) => m.requestId === req.id).slice(-1)[0];
-                return <button key={req.id} onClick={() => { setActiveChatRequest(req); setChatModalOpen(true); }} className="rounded-[22px] border border-slate-200 bg-white/80 p-5 text-left shadow-sm transition hover:border-slate-300"><div className="flex items-center gap-3"><div className="grid h-11 w-11 place-items-center rounded-full bg-slate-100 font-heading font-bold text-slate-700">{partnerName[0]}</div><div><div className="font-heading font-bold text-slate-800">{partnerName}</div><div className="text-[11px] uppercase tracking-wide text-slate-500">{partnerRole}</div></div></div><div className="mt-5 border-t border-slate-200 pt-4"><div className="text-[11px] font-semibold text-slate-500">Shared interest: {req.targetTitle}</div><p className="mt-2 line-clamp-2 text-[13px] text-slate-600">{latest ? latest.text : "Your connection is ready — send the first message."}</p></div></button>;
-              })}
-            </div>
-            {myAcceptedConnections.length === 0 && <div className="rounded-[22px] border border-dashed border-slate-200 bg-slate-50/80 py-10 text-center text-sm text-slate-500">No chats yet. Connect with a person whose work interests you, then chat once they accept.</div>}
-            {/* Connection requests — received */}
-            <div className="mt-8 rounded-[28px] border border-slate-200 bg-white p-6 shadow-sm">
-              <h3 className="font-heading font-extrabold text-lg text-slate-800">Requests received ({myIncomingRequests.length})</h3>
-              <p className="text-xs text-slate-500 mt-1">People who sent you a connection request</p>
-              <div className="mt-4 space-y-3">
-                {myIncomingRequests.map((req) => (
-                  <div key={req.id} className="p-4 rounded-xl bg-slate-50 border border-slate-200 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-                    <div>
-                      <div className="font-semibold text-slate-800 text-sm">{req.senderName} <span className="text-xs font-normal text-slate-500">({req.senderRole})</span> → {req.targetTitle}</div>
-                      <div className="text-xs text-slate-500 mt-1">{req.message}</div>
-                    </div>
-                    <div className="flex gap-2 shrink-0">
-                      {req.status === "pending" ? (
-                        <>
-                          <button onClick={()=> handleAcceptRequest(req.id)} className="h-8 px-4 rounded-full bg-slate-900 text-white text-xs font-bold">Accept</button>
-                          <button onClick={()=> handleRejectRequest(req.id)} className="h-8 px-4 rounded-full bg-white border border-slate-200 text-xs font-bold">Decline</button>
-                        </>
-                      ) : req.status === "accepted" ? (
-                        <button onClick={() => { setActiveChatRequest(req); setChatModalOpen(true); }} className="h-8 px-4 rounded-full bg-emerald-500 text-white text-xs font-bold">Chat →</button>
-                      ) : (
-                        <span className="text-xs px-3 py-1 rounded-full bg-white border border-slate-200">{req.status}</span>
-                      )}
-                    </div>
-                  </div>
-                ))}
-                {myIncomingRequests.length===0 && <div className="text-center py-6 text-xs text-slate-500">No received requests</div>}
-              </div>
-            </div>
-            {/* Connection requests — sent */}
-            <div className="mt-6 rounded-[28px] border border-slate-200 bg-white p-6 shadow-sm">
-              <h3 className="font-heading font-extrabold text-lg text-slate-800">Requests sent ({myOutgoingRequests.length})</h3>
-              <p className="text-xs text-slate-500 mt-1">Requests you sent — chat unlocks after acceptance</p>
-              <div className="mt-4 space-y-3">
-                {myOutgoingRequests.map((req) => (
-                  <div key={req.id} className="p-3.5 rounded-xl bg-slate-50 border border-slate-200 flex items-center justify-between text-xs">
-                    <div>
-                      <div className="font-semibold text-slate-800">To: {req.receiverName}</div>
-                      <div className="text-[11px] text-slate-500">Re: {req.targetTitle}</div>
-                    </div>
-                    <div className="flex items-center gap-2">
-                      <span className="text-[11px] px-2 py-1 rounded-full bg-white border">{req.status}</span>
-                      {req.status === "accepted" && (
-                        <button onClick={() => { setActiveChatRequest(req); setChatModalOpen(true); }} className="h-8 px-3 rounded-full bg-slate-900 text-white text-[11px] font-bold">Chat</button>
-                      )}
-                    </div>
-                  </div>
-                ))}
-                {myOutgoingRequests.length===0 && <div className="text-center py-6 text-xs text-slate-500">No sent requests yet</div>}
-              </div>
-            </div>
-          </div>
-        </section>
-      )}
-
       {/* ==========================================================================
-         TAB 5: ROLE-SPECIFIC DASHBOARD (FOR LOGGED IN USER)
+         TAB 5: UNIFIED DASHBOARD & CHATS (FOR LOGGED IN USER)
          ========================================================================== */}
       {activeTab === "dashboard" && currentUser && (
         <section className="dashboard-surface mx-auto max-w-[1200px] px-4 sm:px-5 md:px-8 py-8 md:py-10">
@@ -2346,8 +2789,8 @@ export default function App() {
                     {/* Profile moved to Profile tab — dashboard now focuses on activity */}
           <div className="mb-6 flex flex-col sm:flex-row sm:items-start sm:justify-between gap-3">
             <div>
-              <h2 className="font-heading text-xl font-extrabold text-slate-800">Dashboard</h2>
-              <p className="text-sm text-slate-500">Track your ideas, incoming requests and chats. Edit your profile in the <button onClick={()=>setActiveTab("profile")} className="underline font-semibold text-slate-700 hover:text-slate-900">Profile</button> tab.</p>
+              <h2 className="font-heading text-2xl font-extrabold text-slate-900">Dashboard & Chats</h2>
+              <p className="text-sm text-slate-500">Manage your ideas, connection requests, and direct chats in one place. Edit your profile in the <button onClick={()=>setActiveTab("profile")} className="underline font-semibold text-slate-700 hover:text-slate-900">Profile</button> tab.</p>
             </div>
             {currentUser?.role === "founder" && (
               <button onClick={()=> setIdeaModalOpen(true)} className="h-10 px-5 rounded-full bg-slate-900 text-white font-bold text-sm hover:bg-black shadow shrink-0">+ Post Idea</button>
@@ -2659,36 +3102,44 @@ export default function App() {
                   </span>
                 </div>
 
+                {currentUser?.role === "backer" && currentUser?._backerPending && (
+                  <div className="mt-4 rounded-full border border-amber-200 bg-amber-50 px-4 py-2 text-center text-[12px] font-semibold text-amber-800">Backer approval pending — chat unlocks after admin approval.</div>
+                )}
+
                 <div className="mt-4 space-y-3">
                   {myAcceptedConnections.map((req) => {
                     const partnerName =
                       req.senderId === currentUser.id ? req.receiverName : req.senderName;
                     const partnerRole =
                       req.senderId === currentUser.id ? req.receiverRole || "partner" : req.senderRole;
+                    const latest = messages.filter((m) => m.requestId === req.id).slice(-1)[0];
 
                       return (
                         <div
                           key={req.id}
-                          className="p-4 rounded-2xl bg-slate-50 border border-slate-200 flex flex-col sm:flex-row sm:items-center justify-between gap-3 transition cursor-pointer"
+                          className="p-4 rounded-2xl bg-slate-50 border border-slate-200 hover:border-indigo-300 flex flex-col sm:flex-row sm:items-center justify-between gap-3 transition cursor-pointer"
                           onClick={() => {
                             setActiveChatRequest(req);
                             setChatModalOpen(true);
                           }}
                         >
                           <div className="flex items-center gap-3 min-w-0">
-                            <div className="h-10 w-10 rounded-full bg-slate-100 border border-slate-200 grid place-items-center text-[18px] shrink-0">👤</div>
+                            <div className="h-10 w-10 rounded-full bg-indigo-50 border border-indigo-200 grid place-items-center font-heading font-bold text-indigo-700 shrink-0">{partnerName[0]}</div>
                             <div className="min-w-0">
-                              <div className="font-bold text-slate-800 text-[14px] truncate">
+                              <div className="font-bold text-slate-900 text-[14px] truncate">
                                 {partnerName}
                               </div>
                               <div className="text-[11px] text-slate-500 truncate">
                                 Topic: {req.targetTitle} • {partnerRole.toUpperCase()}
                               </div>
+                              <div className="text-[12px] text-slate-600 truncate mt-0.5">
+                                {latest ? latest.text : "Connection ready — send the first message."}
+                              </div>
                             </div>
                           </div>
 
-                          <button className="w-full sm:w-auto h-9 px-4 rounded-full bg-slate-100 text-slate-700 font-bold text-[11.5px] border border-slate-200 hover:bg-slate-200 shrink-0">
-                            Open Chat
+                          <button className="w-full sm:w-auto h-9 px-4 rounded-full bg-slate-900 text-white font-bold text-[11.5px] hover:bg-indigo-600 transition shrink-0">
+                            Open Chat →
                           </button>
                         </div>
                       );
@@ -3186,8 +3637,8 @@ export default function App() {
                 Events
               </button>
             )}
-            <button onClick={() => setActiveTab("chats")} className={`min-w-0 flex-1 sm:flex-none truncate text-center px-0.5 min-[380px]:px-1 sm:px-4 py-2 rounded-full text-[9px] min-[380px]:text-[11px] sm:text-[12px] font-bold whitespace-nowrap transition relative ${activeTab === "chats" ? "bg-slate-900 text-white shadow" : "text-slate-600 hover:text-slate-900 hover:bg-slate-100"}`}>
-              Chats
+            <button onClick={() => setActiveTab("dashboard")} className={`min-w-0 flex-1 sm:flex-none truncate text-center px-0.5 min-[380px]:px-1 sm:px-4 py-2 rounded-full text-[9px] min-[380px]:text-[11px] sm:text-[12px] font-bold whitespace-nowrap transition relative ${activeTab === "dashboard" ? "bg-slate-900 text-white shadow" : "text-slate-600 hover:text-slate-900 hover:bg-slate-100"}`}>
+              Dashboard
               {myIncomingRequests.filter(r=>r.status==="pending").length>0 && <span className="absolute top-1 right-2 h-2 w-2 rounded-full bg-emerald-500 border border-white"></span>}
             </button>
             <button onClick={() => setActiveTab("profile")} className={`min-w-0 flex-1 sm:flex-none truncate text-center px-0.5 min-[380px]:px-1 sm:px-4 py-2 rounded-full text-[9px] min-[380px]:text-[11px] sm:text-[12px] font-bold whitespace-nowrap transition ${activeTab === "profile" ? "bg-slate-900 text-white shadow" : "text-slate-600 hover:text-slate-900 hover:bg-slate-100"}`}>
@@ -3201,7 +3652,7 @@ export default function App() {
 
       {/* FOOTER — only for logged-out visitors, hidden when logged in */}
       {!currentUser && (
-      <footer className="border-t border-slate-200 bg-white text-slate-500 py-10">
+      <footer className="border-t border-slate-200 bg-white text-slate-500 py-10 mt-8">
         <div className="mx-auto max-w-[1200px] px-5 md:px-8 flex flex-col md:flex-row items-center justify-between gap-6 text-[12.5px]">
           <div className="flex items-center gap-3.5">
             <img
@@ -3210,15 +3661,21 @@ export default function App() {
               className="h-9 w-auto object-contain"
             />
             <div>
-              <span className="text-zinc-500">© {new Date().getFullYear()}</span>
+              <span className="text-zinc-500">© {new Date().getFullYear()} Startify</span>
             </div>
           </div>
 
-          <div className="text-zinc-500 text-center md:text-left text-[11.5px]">
-            Started at <strong className="text-slate-600">University of Hyderabad</strong> — open to all builders • <a href="/admin.html" className="underline decoration-slate-300 underline-offset-2 hover:text-slate-700">Admin</a>
+          <div className="text-zinc-500 text-center text-[12px] flex flex-wrap items-center justify-center gap-x-4 gap-y-1">
+            <span>Started at <strong className="text-slate-700">University of Hyderabad</strong></span>
+            <a href="#shining-ideas" className="hover:text-slate-900 font-medium">Ideas</a>
+            <a href="#how-it-works" className="hover:text-slate-900 font-medium">How it works</a>
+            <a href="#contact-me" className="hover:text-slate-900 font-medium">Contact me</a>
+            <a href="mailto:startifyuoh@gmail.com" className="hover:text-slate-900 font-medium">startifyuoh@gmail.com</a>
+            <a href="https://instagram.com/dakshdua03" target="_blank" rel="noreferrer" className="hover:text-slate-900 font-medium">@dakshdua03</a>
+            <a href="/admin.html" className="underline decoration-slate-300 underline-offset-2 hover:text-slate-700">Admin</a>
           </div>
 
-          <div className="flex items-center gap-6">
+          <div className="flex items-center gap-3">
             <a
               href={MAIN_WHATSAPP_LINK}
               target="_blank"
