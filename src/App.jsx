@@ -1530,31 +1530,8 @@ export default function App() {
                 <button onClick={() => { setCurrentUser(null); setActiveTab("home"); showToast("Signed out"); }} className="h-9 px-3 rounded-full bg-slate-900 text-white text-xs font-bold whitespace-nowrap">Sign out</button>
               </>
             )}
-            <button
-              onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
-              className="h-9 w-9 rounded-full border border-slate-200 bg-white grid place-items-center text-slate-700 shadow-sm shrink-0"
-              aria-label="Toggle menu"
-            >
-              {mobileMenuOpen ? "✕" : "☰"}
-            </button>
           </div>
         </div>
-
-        {/* Mobile Dropdown Menu */}
-        {mobileMenuOpen && (
-          <div className="md:hidden border-t border-slate-200 bg-white/90 backdrop-blur p-5 space-y-1 text-[14px]">
-            <button onClick={() => { setActiveTab("home"); setMobileMenuOpen(false); }} className={`block w-full text-left py-2 px-3 rounded-xl ${activeTab === "home" ? "bg-slate-900 text-white" : "text-slate-700"}`}>Home</button>
-            {currentUser && <>
-              {showIdeasTab && <button onClick={() => { setActiveTab("ideas"); setMobileMenuOpen(false); }} className={`block w-full text-left py-2 px-3 rounded-xl ${activeTab === "ideas" ? "bg-slate-900 text-white" : "text-slate-700"}`}>Ideas Board</button>}
-              {showTalentTab && <button onClick={() => { setActiveTab("talent"); setMobileMenuOpen(false); }} className={`block w-full text-left py-2 px-3 rounded-xl ${activeTab === "talent" ? "bg-slate-900 text-white" : "text-slate-700"}`}>Skilled Talent</button>}
-              {showBackersTab && <button onClick={() => { setActiveTab("backers"); setMobileMenuOpen(false); }} className={`block w-full text-left py-2 px-3 rounded-xl ${activeTab === "backers" ? "bg-slate-900 text-white" : "text-slate-700"}`}>Backers Hub</button>}
-              {showEventsTab && <button onClick={() => { setActiveTab("events"); setMobileMenuOpen(false); }} className={`block w-full text-left py-2 px-3 rounded-xl ${activeTab === "events" ? "bg-slate-900 text-white" : "text-slate-700"}`}>Events & Meetups</button>}
-              <button onClick={() => { setActiveTab("dashboard"); setMobileMenuOpen(false); }} className={`block w-full text-left py-2 px-3 rounded-xl font-bold ${activeTab === "dashboard" ? "bg-slate-900 text-white" : "text-slate-700"}`}>Chats {myIncomingRequests.filter(r=>r.status==="pending").length>0 && <span className="ml-1 inline-block h-2 w-2 rounded-full bg-emerald-500"></span>} {myAcceptedConnections.length>0 && <span className="ml-1 text-xs bg-slate-200 text-slate-800 px-1.5 py-0.5 rounded-full">{myAcceptedConnections.length}</span>}</button>
-              <button onClick={() => { setActiveTab("profile"); setMobileMenuOpen(false); }} className={`block w-full text-left py-2 px-3 rounded-xl ${activeTab === "profile" ? "bg-slate-900 text-white" : "text-slate-700"}`}>Profile</button>
-            </>}
-            {!currentUser && <button onClick={() => { setAuthMode("register"); setAuthModalOpen(true); setMobileMenuOpen(false); }} className="block w-full text-left py-2 px-3 rounded-xl bg-slate-900 text-white font-bold">Join Startify →</button>}
-          </div>
-        )}
       </nav>
 
       {/* PUBLIC ENTRY: Bold auth CTAs + Shining Ideas first + How to use below + Contact Me at bottom */}
