@@ -1630,12 +1630,6 @@ export default function App() {
                   >
                     Log in
                   </button>
-                  <button
-                    onClick={() => { setSelectedRegisterRoles(["founder"]); setAuthMode("register"); setAuthModalOpen(true); }}
-                    className="h-12 px-5 rounded-full border border-slate-200 bg-slate-50 text-slate-800 font-semibold text-[14px] hover:bg-slate-100 transition whitespace-nowrap"
-                  >
-                    + Post an idea
-                  </button>
                 </div>
               </div>
 
